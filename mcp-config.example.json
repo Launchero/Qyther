@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-config",
+  "_comment": "MCP Server Configuration - See https://modelcontextprotocol.io for more info",
+  "_usage": "Place this file in your project root. Servers will be loaded automatically.",
+  
+  "mcpServers": {
+    "_filesystem_comment": "File System MCP - Allows AI to read/write/search files",
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\kanis"
+      ],
+      "disabled": false,
+      "env": {}
+    },
+    
+    "_sequential_thinking_comment": "Sequential Thinking MCP - Helps AI break down complex problems",
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "disabled": false,
+      "env": {}
+    },
+    
+    "_notion_comment": "Notion MCP - Allows AI to access Notion databases and pages (requires API key)",
+    "_notion_setup": "Get your API key from https://www.notion.so/my-integrations",
+    "notion": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@makenotion/notion-mcp-server"
+      ],
+      "disabled": true,
+      "env": {
+        "NOTION_API_KEY": "your_notion_api_key_here"
+      }
+    },
+    
+    "_github_comment": "GitHub MCP - Allows AI to access GitHub repos, issues, PRs",
+    "_github_setup": "Get your token from https://github.com/settings/tokens",
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "disabled": true,
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
+      }
+    },
+    
+    "_example_http_comment": "HTTP Transport Example - For remote MCP servers",
+    "_example_http_server": {
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your_token_here"
+      }
+    }
+  }
+}

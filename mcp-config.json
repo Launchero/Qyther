@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\kanis"],
+      "disabled": false,
+      "env": {}
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "disabled": false,
+      "env": {}
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest","--caps=vision"],
+      "disabled": false,
+      "env": {
+        "PLAYWRIGHT_MCP_HEADLESS": "true",
+        "PLAYWRIGHT_MCP_BROWSER": "chromium",
+        "PLAYWRIGHT_MCP_TIMEOUT": "60000",
+        "PLAYWRIGHT_MCP_NAVIGATION_TIMEOUT": "60000"
+      }
+    }
+  }
+}

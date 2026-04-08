@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Palette - Ask Mode Compact (800x100)</title>
+    <style>
+        :root {
+            /* Kraken Design System Colors */
+            --white: #ffffff;
+            --black: #101114;
+            --purple: #7132f5;
+            --purple-dark: #5741d8;
+            --purple-subtle: rgba(133, 91, 251, 0.16);
+            --gray: #686b82;
+            --silver: #9497a9;
+            --border: #dedee5;
+            --green: #149e61;
+            --green-subtle: rgba(20, 158, 97, 0.16);
+            
+            /* Shadows */
+            --shadow-subtle: rgba(0, 0, 0, 0.03) 0px 4px 24px;
+            --shadow-micro: rgba(16, 24, 40, 0.04) 0px 1px 4px;
+            
+            /* Typography */
+            --font-ui: 'IBM Plex Sans', 'Kraken-Product', Helvetica, Arial, sans-serif;
+            --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: var(--font-ui);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Compact Command Palette Container - 800x100 for Ask Mode */
+        .command-palette {
+            width: 800px;
+            height: 100px;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-subtle);
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            gap: 12px;
+        }
+
+        /* Mode Dropdown Container */
+        .mode-dropdown {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        /* Mode Toggle Button - Green for Ask mode */
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--green-subtle);
+            border: 1px solid var(--green);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            height: 44px;
+        }
+
+        .mode-toggle:hover {
+            background: rgba(20, 158, 97, 0.22);
+        }
+
+        .mode-toggle:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 1px var(--green);
+        }
+
+        .mode-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--green);
+            flex-shrink: 0;
+        }
+
+        .mode-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--green);
+            white-space: nowrap;
+        }
+
+        .dropdown-arrow {
+            width: 14px;
+            height: 14px;
+            color: var(--green);
+            flex-shrink: 0;
+        }
+
+        /* Dropdown Menu */
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: 220px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-subtle);
+            padding: 8px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .mode-dropdown.open .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+
+        .dropdown-item:hover {
+            background: var(--purple-subtle);
+        }
+
+        .dropdown-item.active {
+            background: var(--purple-subtle);
+        }
+
+        .dropdown-item-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .dropdown-item-icon.files {
+            color: var(--purple);
+        }
+
+        .dropdown-item-icon.ask {
+            color: var(--green);
+        }
+
+        .dropdown-item-icon.code {
+            color: #d8571d;
+        }
+
+        .dropdown-item-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--black);
+            flex: 1;
+        }
+
+        .dropdown-item-shortcut {
+            font-size: 11px;
+            color: var(--silver);
+            font-family: monospace;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 6px 0;
+        }
+
+        /* Search Input Container */
+        .search-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            height: 44px;
+            background: #f5f5f7;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0 14px;
+            transition: all 0.15s ease;
+        }
+
+        .search-container:focus-within {
+            border-color: var(--green);
+            box-shadow: 0 0 0 2px var(--green-subtle);
+        }
+
+        .search-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--silver);
+            flex-shrink: 0;
+            margin-right: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            height: 100%;
+            border: none;
+            outline: none;
+            font-family: var(--font-ui);
+            font-size: 15px;
+            color: var(--black);
+            background: transparent;
+        }
+
+        .search-input::placeholder {
+            color: var(--silver);
+        }
+
+        /* Model Selector */
+        .model-selector {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .model-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            height: 44px;
+        }
+
+        .model-toggle:hover {
+            background: rgba(148, 151, 169, 0.08);
+            border-color: var(--gray);
+        }
+
+        .model-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--gray);
+        }
+
+        .model-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray);
+            white-space: nowrap;
+        }
+
+        .model-dropdown-icon {
+            width: 12px;
+            height: 12px;
+            color: var(--silver);
+        }
+
+        /* Model Dropdown Menu */
+        .model-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 200px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-subtle);
+            padding: 8px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .model-selector.open .model-dropdown-menu {
+            display: block;
+        }
+
+        .model-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+
+        .model-dropdown-item:hover {
+            background: rgba(148, 151, 169, 0.08);
+        }
+
+        .model-dropdown-item.active {
+            background: var(--green-subtle);
+        }
+
+        .model-dropdown-item-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--black);
+            flex: 1;
+        }
+
+        .model-dropdown-item-check {
+            width: 14px;
+            height: 14px;
+            color: var(--green);
+            opacity: 0;
+        }
+
+        .model-dropdown-item.active .model-dropdown-item-check {
+            opacity: 1;
+        }
+
+        /* Chat History Button */
+        .history-toggle {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .history-toggle:hover {
+            border-color: var(--green);
+            background: var(--green-subtle);
+        }
+
+        .history-toggle svg {
+            width: 18px;
+            height: 18px;
+            color: var(--gray);
+            transition: color 0.15s ease;
+        }
+
+        .history-toggle:hover svg {
+            color: var(--green);
+        }
+
+        /* History Dropdown */
+        .history-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 260px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-subtle);
+            padding: 8px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .history-toggle:hover .history-dropdown {
+            display: block;
+        }
+
+        .history-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px;
+        }
+
+        .history-dropdown-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--silver);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .new-chat-link {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--green);
+            cursor: pointer;
+        }
+
+        .new-chat-link:hover {
+            text-decoration: underline;
+        }
+
+        .history-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        .history-dropdown-item:hover {
+            background: rgba(148, 151, 169, 0.08);
+        }
+
+        .history-dropdown-item.active {
+            background: var(--green-subtle);
+        }
+
+        .history-dropdown-item.active .history-item-title {
+            color: var(--green);
+        }
+
+        .history-item-icon {
+            width: 14px;
+            height: 14px;
+            color: var(--silver);
+            flex-shrink: 0;
+        }
+
+        .history-dropdown-item.active .history-item-icon {
+            color: var(--green);
+        }
+
+        .history-item-title {
+            flex: 1;
+            font-size: 13px;
+            color: var(--gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Divider */
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+
+        /* Keyboard Shortcut */
+        .keyboard-shortcut {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .shortcut-key {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 10px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray);
+            box-shadow: var(--shadow-micro);
+        }
+
+        /* Presentation wrapper */
+        .presentation {
+            text-align: center;
+        }
+
+        .presentation-label {
+            color: var(--silver);
+            font-size: 12px;
+            margin-bottom: 24px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <div class="presentation-label">Compact Mode — Ask — 800×100px</div>
+        
+        <div class="command-palette">
+            <!-- Mode Dropdown -->
+            <div class="mode-dropdown" id="modeDropdown">
+                <button class="mode-toggle" id="modeToggle">
+                    <svg class="mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 10C8 10 9 8 12 8C15 8 16 10 16 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 12V12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <span class="mode-label" id="modeLabel">Ask</span>
+                    <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <!-- Mode Dropdown Menu -->
+                <div class="dropdown-menu">
+                    <div class="dropdown-item" data-mode="files">
+                        <svg class="dropdown-item-icon files" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 7C3 5.89543 3.89543 5 5 5H9L11 7H19C20.1046 7 21 7.89543 21 9V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="dropdown-item-label">Files</span>
+                        <span class="dropdown-item-shortcut">⌘F</span>
+                    </div>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <div class="dropdown-item active" data-mode="ask">
+                        <svg class="dropdown-item-icon ask" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 10C8 10 9 8 12 8C15 8 16 10 16 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 12V12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="dropdown-item-label">Ask</span>
+                        <span class="dropdown-item-shortcut">⌘A</span>
+                    </div>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <div class="dropdown-item" data-mode="code">
+                        <svg class="dropdown-item-icon code" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M16 18L22 12L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M8 6L2 12L8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="dropdown-item-label">Code</span>
+                        <span class="dropdown-item-shortcut">⌘C</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Input -->
+            <div class="search-container">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 10C8 10 9 8 12 8C15 8 16 10 16 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 12V12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    placeholder="Ask anything..."
+                    autofocus
+                />
+            </div>
+
+            <!-- Divider -->
+            <div class="divider"></div>
+
+            <!-- Model Selector -->
+            <div class="model-selector" id="modelSelector">
+                <button class="model-toggle" id="modelToggle">
+                    <svg class="model-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span class="model-name" id="modelName">Claude Sonnet</span>
+                    <svg class="model-dropdown-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <!-- Model Dropdown Menu -->
+                <div class="model-dropdown-menu">
+                    <div class="model-dropdown-item active" data-model="claude-sonnet">
+                        <span class="model-dropdown-item-label">Claude Sonnet</span>
+                        <svg class="model-dropdown-item-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="model-dropdown-item" data-model="gpt-4o">
+                        <span class="model-dropdown-item-label">GPT-4o</span>
+                        <svg class="model-dropdown-item-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="model-dropdown-item" data-model="gemini-pro">
+                        <span class="model-dropdown-item-label">Gemini Pro</span>
+                        <svg class="model-dropdown-item-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="model-dropdown-item" data-model="auto">
+                        <span class="model-dropdown-item-label">Auto (Recommended)</span>
+                        <svg class="model-dropdown-item-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat History Toggle -->
+            <div class="history-toggle" id="historyToggle">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                
+                <!-- History Dropdown -->
+                <div class="history-dropdown">
+                    <div class="history-dropdown-header">
+                        <span class="history-dropdown-title">Recent Chats</span>
+                        <span class="new-chat-link">+ New</span>
+                    </div>
+                    <div class="history-dropdown-item active">
+                        <svg class="history-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="history-item-title">Optimize Electron cold start</span>
+                    </div>
+                    <div class="history-dropdown-item">
+                        <svg class="history-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="history-item-title">React 19 best practices</span>
+                    </div>
+                    <div class="history-dropdown-item">
+                        <svg class="history-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="history-item-title">Fix ESLint errors in ipc</span>
+                    </div>
+                    <div class="history-dropdown-item">
+                        <svg class="history-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="history-item-title">TypeScript strict mode</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Mode Dropdown Logic
+        const modeDropdown = document.getElementById('modeDropdown');
+        const modeToggle = document.getElementById('modeToggle');
+        const modeLabel = document.getElementById('modeLabel');
+        const modeIcon = modeToggle.querySelector('.mode-icon');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        const modes = {
+            files: {
+                label: 'Files',
+                icon: '<path d="M3 7C3 5.89543 3.89543 5 5 5H9L11 7H19C20.1046 7 21 7.89543 21 9V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+                color: 'var(--purple)'
+            },
+            ask: {
+                label: 'Ask',
+                icon: '<path d="M8 10C8 10 9 8 12 8C15 8 16 10 16 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12V12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>',
+                color: 'var(--green)'
+            },
+            code: {
+                label: 'Code',
+                icon: '<path d="M16 18L22 12L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6L2 12L8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+                color: '#d8571d'
+            }
+        };
+
+        modeToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            modeDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', () => {
+            modeDropdown.classList.remove('open');
+        });
+
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const mode = item.dataset.mode;
+                
+                dropdownItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                modeLabel.textContent = modes[mode].label;
+                modeIcon.innerHTML = modes[mode].icon;
+                modeIcon.style.color = modes[mode].color;
+                
+                // Update toggle styles based on mode
+                if (mode === 'ask') {
+                    modeToggle.style.background = 'var(--green-subtle)';
+                    modeToggle.style.borderColor = 'var(--green)';
+                    modeLabel.style.color = 'var(--green)';
+                    modeIcon.style.color = 'var(--green)';
+                    document.querySelector('.dropdown-arrow').style.color = 'var(--green)';
+                } else if (mode === 'files') {
+                    modeToggle.style.background = 'var(--purple-subtle)';
+                    modeToggle.style.borderColor = 'var(--purple)';
+                    modeLabel.style.color = 'var(--purple)';
+                    modeIcon.style.color = 'var(--purple)';
+                    document.querySelector('.dropdown-arrow').style.color = 'var(--purple)';
+                } else {
+                    modeToggle.style.background = 'rgba(216, 87, 29, 0.16)';
+                    modeToggle.style.borderColor = '#d8571d';
+                    modeLabel.style.color = '#d8571d';
+                    modeIcon.style.color = '#d8571d';
+                    document.querySelector('.dropdown-arrow').style.color = '#d8571d';
+                }
+                
+                modeDropdown.classList.remove('open');
+            });
+        });
+
+        modeDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Model Selector Logic
+        const modelSelector = document.getElementById('modelSelector');
+        const modelToggle = document.getElementById('modelToggle');
+        const modelName = document.getElementById('modelName');
+        const modelItems = document.querySelectorAll('.model-dropdown-item');
+
+        modelToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            modelSelector.classList.toggle('open');
+        });
+
+        document.addEventListener('click', () => {
+            modelSelector.classList.remove('open');
+        });
+
+        modelItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const model = item.dataset.model;
+                
+                modelItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                const modelLabels = {
+                    'claude-sonnet': 'Claude Sonnet',
+                    'gpt-4o': 'GPT-4o',
+                    'gemini-pro': 'Gemini Pro',
+                    'auto': 'Auto'
+                };
+                
+                modelName.textContent = modelLabels[model];
+                modelSelector.classList.remove('open');
+            });
+        });
+
+        modelSelector.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    </script>
+</body>
+</html>

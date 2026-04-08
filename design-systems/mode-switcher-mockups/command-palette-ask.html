@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Palette - Ask Mode (AI Chat)</title>
+    <style>
+        :root {
+            /* Kraken Design System Colors */
+            --white: #ffffff;
+            --black: #101114;
+            --purple: #7132f5;
+            --purple-dark: #5741d8;
+            --purple-deep: #5b1ecf;
+            --purple-subtle: rgba(133, 91, 251, 0.16);
+            --gray: #686b82;
+            --silver: #9497a9;
+            --border: #dedee5;
+            --green: #149e61;
+            --green-subtle: rgba(20, 158, 97, 0.16);
+            --red: #e53e3e;
+            --red-subtle: rgba(229, 62, 62, 0.12);
+            
+            /* Chat-specific colors */
+            --user-message-bg: var(--purple);
+            --user-message-text: var(--white);
+            --ai-message-bg: #f7f7f9;
+            --ai-message-text: var(--black);
+            
+            /* Shadows */
+            --shadow-subtle: rgba(0, 0, 0, 0.03) 0px 4px 24px;
+            --shadow-micro: rgba(16, 24, 40, 0.04) 0px 1px 4px;
+            
+            /* Typography */
+            --font-ui: 'IBM Plex Sans', 'Kraken-Product', Helvetica, Arial, sans-serif;
+            --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 40px;
+            min-height: 100vh;
+            font-family: var(--font-ui);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Expanded Command Palette Container - 800x560 for Ask Mode */
+        .command-palette {
+            width: 800px;
+            height: 560px;
+            background: var(--white);
+            border-radius: 14px;
+            box-shadow: var(--shadow-subtle);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar with Mode + Search */
+        .command-bar {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--white);
+            flex-shrink: 0;
+        }
+
+        /* Mode Dropdown */
+        .mode-dropdown {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--purple-subtle);
+            border: 1px solid var(--purple);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            height: 44px;
+        }
+
+        .mode-toggle:hover {
+            background: rgba(133, 91, 251, 0.22);
+        }
+
+        .mode-toggle:focus {
+            border-color: var(--purple);
+            box-shadow: 0 0 0 1px var(--purple);
+        }
+
+        .mode-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--purple);
+            flex-shrink: 0;
+        }
+
+        .mode-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--purple);
+            white-space: nowrap;
+        }
+
+        .dropdown-arrow {
+            width: 14px;
+            height: 14px;
+            color: var(--purple);
+            flex-shrink: 0;
+        }
+
+        /* Search Input */
+        .search-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            height: 44px;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            font-family: var(--font-ui);
+            font-size: 16px;
+            color: var(--black);
+            background: transparent;
+        }
+
+        .search-input::placeholder {
+            color: var(--silver);
+        }
+
+        /* Model Selector */
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: rgba(148, 151, 169, 0.08);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .model-selector:hover {
+            background: rgba(148, 151, 169, 0.14);
+            border-color: var(--border);
+        }
+
+        .model-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--gray);
+        }
+
+        .model-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--gray);
+            white-space: nowrap;
+        }
+
+        /* Keyboard Shortcut */
+        .keyboard-shortcut {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .shortcut-key {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 10px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray);
+            box-shadow: var(--shadow-micro);
+        }
+
+        /* Divider Line */
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+            margin: 0 4px;
+        }
+
+        /* Main Content Area - Split into Chat and Sidebar */
+        .content-area {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            background: var(--white);
+        }
+
+        /* Messages Area */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Message Bubble */
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 90%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message.ai {
+            align-self: flex-start;
+        }
+
+        /* Message Avatar */
+        .message-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: var(--purple);
+            color: var(--white);
+        }
+
+        .message.ai .message-avatar {
+            background: var(--ai-message-bg);
+            border: 1px solid var(--border);
+            color: var(--gray);
+        }
+
+        .message-avatar svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Message Content */
+        .message-content {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: var(--user-message-bg);
+            color: var(--user-message-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .message-content {
+            background: var(--ai-message-bg);
+            color: var(--ai-message-text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-content code {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .message.ai .message-content code {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        .message-content p {
+            margin-bottom: 8px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--ai-message-bg);
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--silver);
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            background: var(--white);
+            flex-shrink: 0;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: #f5f5f7;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 14px;
+            transition: all 0.15s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--purple);
+            box-shadow: 0 0 0 2px var(--purple-subtle);
+        }
+
+        .chat-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-family: var(--font-ui);
+            font-size: 14px;
+            color: var(--black);
+            background: transparent;
+            resize: none;
+            min-height: 20px;
+            max-height: 120px;
+            line-height: 1.5;
+        }
+
+        .chat-input::placeholder {
+            color: var(--silver);
+        }
+
+        .send-button {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--purple);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .send-button:hover {
+            background: var(--purple-dark);
+        }
+
+        .send-button:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+        }
+
+        .send-button svg {
+            width: 16px;
+            height: 16px;
+            color: var(--white);
+        }
+
+        /* Sidebar - Chat History */
+        .sidebar {
+            width: 200px;
+            background: #fafafa;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--silver);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .new-chat-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .new-chat-btn:hover {
+            border-color: var(--purple);
+            background: var(--purple-subtle);
+        }
+
+        .new-chat-btn svg {
+            width: 14px;
+            height: 14px;
+            color: var(--gray);
+        }
+
+        /* Chat History List */
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .chat-history-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            margin-bottom: 2px;
+        }
+
+        .chat-history-item:hover {
+            background: rgba(148, 151, 169, 0.08);
+        }
+
+        .chat-history-item.active {
+            background: var(--purple-subtle);
+        }
+
+        .chat-history-item.active .chat-title {
+            color: var(--purple);
+        }
+
+        .chat-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--silver);
+            flex-shrink: 0;
+        }
+
+        .chat-history-item.active .chat-icon {
+            color: var(--purple);
+        }
+
+        .chat-title {
+            flex: 1;
+            font-size: 13px;
+            color: var(--gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Footer */
+        .command-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-top: 1px solid var(--border);
+            background: rgba(148, 151, 169, 0.04);
+            flex-shrink: 0;
+        }
+
+        .footer-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .footer-action {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--gray);
+        }
+
+        .footer-action kbd {
+            font-size: 10px;
+            font-family: var(--font-mono);
+            background: var(--white);
+            border: 1px solid var(--border);
+            padding: 2px 5px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+
+        /* Presentation wrapper */
+        .presentation {
+            text-align: center;
+        }
+
+        .presentation-label {
+            color: var(--silver);
+            font-size: 12px;
+            margin-bottom: 24px;
+            font-family: monospace;
+        }
+
+        /* Scrollbar styling */
+        .messages-area::-webkit-scrollbar,
+        .chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-area::-webkit-scrollbar-track,
+        .chat-history::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb,
+        .chat-history::-webkit-scrollbar-thumb {
+            background: rgba(148, 151, 169, 0.25);
+            border-radius: 3px;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb:hover,
+        .chat-history::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 151, 169, 0.4);
+        }
+
+        /* Preset buttons in AI response */
+        .ai-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .ai-action-btn {
+            padding: 6px 12px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--gray);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .ai-action-btn:hover {
+            border-color: var(--purple);
+            color: var(--purple);
+            background: var(--purple-subtle);
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <div class="presentation-label">Expanded Mode — Ask (AI Chat) — 800×560px</div>
+        
+        <div class="command-palette">
+            <!-- Top Bar -->
+            <div class="command-bar">
+                <!-- Mode Dropdown -->
+                <div class="mode-dropdown">
+                    <button class="mode-toggle">
+                        <svg class="mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 3C7.03 3 3 7.03 3 12s4.03 9 9 9c.43 0 .85-.03 1.26-.08 1.72-.22 2.91-1.65 2.69-3.37-.19-1.48-1.38-2.76-2.85-2.76-.54 0-1.04.15-1.48.41C9.31 12.76 8 11.01 8 9c0-2.21 1.79-4 4-4 .54 0 1.04.11 1.5.3C14.87 3.88 16.13 3 17.5 3c.97 0 1.83.41 2.44 1.07C20.83 3.32 21.5 2.48 21.5 1.5 21.5.67 20.83-.07 20-.13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M8 21c-1.5-.85-3.03-1.5-4.5-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M16.5 15c1.5.85 3.03 1.5 4.5 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span class="mode-label">Ask</span>
+                        <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Search Input (for quick AI) -->
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        placeholder="Ask anything..."
+                        value="How do I optimize my Electron app for faster cold start?"
+                    />
+                </div>
+
+                <!-- Model Selector -->
+                <div class="model-selector">
+                    <svg class="model-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span class="model-name">Claude Sonnet</span>
+                    <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 10px; height: 10px;">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+
+                <!-- Keyboard Shortcut -->
+                <div class="keyboard-shortcut">
+                    <div class="divider"></div>
+                    <div class="shortcut-key">⌘</div>
+                    <div class="shortcut-key">K</div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="content-area">
+                <!-- Chat Messages -->
+                <div class="chat-container">
+                    <div class="messages-area">
+                        <!-- User Message -->
+                        <div class="message user">
+                            <div class="message-avatar">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="message-content">
+                                <p>How do I optimize my Electron app for faster cold start? Current cold start time is around 2 seconds.</p>
+                            </div>
+                        </div>
+
+                        <!-- AI Response -->
+                        <div class="message ai">
+                            <div class="message-avatar">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="message-content">
+                                <p>Here are several strategies to reduce your Electron cold start time from 2 seconds to under 500ms:</p>
+                                <p><strong>1. Enable lazy loading</strong><br>
+                                Defer loading of non-critical modules until needed:</p>
+                                <code>// Instead of static imports
+import { heavyModule } from './heavy';</code>
+                                <p>Use dynamic imports:</p>
+                                <code>// Load on demand
+const heavyModule = await import('./heavy');</code>
+                                <p><strong>2. Use V8 code caching</strong><br>
+                                Enable <code>contextIsolation: true</code> and generate cached data at build time.</p>
+                                <p><strong>3. Optimize main process</strong><br>
+                                Move expensive operations to worker threads or use <code>app.whenReady()</code> strategically.</p>
+                                <div class="ai-actions">
+                                    <button class="ai-action-btn">Copy code</button>
+                                    <button class="ai-action-btn">Explain more</button>
+                                    <button class="ai-action-btn">Show example</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <textarea 
+                                class="chat-input" 
+                                placeholder="Ask a follow-up question..."
+                                rows="1"
+                            ></textarea>
+                            <button class="send-button" disabled>
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar - Chat History -->
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <span class="sidebar-title">Chats</span>
+                        <button class="new-chat-btn">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="chat-history">
+                        <div class="chat-history-item active">
+                            <svg class="chat-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="chat-title">Optimize Electron cold start</span>
+                        </div>
+                        <div class="chat-history-item">
+                            <svg class="chat-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="chat-title">React 19 best practices</span>
+                        </div>
+                        <div class="chat-history-item">
+                            <svg class="chat-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="chat-title">Fix ESLint errors in ipc</span>
+                        </div>
+                        <div class="chat-history-item">
+                            <svg class="chat-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="chat-title">TypeScript strict mode</span>
+                        </div>
+                        <div class="chat-history-item">
+                            <svg class="chat-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="chat-title">Vite build optimization</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="command-footer">
+                <div class="footer-group">
+                    <div class="footer-action">
+                        <kbd>↵</kbd> Send
+                    </div>
+                    <div class="footer-action">
+                        <kbd>⇧</kbd><kbd>↵</kbd> New line
+                    </div>
+                </div>
+                <div class="footer-group">
+                    <div class="footer-action">
+                        <kbd>⌘</kbd><kbd>⇧</kbd><kbd>P</kbd> Presets
+                    </div>
+                    <div class="footer-action">
+                        <kbd>esc</kbd> Close
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
