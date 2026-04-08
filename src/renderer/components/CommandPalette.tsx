@@ -42,10 +42,10 @@ export function CommandPalette({
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
   
-  // Show results and footer only in expanded mode
-  const isExpanded = currentMode === 'expanded';
-  const showResults = isExpanded;
-  const showFooter = isExpanded;
+  // Show results and footer in expanded or custom mode (not in compact)
+  const isCompact = currentMode === 'compact';
+  const showResults = !isCompact;
+  const showFooter = !isCompact;
 
   // Show AskModePanel for AI mode in expanded window
   const showAskMode = isExpanded && searchMode === 'ai';

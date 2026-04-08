@@ -123,7 +123,7 @@ html, body {
 
 .command-palette-body {
   flex: 1;
-  overflow: visible;
+  overflow-y: auto;
   padding: var(--kraken-space-12) var(--kraken-space-8);
   opacity: 1;
   transition: opacity var(--kraken-transition-snap);
