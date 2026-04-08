@@ -28,11 +28,6 @@ interface MCPPreferences {
   }>;
 }
 
-interface OpenCodePreferences {
-  enabled?: boolean;
-  baseUrl?: string;
-}
-
 interface Preferences {
   windowMode?: WindowMode;
   customDimensions?: {
@@ -46,7 +41,6 @@ interface Preferences {
   
   llm?: LLMPreferences;
   mcp?: MCPPreferences;
-  opencode?: OpenCodePreferences;
 }
 
 const PREFERENCES_FILE = join(app.getPath('userData'), 'preferences.json');

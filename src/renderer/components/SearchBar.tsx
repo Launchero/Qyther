@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ModeTabs } from './ModeTabs';
-import { ModelSelector } from './ModelSelector';
 import { ChatHistoryDropdown } from './ChatHistoryDropdown';
 
 export type SearchMode = 'file' | 'ai' | 'code';
@@ -28,8 +27,6 @@ export function SearchBar({
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<SearchMode>(currentMode);
   const [tabsExpanded, setTabsExpanded] = useState(false);
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('claude-sonnet');
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
 
   // Check if in compact window mode and AI search mode
@@ -72,11 +69,7 @@ export function SearchBar({
         onTabsExpanded?.(false);
       }
       
-      // Also check for clicks outside model selector and chat history
-      if (modelSelectorOpen && tabsContainerRef.current && !tabsContainerRef.current.contains(target)) {
-        setModelSelectorOpen(false);
-      }
-      
+      // Also check for clicks outside chat history
       if (chatHistoryOpen && tabsContainerRef.current && !tabsContainerRef.current.contains(target)) {
         setChatHistoryOpen(false);
       }
@@ -86,7 +79,7 @@ export function SearchBar({
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [tabsExpanded, modelSelectorOpen, chatHistoryOpen, onTabsExpanded]);
+  }, [tabsExpanded, chatHistoryOpen, onTabsExpanded]);
 
   // Focus input when window becomes visible
   useEffect(() => {
@@ -126,11 +119,6 @@ export function SearchBar({
   };
 
   const displayPlaceholder = placeholder || modePlaceholders[activeMode];
-
-  const handleModelSelect = (modelId: string) => {
-    setSelectedModel(modelId);
-    setModelSelectorOpen(false);
-  };
 
   const handleChatSelect = (chatTitle: string) => {
     console.log('[SearchBar] Chat selected:', chatTitle);
@@ -180,15 +168,6 @@ export function SearchBar({
 
           {/* Divider */}
           <div className={`divider ${showModelAndHistory ? 'visible' : 'hidden'}`}></div>
-
-          {/* Model Selector */}
-          <ModelSelector
-            selectedModel={selectedModel}
-            onSelect={handleModelSelect}
-            open={modelSelectorOpen}
-            onToggle={() => setModelSelectorOpen(!modelSelectorOpen)}
-            visible={showModelAndHistory}
-          />
 
           {/* Chat History Toggle */}
           <ChatHistoryDropdown

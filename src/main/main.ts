@@ -6,7 +6,6 @@ import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
 import { initializeEs } from './utils/esDownloader';
 import { logSystemInfo, getPlatformName, isWindows, isMacOS } from './utils/platform';
-import { initSessions, initializeMCPServers, initializeOpenCode } from './opencode/index.js';
 
 // Load environment variables from .env file
 import 'dotenv/config';
@@ -37,6 +36,10 @@ app.enableSandbox();
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-direct-composition');
 
+// Disable storage quota management to prevent quota database errors
+// These errors occur when Chromium can't access quota database files
+app.commandLine.appendSwitch('disable-features', 'PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies');
+
 // Log app startup with platform info
 log('🚀 Electron app starting...');
 logSystemInfo();
@@ -46,17 +49,6 @@ app.whenReady().then(async () => {
   
   // Initialize preferences (create directory and files if needed)
   initializePreferences();
-
-  // Initialize OpenCode SDK
-  console.log('[Main] Initializing OpenCode SDK...');
-  try {
-    await initializeOpenCode();
-    await initSessions();
-    await initializeMCPServers();
-    console.log('[Main] OpenCode SDK ready');
-  } catch (error) {
-    console.error('[Main] OpenCode initialization error:', error);
-  }
   
   // Initialize es.exe for file search (Windows only)
   if (isWindows()) {
@@ -70,9 +62,6 @@ app.whenReady().then(async () => {
   } else {
     log(`ℹ️  File search not available on ${getPlatformName()}`);
   }
-  
-  // Initialize MCP support (removed - was via OpenCode/LLM)
-  // MCP and LLM functionality has been removed along with AI chat mode
   
   // Remove default menu bar
   Menu.setApplicationMenu(null);

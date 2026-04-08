@@ -95,29 +95,6 @@ export interface ElectronAPI {
   debug: {
     log: (message: string, data?: any) => Promise<void>;
   };
-
-  // OpenCode SDK
-  opencode: {
-    initialize: (config?: { baseUrl?: string; enabled?: boolean }) => Promise<{ success: boolean; error?: string }>;
-    getConfig: () => Promise<{ configured: boolean; hasApiKey: boolean; model: string }>;
-    getConfiguration: () => Promise<any>;
-    createSession: (title?: string) => Promise<{ id: string; title: string }>;
-    getOrCreateSession: (key: string, title?: string) => Promise<string>;
-    getSession: (sessionId: string) => Promise<any>;
-    saveSession: (session: any) => Promise<{ success: boolean }>;
-    addMessage: (sessionId: string, message: any) => Promise<any>;
-    listSessions: (limit?: number) => Promise<Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }>>;
-    forkSession: (params: { sessionId: string; fromMessageId?: string }) => Promise<string>;
-    deleteSession: (sessionId: string) => Promise<{ success: boolean }>;
-    getMCPServers: () => Promise<Array<{ id: string; name: string; status: string; icon: string }>>;
-    getMCPServerStatus: (serverId: string) => Promise<any>;
-    getAllMCPServerStatus: () => Promise<any[]>;
-    getModels: () => Promise<Array<{ id: string; name: string; description?: string; isRecommended?: boolean }>>;
-    sendMessage: (payload: { sessionId: string; messages: Array<{ role: string; content: string }>; model?: string }) => Promise<any>;
-    getSessionMessages: (sessionId: string) => Promise<any[]>;
-    summarizeSession: (sessionId: string) => Promise<string>;
-    onStreamChunk: (callback: (chunk: { sessionId: string; messageId: string; delta: string }) => void) => () => void;
-  };
 }
 
 declare global {

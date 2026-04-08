@@ -256,6 +256,31 @@ npm run dev
 
 Use this section to document any issues, discoveries, or deviations from the plan:
 
+### Phase 1: CommandPalette Extraction (COMPLETED 2026-04-08, FIXED 2026-04-08)
+
+**Files Created**:
+- `src/renderer/utils/debugLogger.ts` - Centralized logging utility
+- `src/renderer/components/CommandPaletteHeader.tsx` - Header sub-component
+- `src/renderer/components/CommandPaletteBody.tsx` - Body sub-component  
+- `src/renderer/components/CommandPaletteFooter.tsx` - Footer sub-component
+
+**Files Modified**:
+- `src/renderer/components/CommandPalette.tsx` - Refactored to use sub-components (185 → 157 lines)
+- `src/renderer/styles/globals.css` - Fixed scrollbar and footer visibility
+
+**Verification Results**:
+- ✅ `npm run typecheck` - 0 errors
+- ✅ `npm run lint` - 0 errors
+- ✅ `npm run build` - Success
+- Bundle size: 673.67 KB (was 678.29 KB, -4.62 KB = -0.68%)
+- All classNames preserved
+- Scrollbar visible with `overflow-y: auto`
+- Footer visible in expanded and custom modes
+
+**Bug Fixes**:
+- Scrollbar wasn't showing (fixed `overflow: visible` → `overflow-y: auto`)
+- Footer wasn't showing in custom mode (fixed to show in all non-compact modes)
+
 ### Phase 5: Type Definitions & Utilities (COMPLETED 2026-04-08)
 
 **Files Created**:
@@ -287,12 +312,12 @@ Use this section to document any issues, discoveries, or deviations from the pla
 **Total Lines Before**: 1,691 lines (CommandPalette 185 + SearchBar 468 + App 409 + AskModePanel 519 + useSearch 110)  
 **Total Lines After**: 1,260 lines (-431 lines = -25.5% reduction)
 
-**Bundle Size**: 673.64 KB (was 678.29 KB, -4.65 KB = -0.68%)
+**Bundle Size**: 673.67 KB (was 678.29 KB, -4.62 KB = -0.68%)
 
 **All Phases Completed Successfully**:
-1. ✅ CommandPalette extraction (185 → 157 lines)
+1. ✅ CommandPalette extraction (185 → 157 lines) - FIXED scrollbar & footer
 2. ✅ SearchBar refactoring (468 → 254 lines)
-3. ✅ App.tsx cleanup (409 → 193 lines) - **FIXED auto-expand**
+3. ✅ App.tsx cleanup (409 → 193 lines) - FIXED auto-expand
 4. ✅ Type definitions centralized
 5. ✅ Utilities extracted
 
@@ -302,7 +327,9 @@ Use this section to document any issues, discoveries, or deviations from the pla
 - ✅ AI chat with streaming
 - ✅ Keyboard navigation
 - ✅ Mode/theme switching
-- ✅ **Auto-expand when typing** (FIXED)
+- ✅ Auto-expand when typing (FIXED)
+- ✅ Scrollbar visible in results (FIXED)
+- ✅ Footer visible in expanded/custom modes (FIXED)
 
 **No Breaking Changes**:
 - All IPC calls unchanged

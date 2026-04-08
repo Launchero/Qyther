@@ -129,32 +129,6 @@ export const electronAPI = {
   debug: {
     log: (message: string, data?: any) => ipcRenderer.invoke('debug:log', message, data),
   },
-
-  // OpenCode SDK
-  opencode: {
-    initialize: (config?: { baseUrl?: string; enabled?: boolean }) => ipcRenderer.invoke('opencode:initialize', config),
-    getConfig: () => ipcRenderer.invoke('opencode:getConfig'),
-    getConfiguration: () => ipcRenderer.invoke('opencode:getConfiguration'),
-    createSession: (title?: string) => ipcRenderer.invoke('opencode:createSession', title),
-    getOrCreateSession: (key: string, title?: string) => ipcRenderer.invoke('opencode:getOrCreateSession', key, title),
-    getSession: (sessionId: string) => ipcRenderer.invoke('opencode:getSession', sessionId),
-    saveSession: (session: any) => ipcRenderer.invoke('opencode:saveSession', session),
-    addMessage: (sessionId: string, message: any) => ipcRenderer.invoke('opencode:addMessage', sessionId, message),
-    listSessions: (limit?: number) => ipcRenderer.invoke('opencode:listSessions', limit),
-    forkSession: (params: { sessionId: string; fromMessageId?: string }) => ipcRenderer.invoke('opencode:forkSession', params),
-    deleteSession: (sessionId: string) => ipcRenderer.invoke('opencode:deleteSession', sessionId),
-    getMCPServers: () => ipcRenderer.invoke('opencode:getMCPServers'),
-    getMCPServerStatus: (serverId: string) => ipcRenderer.invoke('opencode:getMCPServerStatus', serverId),
-    getAllMCPServerStatus: () => ipcRenderer.invoke('opencode:getAllMCPServerStatus'),
-    getModels: () => ipcRenderer.invoke('opencode:getModels'),
-    sendMessage: (payload: { sessionId: string; messages: Array<{ role: string; content: string }>; model?: string }) => ipcRenderer.invoke('opencode:sendMessage', payload),
-    getSessionMessages: (sessionId: string) => ipcRenderer.invoke('opencode:getSessionMessages', sessionId),
-    summarizeSession: (sessionId: string) => ipcRenderer.invoke('opencode:summarizeSession', sessionId),
-    onStreamChunk: (callback: (chunk: { sessionId: string; messageId: string; delta: string }) => void) => {
-      ipcRenderer.on('opencode:stream-chunk', (_, data) => callback(data));
-      return () => ipcRenderer.removeAllListeners('opencode:stream-chunk');
-    },
-  },
 };
 
 // Expose with type safety

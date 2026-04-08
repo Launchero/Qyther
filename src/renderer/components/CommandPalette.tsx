@@ -4,7 +4,6 @@ import { CommandPaletteBody } from './CommandPaletteBody';
 import { CommandPaletteFooter } from './CommandPaletteFooter';
 import { SearchBar, type SearchMode } from './SearchBar';
 import { ResultsList, SearchResult } from './ResultsList';
-import { AskModePanel } from './AskModePanel';
 import { ThemeToggle } from './ThemeToggle';
 import { logComponentSizes } from '../utils/debugLogger';
 
@@ -47,9 +46,8 @@ export function CommandPalette({
   const showResults = !isCompact;
   const showFooter = !isCompact;
 
-  // Show AskModePanel for AI mode in expanded window
-  const showAskMode = isExpanded && searchMode === 'ai';
-  const showResultsList = isExpanded && searchMode !== 'ai';
+  // Show results list in non-compact mode
+  const showResultsList = !isCompact;
   
   // Debug: Log mode changes and measure sizes to main process terminal
   React.useEffect(() => {
@@ -133,7 +131,6 @@ export function CommandPalette({
       />
       
       <CommandPaletteBody
-        showAskMode={showAskMode}
         showResults={showResults}
         searchQuery={searchQuery}
         results={results}
