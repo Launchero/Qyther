@@ -287,12 +287,12 @@ Use this section to document any issues, discoveries, or deviations from the pla
 **Total Lines Before**: 1,691 lines (CommandPalette 185 + SearchBar 468 + App 409 + AskModePanel 519 + useSearch 110)  
 **Total Lines After**: 1,260 lines (-431 lines = -25.5% reduction)
 
-**Bundle Size**: 673.62 KB (was 678.29 KB, -4.67 KB = -0.69%)
+**Bundle Size**: 673.64 KB (was 678.29 KB, -4.65 KB = -0.68%)
 
 **All Phases Completed Successfully**:
 1. ✅ CommandPalette extraction (185 → 157 lines)
 2. ✅ SearchBar refactoring (468 → 254 lines)
-3. ✅ App.tsx cleanup (409 → 193 lines)
+3. ✅ App.tsx cleanup (409 → 193 lines) - **FIXED auto-expand**
 4. ✅ Type definitions centralized
 5. ✅ Utilities extracted
 
@@ -302,6 +302,7 @@ Use this section to document any issues, discoveries, or deviations from the pla
 - ✅ AI chat with streaming
 - ✅ Keyboard navigation
 - ✅ Mode/theme switching
+- ✅ **Auto-expand when typing** (FIXED)
 
 **No Breaking Changes**:
 - All IPC calls unchanged

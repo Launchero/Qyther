@@ -33,22 +33,6 @@ const DEFAULT_COMMANDS: SearchResult[] = [
 export function App() {
   const { toggleTheme } = useTheme();
   
-  // Use custom hooks for state management
-  const { windowMode, isManuallyExpanded, setIsManuallyExpanded } = useWindowMode();
-  const { executingId, execute } = useCommandExecution();
-  const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
-  
-  // Debug: Log on mount
-  React.useEffect(() => {
-    const hasElectronAPI = !!window.electronAPI;
-    const hasWindowProp = !!window.electronAPI?.window;
-    const hasAppsProp = !!window.electronAPI?.apps;
-    
-    console.log('[App] Mounted! window.electronAPI exists:', hasElectronAPI);
-    console.log('[App] window.electronAPI.window exists:', hasWindowProp);
-    console.log('[App] window.electronAPI.apps exists:', hasAppsProp);
-  }, []);
-  
   // Fetch installed applications on mount
   const [apps, setApps] = React.useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -82,7 +66,7 @@ export function App() {
     return [...DEFAULT_COMMANDS, ...apps];
   }, [apps]);
 
-  // Search hooks
+  // Search hooks (need to call this first to get searchQuery)
   const {
     searchQuery,
     setSearchQuery,
@@ -90,6 +74,22 @@ export function App() {
     selectedIndex,
     setSelectedIndex,
   } = useSearch(allItems);
+  
+  // Use custom hooks for state management (pass searchQuery for auto-expand)
+  const { windowMode, isManuallyExpanded, setIsManuallyExpanded } = useWindowMode({ searchQuery });
+  const { executingId, execute } = useCommandExecution();
+  const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
+  
+  // Debug: Log on mount
+  React.useEffect(() => {
+    const hasElectronAPI = !!window.electronAPI;
+    const hasWindowProp = !!window.electronAPI?.window;
+    const hasAppsProp = !!window.electronAPI?.apps;
+    
+    console.log('[App] Mounted! window.electronAPI exists:', hasElectronAPI);
+    console.log('[App] window.electronAPI.window exists:', hasWindowProp);
+    console.log('[App] window.electronAPI.apps exists:', hasAppsProp);
+  }, []);
 
   // File search hook - only enabled when there's a query AND not in AI mode
   const {
