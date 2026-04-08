@@ -116,6 +116,7 @@ export interface ElectronAPI {
     sendMessage: (payload: { sessionId: string; messages: Array<{ role: string; content: string }>; model?: string }) => Promise<any>;
     getSessionMessages: (sessionId: string) => Promise<any[]>;
     summarizeSession: (sessionId: string) => Promise<string>;
+    onStreamChunk: (callback: (chunk: { sessionId: string; messageId: string; delta: string }) => void) => () => void;
   };
 }
 

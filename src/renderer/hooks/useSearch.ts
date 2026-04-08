@@ -1,61 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { SearchResult } from '../components/ResultsList';
-
-// Simple fuzzy search implementation
-function fuzzyMatch(query: string, text: string): boolean {
-  const lowerQuery = query.toLowerCase();
-  const lowerText = text.toLowerCase();
-  
-  // Simple substring match
-  if (lowerText.includes(lowerQuery)) {
-    return true;
-  }
-  
-  // Fuzzy match
-  let queryIndex = 0;
-  for (let i = 0; i < lowerText.length && queryIndex < lowerQuery.length; i++) {
-    if (lowerText[i] === lowerQuery[queryIndex]) {
-      queryIndex++;
-    }
-  }
-  
-  return queryIndex === lowerQuery.length;
-}
-
-// Score for ranking results
-function scoreMatch(query: string, text: string): number {
-  const lowerQuery = query.toLowerCase();
-  const lowerText = text.toLowerCase();
-  
-  // Exact match gets highest score
-  if (lowerText === lowerQuery) {
-    return 100;
-  }
-  
-  // Starts with query gets high score
-  if (lowerText.startsWith(lowerQuery)) {
-    return 50;
-  }
-  
-  // Contains query
-  if (lowerText.includes(lowerQuery)) {
-    return 25;
-  }
-  
-  // Fuzzy match
-  let queryIndex = 0;
-  for (let i = 0; i < lowerText.length && queryIndex < lowerQuery.length; i++) {
-    if (lowerText[i] === lowerQuery[queryIndex]) {
-      queryIndex++;
-    }
-  }
-  
-  if (queryIndex === lowerQuery.length) {
-    return 10;
-  }
-  
-  return 0;
-}
+import { fuzzyMatch, scoreMatch } from '../utils/fuzzySearch';
 
 export function useSearch(allItems: SearchResult[]) {
   const [searchQuery, setSearchQuery] = useState('');

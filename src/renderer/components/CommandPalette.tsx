@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { CommandPaletteHeader } from './CommandPaletteHeader';
+import { CommandPaletteBody } from './CommandPaletteBody';
+import { CommandPaletteFooter } from './CommandPaletteFooter';
 import { SearchBar, type SearchMode } from './SearchBar';
 import { ResultsList, SearchResult } from './ResultsList';
 import { AskModePanel } from './AskModePanel';
 import { ThemeToggle } from './ThemeToggle';
+import { logComponentSizes } from '../utils/debugLogger';
 
 export interface CommandPaletteProps {
   searchQuery: string;
@@ -98,11 +102,11 @@ export function CommandPalette({
       logData.electronWindow = `${config.width} x ${config.height}px (mode: ${mode})`;
       
       // Send to main process terminal
-      window.electronAPI?.debug?.log(`[CommandPalette] Mode: ${currentMode}`, logData).catch(console.error);
+      logComponentSizes(logData);
     }).catch(() => {
       // Fallback if getMode fails
       logData.electronWindow = 'UNKNOWN';
-      window.electronAPI?.debug?.log(`[CommandPalette] Mode: ${currentMode}`, logData).catch(console.error);
+      logComponentSizes(logData);
     });
   }, [currentMode, showResults, showFooter]);
   
@@ -118,67 +122,32 @@ export function CommandPalette({
   
   return (
     <div ref={containerRef} className="command-palette">
-      <div ref={headerRef} className="command-palette-header">
-        <SearchBar
-          value={searchQuery}
-          onChange={onSearchChange}
-          placeholder="Search commands, apps, and more..."
-          currentMode={searchMode}
-          onModeChange={handleModeChange}
-          onTabsExpanded={handleTabsExpanded}
-          windowMode={currentMode}
-        />
-      </div>
+      <CommandPaletteHeader
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        searchMode={searchMode}
+        onSearchModeChange={handleModeChange}
+        onTabsExpanded={handleTabsExpanded}
+        windowMode={currentMode}
+        headerRef={headerRef}
+      />
       
-      {showResults && (
-        <div ref={bodyRef} className="command-palette-body">
-          {showAskMode ? (
-            <AskModePanel initialQuery={searchQuery} />
-          ) : (
-            <ResultsList
-              results={results}
-              selectedIndex={selectedIndex}
-              onSelect={onSelect}
-              onExecute={onExecute}
-              searchQuery={searchQuery}
-              executingId={executingId || undefined}
-            />
-          )}
-        </div>
-      )}
-      {showFooter && (
-        <div ref={footerRef} className="command-palette-footer">
-          <div className="footer-section">
-            <div className="shortcut-hint">
-              <kbd>↑↓</kbd> Navigate
-            </div>
-            <div className="shortcut-hint">
-              <kbd>Enter</kbd> Execute
-            </div>
-            <div className="shortcut-hint">
-              <kbd>Esc</kbd> Close
-            </div>
-          </div>
-          <div className="footer-divider" />
-          <div className="footer-section">
-            <div className="shortcut-hint">
-              <kbd>Home</kbd><kbd>End</kbd> Jump
-            </div>
-            <div className="shortcut-hint">
-              <kbd>PgUp</kbd><kbd>PgDn</kbd> Page
-            </div>
-          </div>
-          <div className="footer-section footer-section-right">
-            <div className="shortcut-hint">
-              <kbd>Alt+Shift+M</kbd> Mode
-            </div>
-            <div className="shortcut-hint">
-              <kbd>Alt+Shift+T</kbd> Theme
-            </div>
-            <ThemeToggle />
-          </div>
-        </div>
-      )}
+      <CommandPaletteBody
+        showAskMode={showAskMode}
+        showResults={showResults}
+        searchQuery={searchQuery}
+        results={results}
+        selectedIndex={selectedIndex}
+        onSelect={onSelect}
+        onExecute={onExecute}
+        executingId={executingId}
+        bodyRef={bodyRef}
+      />
+      
+      <CommandPaletteFooter
+        showFooter={showFooter}
+        footerRef={footerRef}
+      />
     </div>
   );
 }
