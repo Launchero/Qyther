@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ChatHistoryPanel, ChatSession } from './ChatHistoryPanel';
 import { BrowserModeTooltip } from './BrowserModeTooltip';
+import { ModelComparisonModal } from './ModelComparisonModal';
 
 interface ChatTopBarProps {
   selectedModel: string;
@@ -32,6 +33,7 @@ export function ChatTopBar({
   const [showHistory, setShowHistory] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [showBrowserTooltip, setShowBrowserTooltip] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
   const browserToggleRef = useRef<HTMLButtonElement>(null);
 
   const models = ['Qwen', 'Claude 4.6', 'GPT-5'];
@@ -106,11 +108,10 @@ export function ChatTopBar({
         {/* Model Selector */}
         <div 
           className="chat-model-selector"
-          onClick={() => setShowModelDropdown(!showModelDropdown)}
+          onClick={() => setShowModelModal(true)}
           role="button"
           tabIndex={0}
           aria-label="Select AI model"
-          aria-expanded={showModelDropdown}
         >
           <span className="chat-model-name">{selectedModel}</span>
           <svg className="chat-model-dropdown" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -136,6 +137,14 @@ export function ChatTopBar({
             </div>
           )}
         </div>
+
+        {/* Model Comparison Modal */}
+        <ModelComparisonModal
+          isOpen={showModelModal}
+          onClose={() => setShowModelModal(false)}
+          selectedModel={selectedModel}
+          onSelectModel={onModelSelect}
+        />
 
         {/* History Button */}
         <div 
