@@ -4,6 +4,7 @@ import { useChatSession } from '../hooks/useChatSession';
 import { MCPToolModal } from './MCPToolModal';
 import { useMCPKeyboardShortcuts } from '../hooks/useMCPKeyboardShortcuts';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { ToastProvider } from '../contexts/ToastContext';
 import { ChatTopBar } from './ask-mode/ChatTopBar';
 import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { ChatErrorBanner } from './ask-mode/ChatErrorBanner';
@@ -265,7 +266,8 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
   }
 
   return (
-    <div className="ask-mode-expanded">
+    <ToastProvider>
+      <div className="ask-mode-expanded">
       {/* Compact Top Bar with Browser Controls, Model Selector, and History */}
       <ChatTopBar
         selectedModel={selectedModel}
@@ -339,6 +341,7 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
       {showMCPModal && (
         <MCPToolModal onClose={() => setShowMCPModal(false)} />
       )}
-    </div>
+      </div>
+    </ToastProvider>
   );
 }

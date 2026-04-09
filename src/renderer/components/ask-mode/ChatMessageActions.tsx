@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '../../hooks/useToast';
 
 interface ChatMessageActionsProps {
   messageContent: string;
@@ -23,6 +24,7 @@ export function ChatMessageActions({
 }: ChatMessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const { showToast } = useToast();
 
   const handleCopy = async () => {
     try {
@@ -30,14 +32,39 @@ export function ChatMessageActions({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       onCopy(messageContent);
+      showToast({ type: 'success', message: 'Copied to clipboard!' });
     } catch (error) {
       console.error('Failed to copy:', error);
+      showToast({ type: 'error', message: 'Failed to copy' });
     }
   };
 
   const handleAction = (action: () => void) => {
     if (isActionInProgress) return;
     action();
+  };
+
+  const handleExplainWithToast = () => {
+    handleAction(() => {
+      onExplain(messageContent);
+      showToast({ type: 'info', message: 'Generating explanation...' });
+    });
+  };
+
+  const handleShowCodeWithToast = () => {
+    handleAction(() => {
+      onShowCode(messageContent);
+      showToast({ type: 'info', message: 'Generating code examples...' });
+    });
+  };
+
+  const handleRegenerateWithToast = () => {
+    handleAction(() => {
+      if (onRegenerate) {
+        onRegenerate();
+        showToast({ type: 'info', message: 'Regenerating response...' });
+      }
+    });
   };
 
   return (
@@ -64,7 +91,7 @@ export function ChatMessageActions({
       {/* Explain Button */}
       <button
         className="chat-action-btn"
-        onClick={() => handleAction(() => onExplain(messageContent))}
+        onClick={handleExplainWithToast}
         disabled={isActionInProgress}
         title="Explain this in simpler terms"
         aria-label="Explain message"
@@ -80,7 +107,7 @@ export function ChatMessageActions({
       {hasCode && (
         <button
           className="chat-action-btn"
-          onClick={() => handleAction(() => onShowCode(messageContent))}
+          onClick={handleShowCodeWithToast}
           disabled={isActionInProgress}
           title="Show more code examples"
           aria-label="Show code examples"
@@ -97,7 +124,7 @@ export function ChatMessageActions({
       {onRegenerate && (
         <button
           className="chat-action-btn"
-          onClick={() => handleAction(onRegenerate)}
+          onClick={handleRegenerateWithToast}
           disabled={isActionInProgress}
           title="Generate alternative response"
           aria-label="Regenerate response"
