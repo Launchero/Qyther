@@ -129,6 +129,68 @@ export const electronAPI = {
   debug: {
     log: (message: string, data?: any) => ipcRenderer.invoke('debug:log', message, data),
   },
+  
+  // Chat API
+  chat: {
+    initialize: () => ipcRenderer.invoke('chat:initialize'),
+    sendMessage: (content: string, sessionId?: string) => 
+      ipcRenderer.invoke('chat:sendMessage', { content, sessionId }),
+    createSession: (title?: string) => ipcRenderer.invoke('chat:createSession', title),
+    getCurrentSession: () => ipcRenderer.invoke('chat:getCurrentSession'),
+    getSession: (sessionId: string) => ipcRenderer.invoke('chat:getSession', sessionId),
+    listSessions: () => ipcRenderer.invoke('chat:listSessions'),
+    switchSession: (sessionId: string) => ipcRenderer.invoke('chat:switchSession', sessionId),
+    deleteSession: (sessionId: string) => ipcRenderer.invoke('chat:deleteSession', sessionId),
+    clearHistory: () => ipcRenderer.invoke('chat:clearHistory'),
+    isReady: () => ipcRenderer.invoke('chat:isReady'),
+    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean }) => void) => {
+      ipcRenderer.on('chat:stream-chunk', (_event, data) => callback(data));
+      return () => {
+        ipcRenderer.removeAllListeners('chat:stream-chunk');
+      };
+    },
+  },
+  
+  // Browser Automation API
+  browser: {
+    initializeAgent: (config?: { headed?: boolean }) => ipcRenderer.invoke('browser:initializeAgent', config),
+    setMode: (enabled: boolean) => ipcRenderer.invoke('browser:setMode', enabled),
+    getMode: () => ipcRenderer.invoke('browser:getMode'),
+    getStatus: () => ipcRenderer.invoke('browser:getStatus'),
+    getSessionStatus: () => ipcRenderer.invoke('browser:getSessionStatus'),
+    createSession: (config?: { headed?: boolean }) => ipcRenderer.invoke('browser:createSession', config),
+    closeSession: (sessionId: string) => ipcRenderer.invoke('browser:closeSession', sessionId),
+    extractLinks: () => ipcRenderer.invoke('browser:extractLinks'),
+    onProgress: (callback: (data: { sessionId: string; progress: any }) => void) => {
+      ipcRenderer.on('browser:progress', (_event, data) => callback(data));
+      return () => {
+        ipcRenderer.removeAllListeners('browser:progress');
+      };
+    },
+    onChunk: (callback: (data: { sessionId: string; chunk: string }) => void) => {
+      ipcRenderer.on('browser:chunk', (_event, data) => callback(data));
+      return () => {
+        ipcRenderer.removeAllListeners('browser:chunk');
+      };
+    },
+    onError: (callback: (data: { sessionId: string; error: string }) => void) => {
+      ipcRenderer.on('browser:error', (_event, data) => callback(data));
+      return () => {
+        ipcRenderer.removeAllListeners('browser:error');
+      };
+    },
+  },
+  
+  // MCP API
+  mcp: {
+    getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
+    toggle: (enabled: boolean) => ipcRenderer.invoke('mcp:toggle', enabled),
+    getServers: () => ipcRenderer.invoke('mcp:getServers'),
+    toggleServer: (serverName: string, enabled: boolean) => 
+      ipcRenderer.invoke('mcp:toggleServer', serverName, enabled),
+    getTools: () => ipcRenderer.invoke('mcp:getTools'),
+    toggleTool: (toolName: string) => ipcRenderer.invoke('mcp:toggleTool', toolName),
+  },
 };
 
 // Expose with type safety

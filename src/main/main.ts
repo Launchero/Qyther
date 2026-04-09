@@ -6,6 +6,10 @@ import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
 import { initializeEs } from './utils/esDownloader';
 import { logSystemInfo, getPlatformName, isWindows, isMacOS } from './utils/platform';
+import { mcpService } from './services/mcp/client';
+import { registerBrowserHandlers } from './ipc/browser-handlers';
+import { statefulBrowserAgent } from './services/browser/stateful-browser-agent';
+import { execSync } from 'child_process';
 
 // Load environment variables from .env file
 import 'dotenv/config';
@@ -70,6 +74,20 @@ app.whenReady().then(async () => {
   registerIPCHandlers();
   log('📡 IPC handlers registered');
   
+  // Register browser handlers
+  registerBrowserHandlers();
+  log('🌐 Browser handlers registered');
+  
+  // Check if Playwright browsers are installed
+  try {
+    log('🔍 Checking Playwright installation...');
+    execSync('npx playwright install chromium', { stdio: 'ignore' });
+    log('✅ Playwright Chromium installed');
+  } catch (error) {
+    log('⚠️  Playwright installation failed:', error instanceof Error ? error.message : 'Unknown error');
+    log('ℹ️  Browser automation will install Playwright on first use');
+  }
+  
   // Register global shortcuts
   registerGlobalShortcuts();
   log('⌨️  Global shortcuts registered');
@@ -113,6 +131,17 @@ app.on('will-quit', () => {
   log('👋 App quitting...');
   unregisterGlobalShortcuts();
   destroyTray();
+  
+  // Cleanup MCP
+  mcpService.cleanup().catch(err => {
+    log('⚠️  MCP cleanup error:', err);
+  });
+  
+  // Cleanup browser agent
+  statefulBrowserAgent.cleanup().catch(err => {
+    log('⚠️  Browser agent cleanup error:', err);
+  });
+  
   log('✅ Cleanup complete');
 });
 

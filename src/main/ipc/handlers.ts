@@ -5,10 +5,17 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { searchFiles, formatFileSize, formatDate } from '../utils/esRunner';
 import { getSystemInfo, getPlatform, getPlatformName, isWindows, isMacOS, isLinux } from '../utils/platform';
+import { registerChatHandlers } from './chat-handlers';
+import { registerMCPHandlers } from './mcp-handlers';
 
 const execAsync = promisify(exec);
 
 export function registerIPCHandlers(): void {
+  // Register chat handlers
+  registerChatHandlers();
+  // Register MCP handlers
+  registerMCPHandlers();
+  
   // App info handlers
   ipcMain.handle('app:version', () => {
     return app.getVersion();

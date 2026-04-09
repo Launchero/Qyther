@@ -139,11 +139,15 @@ export function CommandPalette({
         onExecute={onExecute}
         executingId={executingId}
         bodyRef={bodyRef}
+        searchMode={searchMode}
+        windowMode={currentMode}
       />
       
       <CommandPaletteFooter
         showFooter={showFooter}
         footerRef={footerRef}
+        searchMode={searchMode}
+        windowMode={currentMode}
       />
     </div>
   );

@@ -17,6 +17,8 @@ interface LLMPreferences {
 
 interface MCPPreferences {
   enabled?: boolean;
+  enabledServers?: string[];
+  enabledTools?: string[];
   servers?: Array<{
     name: string;
     type: 'stdio' | 'http';
@@ -56,19 +58,53 @@ function getPreferencesPath(): string {
   return PREFERENCES_FILE;
 }
 
+export function getDefaultMCPConfig(): MCPPreferences {
+  return {
+    enabled: true,
+    servers: [
+      {
+        name: 'filesystem',
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', process.cwd()],
+        enabled: true,
+      },
+      {
+        name: 'time',
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-time'],
+        enabled: false,
+      },
+    ],
+  };
+}
+
 export function loadPreferences(): Preferences {
   const prefsPath = getPreferencesPath();
   
   if (!existsSync(prefsPath)) {
-    return {};
+    // Return defaults
+    return {
+      mcp: getDefaultMCPConfig(),
+    };
   }
   
   try {
     const data = readFileSync(prefsPath, 'utf-8');
-    return JSON.parse(data) as Preferences;
+    const prefs = JSON.parse(data) as Preferences;
+    
+    // Merge with defaults if mcp config is missing
+    if (!prefs.mcp) {
+      prefs.mcp = getDefaultMCPConfig();
+    }
+    
+    return prefs;
   } catch (error) {
     console.error('Failed to load preferences:', error);
-    return {};
+    return {
+      mcp: getDefaultMCPConfig(),
+    };
   }
 }
 
