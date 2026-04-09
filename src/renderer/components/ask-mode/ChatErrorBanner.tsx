@@ -10,7 +10,6 @@ interface ChatErrorBannerProps {
 
 export function ChatErrorBanner({
   error,
-  browserModeEnabled,
   onRetry,
   onNewChat,
   onEditQuery,

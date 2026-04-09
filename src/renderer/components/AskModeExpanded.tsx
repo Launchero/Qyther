@@ -7,6 +7,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { ChatTopBar } from './ask-mode/ChatTopBar';
 import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { ChatErrorBanner } from './ask-mode/ChatErrorBanner';
+import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
 import { ChatSession as ChatSessionType } from './ask-mode/ChatHistoryPanel';
 import './BrowserAutomation.css';
 
@@ -44,6 +45,9 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
   const [browserSessionActive, setBrowserSessionActive] = useState(false);
   const [browserStatus, setBrowserStatus] = useState<BrowserProgress | null>(null);
   const [browserSessionUrl, setBrowserSessionUrl] = useState<string | null>(null);
+  const [isBrowserPaused, setIsBrowserPaused] = useState(false);
+  const [browserStartTime, setBrowserStartTime] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   
   // Tooltip preference (reserved for future use)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -55,6 +59,11 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
       console.log('[AskModeExpanded] Browser progress:', data);
       setBrowserStatus(data.progress);
       setBrowserSessionActive(data.progress.status !== 'complete' && data.progress.status !== 'error');
+      
+      // Start timer on first progress update
+      if (!browserStartTime && data.progress.step === 1) {
+        setBrowserStartTime(Date.now());
+      }
     };
     
     const handleBrowserChunk = (data: { sessionId: string; chunk: string }) => {
@@ -76,7 +85,7 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
       cleanupChunk();
       cleanupError();
     };
-  }, []);
+  }, [browserStartTime]);
   
   // Poll browser session status
   useEffect(() => {
@@ -96,6 +105,17 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
     const interval = setInterval(pollStatus, 2000); // Poll every 2 seconds
     return () => clearInterval(interval);
   }, [browserModeEnabled]);
+  
+  // Timer for elapsed time
+  useEffect(() => {
+    if (browserSessionActive && browserStartTime && !isBrowserPaused) {
+      const timer = setInterval(() => {
+        setElapsedMs(Date.now() - browserStartTime);
+      }, 100);
+      
+      return () => clearInterval(timer);
+    }
+  }, [browserSessionActive, browserStartTime, isBrowserPaused]);
 
   // Keyboard shortcut for browser mode toggle
   useEffect(() => {
@@ -205,6 +225,26 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
     }
   };
   
+  const handlePauseBrowser = async () => {
+    try {
+      // In a real implementation, this would call IPC to pause
+      setIsBrowserPaused(true);
+      console.log('[AskModeExpanded] Browser automation paused');
+    } catch (error) {
+      console.error('[AskModeExpanded] Failed to pause browser:', error);
+    }
+  };
+  
+  const handleResumeBrowser = async () => {
+    try {
+      // In a real implementation, this would call IPC to resume
+      setIsBrowserPaused(false);
+      console.log('[AskModeExpanded] Browser automation resumed');
+    } catch (error) {
+      console.error('[AskModeExpanded] Failed to resume browser:', error);
+    }
+  };
+  
 
   // MCP keyboard shortcuts
   useMCPKeyboardShortcuts({
@@ -243,29 +283,24 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
 
       {/* Browser Session Status Indicator */}
       {browserSessionActive && browserStatus && (
-        <div className="browser-session-status">
-          <div className="browser-status-header">
-            <svg className="browser-status-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="3" fill="currentColor"/>
-            </svg>
-            <span>Browser automation in progress...</span>
-          </div>
-          <div className="browser-status-details">
-            <span className="browser-step">
-              Step {browserStatus.step}/{browserStatus.maxSteps}
-            </span>
-            <span className="browser-action">
-              {browserStatus.status}: {browserStatus.url || 'Starting...'}
-            </span>
-            <div className="browser-progress-bar">
-              <div 
-                className="browser-progress-fill" 
-                style={{ width: `${(browserStatus.step / browserStatus.maxSteps) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
+        <BrowserProgressPanel
+          progress={browserStatus}
+          reasoning={browserStatus.status === 'navigating' ? 'Accessing the requested page to gather information' : undefined}
+          upcomingSteps={
+            browserStatus.status === 'navigating' 
+              ? ['Extract content from page', 'Process and format results', 'Present findings']
+              : undefined
+          }
+          metrics={{
+            elapsedMs,
+            estimatedTokens: Math.floor(elapsedMs / 100), // Rough estimate
+            confidence: Math.max(70, 100 - Math.floor(elapsedMs / 1000)), // Decreases over time
+          }}
+          onPause={handlePauseBrowser}
+          onResume={handleResumeBrowser}
+          onStop={handleCloseBrowserSession}
+          isPaused={isBrowserPaused}
+        />
       )}
 
       {/* Main Chat Area with Welcome State and Messages */}
@@ -294,7 +329,6 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
       {error && (
         <ChatErrorBanner
           error={error}
-          browserModeEnabled={browserModeEnabled}
           onRetry={handleRetry}
           onNewChat={handleNewChat}
           onEditQuery={handleEditQuery}

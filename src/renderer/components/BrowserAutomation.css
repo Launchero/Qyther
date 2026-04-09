@@ -1475,3 +1475,312 @@
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
   }
 }
+
+/* ============================================ */
+/* Browser Progress Panel                       */
+/* ============================================ */
+
+.browser-progress-panel {
+  background: linear-gradient(135deg, rgba(113, 50, 245, 0.05) 0%, rgba(113, 50, 245, 0.02) 100%);
+  border: 1px solid rgba(113, 50, 245, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 16px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.browser-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.browser-progress-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #101114;
+}
+
+.browser-progress-icon {
+  width: 20px;
+  height: 20px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.browser-progress-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.browser-control-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.browser-control-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #374151;
+  transform: translateY(-1px);
+}
+
+.browser-control-btn-stop:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.browser-current-step {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #7132f5;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.step-status-line {
+  flex: 1;
+  width: 2px;
+  background: linear-gradient(to bottom, #7132f5, #e5e7eb);
+  min-height: 20px;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.step-status-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #101114;
+}
+
+.step-url {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+  max-width: fit-content;
+}
+
+.step-reasoning {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(113, 50, 245, 0.05);
+  border-left: 3px solid #7132f5;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.step-reasoning svg {
+  flex-shrink: 0;
+  color: #7132f5;
+}
+
+.browser-upcoming-steps {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+}
+
+.upcoming-steps-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.step-preview-number {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.step-preview-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.browser-step-metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.metric-item svg {
+  color: #9ca3af;
+}
+
+.browser-progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.browser-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.browser-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.browser-progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* Dark mode for progress panel */
+@media (prefers-color-scheme: dark) {
+  .browser-progress-panel {
+    background: linear-gradient(135deg, rgba(113, 50, 245, 0.1) 0%, rgba(113, 50, 245, 0.05) 100%);
+    border-color: rgba(113, 50, 245, 0.3);
+  }
+
+  .browser-progress-title {
+    color: #f9fafb;
+  }
+
+  .step-text {
+    color: #f9fafb;
+  }
+
+  .step-url {
+    background: rgba(255, 255, 255, 0.05);
+    color: #9ca3af;
+  }
+
+  .step-reasoning {
+    background: rgba(113, 50, 245, 0.1);
+    color: #d1d5db;
+  }
+
+  .browser-upcoming-steps {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .upcoming-steps-title {
+    color: #9ca3af;
+  }
+
+  .step-preview-text {
+    color: #9ca3af;
+  }
+
+  .browser-step-metrics {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .metric-item {
+    color: #9ca3af;
+  }
+
+  .browser-control-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #d1d5db;
+  }
+
+  .browser-control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #f9fafb;
+  }
+
+  .step-status-line {
+    background: linear-gradient(to bottom, #7132f5, #374151);
+  }
+}
