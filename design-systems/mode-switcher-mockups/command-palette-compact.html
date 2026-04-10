@@ -40,10 +40,10 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Compact Command Palette Container - 800x100 */
+        /* Compact Command Palette Container - 800x100 (updated to fill viewport) */
         .command-palette {
             width: 800px;
-            height: 100px;
+            height: 100px;  /* Updated from 80px to fill complete viewport */
             background: var(--white);
             border-radius: 12px;
             box-shadow: var(--shadow-subtle);
@@ -247,7 +247,7 @@
 </head>
 <body>
     <div class="presentation">
-        <div class="presentation-label">Compact Mode — 800×100px</div>
+        <div class="presentation-label">Compact Mode — 800×100px (Updated to fill viewport)</div>
         
         <div class="command-palette">
             <!-- Mode Dropdown -->

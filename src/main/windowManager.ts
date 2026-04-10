@@ -16,7 +16,7 @@ export interface WindowModeConfig {
 const MODE_CONFIGS: Record<WindowMode, { width: number; height: number; positionY: 'top' | 'center' }> = {
   compact: {
     width: 800,
-    height: 100,
+    height: 100,  // Updated to fill viewport (was 80px)
     positionY: 'top',
   },
   expanded: {
@@ -32,7 +32,7 @@ const MODE_CONFIGS: Record<WindowMode, { width: number; height: number; position
 };
 
 class WindowManager {
-  private currentMode: WindowMode = 'expanded';
+  private currentMode: WindowMode = 'compact'; // Default to compact mode per mockup design
   private customDimensions: { width: number; height: number } | null = null;
 
   constructor() {
@@ -41,9 +41,17 @@ class WindowManager {
 
   private loadSavedPreferences(): void {
     const prefs = loadPreferences();
-    if (prefs.windowMode) {
-      this.currentMode = prefs.windowMode;
+    
+    // FORCE compact mode as default - override any saved preference
+    // This ensures the app always starts in compact mode per mockup design
+    if (prefs.windowMode && prefs.windowMode !== 'compact') {
+      console.log('[WindowManager] Overriding saved window mode to compact (was:', prefs.windowMode, ')');
+      this.currentMode = 'compact';
+      savePreferences({ windowMode: 'compact' });
+    } else {
+      this.currentMode = 'compact'; // Default to compact
     }
+    
     // Only load custom dimensions if mode is actually 'custom'
     if (prefs.windowMode === 'custom' && prefs.customDimensions) {
       this.customDimensions = prefs.customDimensions;

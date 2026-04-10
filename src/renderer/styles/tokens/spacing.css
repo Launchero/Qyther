@@ -1,0 +1,61 @@
+/*
+ * =============================================================================
+ * SPACING SCALE
+ * =============================================================================
+ * 
+ * PURPOSE: This file contains spacing tokens for the shadcn design system.
+ * 
+ * RULES:
+ * 1. No arbitrary values in components (e.g., p-[17px], bg-[#ff0000])
+ * 2. Use tokens: var(--spacing-4), var(--color-primary)
+ * 3. Add new tokens here, not in components
+ * 4. All colors in OKLCH format for perceptual consistency
+ * 5. Document mockup specs when extracting (e.g., "Mockup line 78")
+ */
+
+@theme {
+  /* Spacing scale (0-16) */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;   /* 4px */
+  --spacing-2: 0.5rem;    /* 8px */
+  --spacing-3: 0.75rem;   /* 12px */
+  --spacing-4: 1rem;      /* 16px */
+  --spacing-5: 1.25rem;   /* 20px */
+  --spacing-6: 1.5rem;    /* 24px */
+  --spacing-8: 2rem;      /* 32px */
+  --spacing-10: 2.5rem;   /* 40px */
+  --spacing-12: 3rem;     /* 48px */
+  --spacing-14: 3.5rem;   /* 56px */
+  --spacing-16: 4rem;     /* 64px */
+  
+  /* Container widths (from mockup specs) */
+  --container-command-palette: 800px;    /* Mockup line 78 */
+  --container-input-height: 44px;         /* Mockup line 241 */
+  --container-compact-height: 100px;      /* Updated to fill viewport (was 80px) */
+  --container-expanded-height: 600px;     /* Mockup line 80 */
+  --container-custom-height: 480px;      /* custom mode */
+  
+  /* Section padding */
+  --padding-section-sm: var(--spacing-3);
+  --padding-section-md: var(--spacing-4);
+  --padding-section-lg: var(--spacing-6);
+  
+  /* Shortcut key specific */
+  --shortcut-key-min-width: 20px;
+  --shortcut-key-width: 28px;
+  --shortcut-key-height: 28px;
+
+  /* Gap token for SearchBar (12px = gap-3) */
+  --spacing-gap-searchbar: 12px;
+
+  /* Result item specific */
+  --max-width-path: 300px;
+  --result-item-height: 44px; /* h-11 = 44px */
+
+  /* Textarea specific */
+  --min-height-textarea: 48px;
+  --max-height-textarea: 120px;
+
+  /* Modal specific */
+  --max-height-scroll-section: 300px;
+}
