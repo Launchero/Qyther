@@ -27,8 +27,9 @@ export function CommandPaletteHeader({
     <div 
       ref={headerRef} 
       className={cn(
-        // Layout - full width, auto height (content-sized)
+        // Layout - full width, fixed 100px height per design system
         "w-full",
+        "h-[100px]", // Fixed header height in all modes
         "flex items-center",
         "flex-shrink-0", // Prevent growing
         
