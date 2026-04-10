@@ -27,8 +27,8 @@ export function CommandPaletteHeader({
     <div 
       ref={headerRef} 
       className={cn(
-        // Layout - fill parent height and center content
-        "w-full h-full",
+        // Layout - full width, auto height (content-sized)
+        "w-full",
         "flex items-center",
         "flex-shrink-0", // Prevent growing
         

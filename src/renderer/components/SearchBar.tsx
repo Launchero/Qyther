@@ -143,10 +143,11 @@ export function SearchBar({
       // Mockup line 77-89: Compact command palette layout
       "flex items-center",
       "w-full",
-      "h-full", // Fill parent height (100px in compact mode)
+      // Height: fill parent in compact mode, auto in expanded
+      isCompactWindow ? "h-full" : "h-auto",
       "gap-[var(--spacing-gap-searchbar)]", // Mockup line 86: Exact 12px gap
-      // Padding adjusted for 100px height (was 80px)
-      "px-3 py-3", // Add vertical padding to center 44px content in 100px space
+      // Padding: adjusted for 100px height in compact mode
+      isCompactWindow ? "px-3 py-3" : "px-3 py-2",
       isCompactWindow && "compact-window",
       tabsExpanded && "tabs-expanded",
       isCompactAskMode && "compact-ask-mode",
