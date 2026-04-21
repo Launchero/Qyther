@@ -16,7 +16,7 @@ export interface WindowModeConfig {
 const MODE_CONFIGS: Record<WindowMode, { width: number; height: number; positionY: 'top' | 'center' }> = {
   compact: {
     width: 800,
-    height: 100,  // Updated to fill viewport (was 80px)
+    height: 100,
     positionY: 'top',
   },
   expanded: {
@@ -31,32 +31,49 @@ const MODE_CONFIGS: Record<WindowMode, { width: number; height: number; position
   },
 };
 
+// Height step size and interval for animated transitions
+const RESIZE_ANIMATION_STEP = 30;
+const RESIZE_ANIMATION_INTERVAL_MS = 16;
+
 class WindowManager {
-  private currentMode: WindowMode = 'compact'; // Default to compact mode per mockup design
+  private currentMode: WindowMode = 'compact';
   private customDimensions: { width: number; height: number } | null = null;
+  private isUserResizing = false;
+  private resizeListenerAttached = false;
+  private animationTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.loadSavedPreferences();
   }
 
+  private attachResizeListener(window: BrowserWindow, configWidth: number): void {
+    if (this.resizeListenerAttached) return;
+    this.resizeListenerAttached = true;
+
+    window.on('resize', () => {
+      if (this.isUserResizing || this.currentMode !== 'expanded') return;
+      const bounds = window.getBounds();
+      if (bounds.width !== configWidth) {
+        this.isUserResizing = true;
+        window.setSize(configWidth, bounds.height);
+        this.isUserResizing = false;
+      }
+    });
+  }
+
   private loadSavedPreferences(): void {
     const prefs = loadPreferences();
     
-    // FORCE compact mode as default - override any saved preference
-    // This ensures the app always starts in compact mode per mockup design
-    if (prefs.windowMode && prefs.windowMode !== 'compact') {
-      console.log('[WindowManager] Overriding saved window mode to compact (was:', prefs.windowMode, ')');
-      this.currentMode = 'compact';
-      savePreferences({ windowMode: 'compact' });
+    if (prefs.windowMode && (prefs.windowMode === 'compact' || prefs.windowMode === 'expanded' || prefs.windowMode === 'custom')) {
+      this.currentMode = prefs.windowMode;
     } else {
-      this.currentMode = 'compact'; // Default to compact
+      this.currentMode = 'compact';
     }
     
     // Only load custom dimensions if mode is actually 'custom'
     if (prefs.windowMode === 'custom' && prefs.customDimensions) {
       this.customDimensions = prefs.customDimensions;
     } else if (prefs.customDimensions) {
-      // Clear stale custom dimensions from preferences to prevent conflicts
       console.log('[WindowManager] Clearing stale custom dimensions from preferences');
       savePreferences({ customDimensions: undefined });
     }
@@ -67,6 +84,11 @@ class WindowManager {
   }
 
   public setMode(mode: WindowMode, window?: BrowserWindow): void {
+    // If already in this mode and it's expanded, don't reset size (user may have resized)
+    if (mode === this.currentMode && mode === 'expanded') {
+      return;
+    }
+    
     this.currentMode = mode;
     
     // Clear custom dimensions when switching to default modes
@@ -84,24 +106,86 @@ class WindowManager {
       // Tell renderer to update layout for the new mode
       window.webContents.send('window:modeChanged', mode);
       
-      // Enable resizing
-      window.setResizable(true);
-      window.setMinimumSize(100, 100);
-      window.setMaximumSize(1920, 1080);
-      
-      // Set new size and position
-      window.setSize(config.width, config.height);
-      this.repositionWindow(window);
-      
-      // Lock to new size after a short delay to allow renderer to update
-      setTimeout(() => {
-        window.setMinimumSize(config.width, config.height);
-        window.setMaximumSize(config.width, config.height);
-        window.setResizable(false);
-        const lockTime = new Date().toLocaleTimeString();
-        console.log(`[${lockTime}] 🔒 Window locked at ${config.width}x${config.height}`);
-      }, 150);
+      if (mode === 'expanded') {
+        const defaultHeight = config.height;
+        window.setResizable(true);
+        window.setMinimumSize(config.width, Math.max(300, defaultHeight * 0.5));
+        
+        // Cap height to available work area below the window top position
+        const currentScreen = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+        const { y: windowY } = this.calculateWindowPosition(window);
+        const maxAvailableHeight = currentScreen.workAreaSize.height - (windowY - currentScreen.bounds.y);
+        const effectiveHeight = Math.min(defaultHeight, maxAvailableHeight);
+        const cappedMaxHeight = Math.min(1080, maxAvailableHeight);
+        window.setMaximumSize(config.width, cappedMaxHeight);
+        
+        // Animate from current height to target height
+        const currentBounds = window.getBounds();
+        const startHeight = currentBounds.height;
+        this.animateWindowHeight(window, startHeight, effectiveHeight, () => {
+          this.repositionWindow(window);
+          this.attachResizeListener(window, config.width);
+        });
+      } else {
+        // For compact/custom modes, lock to fixed size
+        window.setResizable(true);
+        window.setMinimumSize(100, 100);
+        window.setMaximumSize(1920, 1080);
+        
+        // Animate from current height to target height
+        const currentBounds = window.getBounds();
+        const startHeight = currentBounds.height;
+        this.animateWindowHeight(window, startHeight, config.height, () => {
+          this.repositionWindow(window);
+          // Lock dimensions after animation completes
+          window.setMinimumSize(config.width, config.height);
+          window.setMaximumSize(config.width, config.height);
+          window.setResizable(false);
+          const lockTime = new Date().toLocaleTimeString();
+          console.log(`[${lockTime}] 🔒 Window locked at ${config.width}x${config.height}`);
+        });
+      }
     }
+  }
+
+  private animateWindowHeight(
+    window: BrowserWindow,
+    fromHeight: number,
+    toHeight: number,
+    onComplete?: () => void,
+  ): void {
+    // Cancel any ongoing animation
+    if (this.animationTimer) {
+      clearInterval(this.animationTimer);
+      this.animationTimer = null;
+    }
+
+    // If the height difference is small, jump directly
+    if (Math.abs(toHeight - fromHeight) < RESIZE_ANIMATION_STEP) {
+      window.setBounds({ height: toHeight });
+      onComplete?.();
+      return;
+    }
+
+    let currentHeight = fromHeight;
+    const direction = toHeight > fromHeight ? 1 : -1;
+
+    this.animationTimer = setInterval(() => {
+      const remaining = Math.abs(toHeight - currentHeight);
+      if (remaining <= RESIZE_ANIMATION_STEP) {
+        currentHeight = toHeight;
+        window.setBounds({ height: currentHeight });
+        if (this.animationTimer) {
+          clearInterval(this.animationTimer);
+          this.animationTimer = null;
+        }
+        onComplete?.();
+        return;
+      }
+
+      currentHeight += RESIZE_ANIMATION_STEP * direction;
+      window.setBounds({ height: currentHeight });
+    }, RESIZE_ANIMATION_INTERVAL_MS);
   }
 
   public toggleMode(window?: BrowserWindow): WindowMode {
@@ -152,13 +236,13 @@ class WindowManager {
   public calculateWindowPosition(_window: BrowserWindow): { x: number; y: number } {
     const config = this.getModeConfig();
     const currentScreen = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-    const { width: screenWidth, height: screenHeight } = currentScreen.workAreaSize;
+    const { width: screenWidth } = currentScreen.workAreaSize;
     const { width: windowWidth } = config;
 
     const x = Math.floor((screenWidth - windowWidth) / 2 + currentScreen.bounds.x);
     
     // Keep consistent top position for both modes (expand downward only)
-    const y = Math.floor(screenHeight * 0.15 + currentScreen.bounds.y); // 15% from top
+    const y = Math.floor(currentScreen.workAreaSize.height * 0.15 + currentScreen.bounds.y);
 
     return { x, y };
   }

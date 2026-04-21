@@ -14,10 +14,10 @@ export function ContextUsageIndicator({
   const percentage = (current / total) * 100;
   
   const getColor = () => {
-    if (percentage >= 90) return 'var(--kraken-red)';
-    if (percentage >= 75) return 'var(--kraken-purple)';
-    if (percentage >= 50) return 'var(--kraken-purple-dark)';
-    return 'var(--kraken-green)';
+    if (percentage >= 90) return 'var(--color-red-500)';
+    if (percentage >= 75) return 'var(--primary)';
+    if (percentage >= 50) return 'var(--color-primary-dark)';
+    return 'var(--color-green-500)';
   };
 
   const getAlertMessage = () => {

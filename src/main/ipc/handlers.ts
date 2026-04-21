@@ -1,4 +1,4 @@
-import { ipcMain, app, shell } from 'electron';
+import { ipcMain, app, shell, dialog as electronDialog } from 'electron';
 import { hideMainWindow, setWindowMode, getWindowMode, toggleWindowMode, getMainWindow } from '../windows';
 import { windowManager } from '../windowManager';
 import { exec } from 'child_process';
@@ -11,9 +11,7 @@ import { registerMCPHandlers } from './mcp-handlers';
 const execAsync = promisify(exec);
 
 export function registerIPCHandlers(): void {
-  // Register chat handlers
   registerChatHandlers();
-  // Register MCP handlers
   registerMCPHandlers();
   
   // App info handlers
@@ -97,6 +95,36 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  ipcMain.handle('window:resizeHeight', (_, height: number) => {
+    try {
+      const mainWindow = getMainWindow();
+      if (mainWindow) {
+        const currentBounds = mainWindow.getBounds();
+        mainWindow.setBounds({
+          x: currentBounds.x,
+          y: currentBounds.y,
+          width: currentBounds.width,
+          height: Math.round(height),
+        });
+      }
+    } catch (error) {
+      console.error('[IPC] Error in resizeHeight:', error);
+    }
+  });
+
+  ipcMain.handle('window:getHeight', () => {
+    try {
+      const mainWindow = getMainWindow();
+      if (mainWindow) {
+        return mainWindow.getBounds().height;
+      }
+      return 600;
+    } catch (error) {
+      console.error('[IPC] Error in getHeight:', error);
+      return 600;
+    }
+  });
+
   // Command execution handler
   ipcMain.handle('command:execute', async (_, command: string): Promise<{ success: boolean; output?: string; error?: string }> => {
     try {
@@ -128,20 +156,31 @@ export function registerIPCHandlers(): void {
     const apps: Array<{ name: string; path: string; icon?: string }> = [];
 
     if (isWindows()) {
-      // Windows: Get programs from Start Menu
+      // Windows: Get programs from both Start Menu locations
+      const startMenuPaths = [
+        process.env.APPDATA ? `${process.env.APPDATA}\\Microsoft\\Windows\\Start Menu\\Programs` : '',
+        'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+      ].filter(Boolean);
+      
       try {
-        const startMenuPath = process.env.APPDATA || '';
-        const programsPath = `${startMenuPath}\\Microsoft\\Windows\\Start Menu\\Programs`;
-        
-        const { stdout } = await execAsync(`dir /b "${programsPath}"`);
-        const items = stdout.split('\r\n').filter(line => line.trim());
-        
-        for (const item of items.slice(0, 50)) { // Limit to 50 apps
-          if (item.endsWith('.lnk') || item.endsWith('.exe')) {
-            apps.push({
-              name: item.replace(/\.(lnk|exe)$/, ''),
-              path: `${programsPath}\\${item}`,
-            });
+        for (const programsPath of startMenuPaths) {
+          try {
+            const { stdout } = await execAsync(`dir /b "${programsPath}"`);
+            const items = stdout.split('\r\n').filter(line => line.trim());
+            
+            for (const item of items.slice(0, 50)) {
+              if (item.endsWith('.lnk') || item.endsWith('.exe')) {
+                const existing = apps.find(a => a.name === item.replace(/\.(lnk|exe)$/, ''));
+                if (!existing) {
+                  apps.push({
+                    name: item.replace(/\.(lnk|exe)$/, ''),
+                    path: `${programsPath}\\${item}`,
+                  });
+                }
+              }
+            }
+          } catch {
+            // Skip paths that don't exist
           }
         }
       } catch (error) {
@@ -217,7 +256,6 @@ export function registerIPCHandlers(): void {
         return [];
       }
       
-      // Use new searchFiles signature with options (backward compatible)
       const results = await searchFiles(query, {
         maxResults: options?.maxResults || 50,
         excludeHidden: options?.excludeHidden ?? true,
@@ -246,5 +284,50 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('debug:log', (event, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     console.log(`[${timestamp}] 📊 ${message}`, data ? JSON.stringify(data, null, 2) : '');
+  });
+
+  // Dialog handlers
+  ipcMain.handle('dialog:openFile', async (_, options?: { 
+    defaultPath?: string; 
+    filters?: Array<{ name: string; extensions: string[] }> 
+  }): Promise<{ path?: string; cancelled?: boolean }> => {
+    try {
+      const mainWindow = getMainWindow();
+      const result = await electronDialog.showOpenDialog(mainWindow!, {
+        properties: ['openFile'],
+        defaultPath: options?.defaultPath,
+        filters: options?.filters,
+      });
+      
+      if (result.canceled || result.filePaths.length === 0) {
+        return { cancelled: true };
+      }
+      
+      return { path: result.filePaths[0] };
+    } catch (error) {
+      console.error('[IPC] Dialog openFile error:', error);
+      return { cancelled: true };
+    }
+  });
+
+  ipcMain.handle('dialog:openFolder', async (_, options?: { 
+    defaultPath?: string 
+  }): Promise<{ path?: string; cancelled?: boolean }> => {
+    try {
+      const mainWindow = getMainWindow();
+      const result = await electronDialog.showOpenDialog(mainWindow!, {
+        properties: ['openDirectory'],
+        defaultPath: options?.defaultPath,
+      });
+      
+      if (result.canceled || result.filePaths.length === 0) {
+        return { cancelled: true };
+      }
+      
+      return { path: result.filePaths[0] };
+    } catch (error) {
+      console.error('[IPC] Dialog openFolder error:', error);
+      return { cancelled: true };
+    }
   });
 }

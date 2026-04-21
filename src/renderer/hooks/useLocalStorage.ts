@@ -28,7 +28,6 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
 
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
-  // Return a wrapped version of useState's setter function that persists to localStorage
   const setValue = useCallback((value: T) => {
     try {
       const valueToStore = value;
@@ -36,7 +35,6 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
       
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        // Dispatch event to sync across tabs/components
         window.dispatchEvent(new Event('local-storage'));
       }
     } catch (error) {

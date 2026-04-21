@@ -4,7 +4,6 @@ import { showMainWindow, hideMainWindow } from './windows';
 let tray: Tray | null = null;
 
 export function createTray(): void {
-  // Create a simple 16x16 blue icon programmatically
   const size = 16;
   const canvas = Buffer.alloc(size * size * 4);
   
@@ -48,7 +47,7 @@ export function createTray(): void {
   
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show Raycast Clone',
+      label: 'Show Qyther',
       click: () => {
         showMainWindow();
       },
@@ -68,7 +67,7 @@ export function createTray(): void {
     },
   ]);
   
-  tray.setToolTip('Raycast Clone');
+  tray.setToolTip('Qyther');
   tray.setContextMenu(contextMenu);
   
   // Show/hide on double click

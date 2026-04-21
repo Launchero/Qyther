@@ -9,13 +9,11 @@ export function useSearch(allItems: SearchResult[]) {
   // Filter and sort results based on search query
   const results = useMemo(() => {
     if (!searchQuery.trim()) {
-      // Return first 10 items when no search query
       return allItems.slice(0, 10);
     }
 
     const query = searchQuery.trim();
     
-    // Filter items that match the query
     const matchingItems = allItems.filter(item => {
       const titleMatch = fuzzyMatch(query, item.title);
       const subtitleMatch = item.subtitle ? fuzzyMatch(query, item.subtitle) : false;
@@ -42,7 +40,7 @@ export function useSearch(allItems: SearchResult[]) {
   // Reset selection when results change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [results.length]);
+  }, [results.map(r => r.id).join(',')]);
 
   return {
     searchQuery,

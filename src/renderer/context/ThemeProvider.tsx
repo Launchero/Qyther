@@ -10,7 +10,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = 'kraken-theme';
+const THEME_STORAGE_KEY = 'app-theme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
@@ -30,10 +30,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    // Update HTML data-theme attribute
-    document.documentElement.setAttribute('data-theme', theme);
+    const root = document.documentElement;
     
-    // Store preference
+    // Toggle .dark class (required for CSS selector)
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+    
+    // Also set data-theme attribute for semantic tokens
+    root.setAttribute('data-theme', theme);
+    
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 

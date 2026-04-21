@@ -1,4 +1,13 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ClockIcon, ChatsCircleIcon, PlusIcon } from '@phosphor-icons/react';
 
 export interface ChatHistoryDropdownProps {
   history?: string[];
@@ -33,36 +42,43 @@ export function ChatHistoryDropdown({
   }
 
   return (
-    <div className={`history-toggle ${open ? 'open' : ''}`}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      
-      {/* History Dropdown */}
-      <div className="history-dropdown">
-        <div className="history-dropdown-header">
-          <span className="history-dropdown-title">Recent Chats</span>
-          <span className="new-chat-link" onClick={(e) => {
+    <DropdownMenu open={open} onOpenChange={onToggle}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-11 w-11 p-0"
+        >
+          <ClockIcon className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Recent Chats
+        </div>
+        <DropdownMenuSeparator />
+        {history.map((chat, index) => (
+          <DropdownMenuItem
+            key={index}
+            onClick={() => handleChatSelect(chat)}
+            className="flex items-center gap-2"
+          >
+            <ChatsCircleIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="truncate">{chat}</span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={(e) => {
             e.stopPropagation();
             onNewChat?.();
-          }}>+ New</span>
-        </div>
-        {history.map((chat, index) => (
-          <div
-            key={index}
-            className={`history-dropdown-item ${index === 0 ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleChatSelect(chat);
-            }}
-          >
-            <svg className="history-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="history-item-title">{chat}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+          }}
+          className="text-primary focus:text-primary"
+        >
+          <PlusIcon className="h-3.5 w-3.5 mr-2" />
+          New Chat
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

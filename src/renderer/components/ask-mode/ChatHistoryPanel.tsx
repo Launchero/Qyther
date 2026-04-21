@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { MagnifyingGlassIcon, XIcon, GlobeIcon } from '@phosphor-icons/react';
 
 export interface ChatSession {
   id: string;
@@ -33,11 +34,15 @@ export function ChatHistoryPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
 
-  // Focus search input when panel opens
+  // Focus search input when panel opens and restore focus when it closes
   useEffect(() => {
-    if (isVisible && searchInputRef.current) {
-      searchInputRef.current.focus();
+    if (isVisible) {
+      previousFocusRef.current = document.activeElement;
+      searchInputRef.current?.focus();
+    } else if (previousFocusRef.current instanceof HTMLElement) {
+      previousFocusRef.current.focus();
     }
   }, [isVisible]);
 
@@ -131,9 +136,7 @@ export function ChatHistoryPanel({
       {/* History Header with Search */}
       <div className="history-header">
         <div className="history-search-container">
-          <svg className="history-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <MagnifyingGlassIcon className="history-search-icon" />
           <input
             ref={searchInputRef}
             type="text"
@@ -149,9 +152,7 @@ export function ChatHistoryPanel({
               onClick={() => setSearchQuery('')}
               aria-label="Clear search"
             >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <XIcon />
             </button>
           )}
         </div>
@@ -168,9 +169,7 @@ export function ChatHistoryPanel({
       <div className="history-groups" role="list">
         {groupedSessions.length === 0 ? (
           <div className="history-no-results">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <MagnifyingGlassIcon />
             <p>No conversations found</p>
             {searchQuery && (
               <button 
@@ -204,10 +203,7 @@ export function ChatHistoryPanel({
                   >
                     <div className="history-session-content">
                       {session.hasBrowserSession && (
-                        <svg className="history-browser-indicator" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" stroke="currentColor" strokeWidth="2"/>
-                          <circle cx="12" cy="12" r="3" fill="currentColor"/>
-                        </svg>
+                        <GlobeIcon className="history-browser-indicator" />
                       )}
                       <div className="history-session-text">
                         <div className="history-session-title">

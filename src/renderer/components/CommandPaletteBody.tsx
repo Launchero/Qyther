@@ -1,10 +1,10 @@
 import React from 'react';
 import { ResultsList, SearchResult } from './ResultsList';
 import { AskModeExpanded } from './AskModeExpanded';
-import { DesktopModeExpanded } from './DesktopModeExpanded';
 import { SearchEmptyState } from './SearchEmptyState';
 import type { AttachedFile } from './ChatInputArea';
 import type { RecentFile } from '@/hooks/useRecentFiles';
+import type { SearchMode } from './SearchBar';
 
 export interface CommandPaletteBodyProps {
   showResults: boolean;
@@ -16,7 +16,7 @@ export interface CommandPaletteBodyProps {
   onExecute: (result: SearchResult) => void;
   executingId?: string | null;
   bodyRef: React.RefObject<HTMLDivElement | null>;
-  searchMode?: 'file' | 'ai' | 'code' | 'desktop';
+  searchMode?: SearchMode;
   windowMode?: 'expanded' | 'compact' | 'custom';
   onRegisterSendMessage?: (fn: ((message?: string) => void) | null) => void;
   attachedFiles?: AttachedFile[];
@@ -27,6 +27,7 @@ export interface CommandPaletteBodyProps {
   isFileSearchLoading?: boolean;
   fileSearchError?: string | null;
   recentFiles?: RecentFile[];
+  onAskAboutFile?: (result: SearchResult) => void;
   onQuickAction?: (action: string) => void;
 }
 
@@ -52,11 +53,8 @@ export function CommandPaletteBody({
   fileSearchError,
   recentFiles = [],
   onQuickAction,
+  onAskAboutFile,
 }: CommandPaletteBodyProps) {
-  if (!showResults) {
-    return null;
-  }
-
   // Show chat interface in expanded Ask mode
   if (searchMode === 'ai' && windowMode === 'expanded') {
     return (
@@ -75,21 +73,8 @@ export function CommandPaletteBody({
     );
   }
 
-  // Show desktop control in expanded mode
-  if (searchMode === 'desktop' && windowMode === 'expanded') {
-    return (
-      <div ref={bodyRef} className="flex-1 min-h-0 flex flex-col overflow-hidden bg-card">
-        <DesktopModeExpanded
-          searchQuery={searchQuery}
-          onSearchChange={onSearchChange}
-          onRegisterSendMessage={onRegisterSendMessage}
-        />
-      </div>
-    );
-  }
-
-  // Show empty state with quick actions when no query
-  if (!searchQuery.trim() && searchMode !== 'ai' && searchMode !== 'desktop') {
+  // Show empty state with quick actions when no query (file mode)
+  if (!searchQuery.trim() && searchMode !== 'ai') {
     return (
       <div ref={bodyRef} className="flex-1 min-h-0 overflow-hidden flex flex-col bg-card">
         <SearchEmptyState
@@ -110,20 +95,11 @@ export function CommandPaletteBody({
     );
   }
 
-  // For desktop mode with no query, show DesktopWelcomeState
-  if (searchMode === 'desktop' && !searchQuery.trim()) {
-    return (
-      <div ref={bodyRef} className="flex-1 min-h-0 overflow-hidden flex flex-col bg-card">
-        <DesktopModeExpanded
-          searchQuery={searchQuery}
-          onSearchChange={(_q) => {}}
-          onRegisterSendMessage={onRegisterSendMessage}
-        />
-      </div>
-    );
+  // Show results list for other modes
+  if (!showResults) {
+    return null;
   }
 
-  // Show results list for other modes
   return (
     <div
       ref={bodyRef}
@@ -138,6 +114,7 @@ export function CommandPaletteBody({
         executingId={executingId || undefined}
         isFileSearchLoading={isFileSearchLoading}
         fileSearchError={fileSearchError}
+        onAskAbout={onAskAboutFile}
       />
     </div>
   );

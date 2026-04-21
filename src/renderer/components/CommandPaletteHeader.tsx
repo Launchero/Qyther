@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { SearchBar, type SearchMode } from './SearchBar';
 import { UnifiedCommandBar } from './ask-mode/UnifiedCommandBar';
-import { DesktopCommandBar } from './DesktopCommandBar';
 import type { AttachedFile } from './ChatInputArea';
 import { cn } from '@/lib/utils';
 
@@ -19,13 +18,12 @@ export interface CommandPaletteHeaderProps {
   onOpenMCPModal?: () => void;
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
-  desktopControlEnabled?: boolean;
-  onToggleDesktopControl?: () => void;
   attachedFiles?: AttachedFile[];
   onRemoveFile?: (index: number) => void;
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onAddFile?: (file: AttachedFile) => void;
+  onExpandWindow?: () => void;
 }
 
 export function CommandPaletteHeader({
@@ -42,16 +40,14 @@ export function CommandPaletteHeader({
   onOpenMCPModal,
   webSearchEnabled = false,
   onToggleWebSearch,
-  desktopControlEnabled = false,
-  onToggleDesktopControl,
   attachedFiles = [],
   onRemoveFile,
   onAttachFile,
   onAttachFolder,
   onAddFile,
+  onExpandWindow,
 }: CommandPaletteHeaderProps) {
   const isAskMode = searchMode === 'ai';
-  const isDesktopMode = searchMode === 'desktop';
   const [askTabsExpanded, setAskTabsExpanded] = useState(false);
 
   const handleSend = (message: string) => {
@@ -74,15 +70,12 @@ export function CommandPaletteHeader({
         "w-full",
         "flex-shrink-0",
         "bg-card text-card-foreground",
-        // In Ask mode, height is determined by content (command-bar + optional chips).
-        // In file/code mode, use fixed 100px header.
-        !isAskMode && !isDesktopMode && "h-[var(--container-header-height)]",
+        // In file mode, use fixed 100px header.
+        "h-[var(--container-header-height)]",
         // Ask mode wrapper: column layout so chips appear below the command bar
         isAskMode && "flex flex-col",
-        // Desktop mode: column layout for command bar + quick action pills
-        isDesktopMode && "flex flex-col",
         // Border: compact file mode has no border, everything else has bottom border
-        windowMode === 'compact' && !isAskMode && !isDesktopMode
+        windowMode === 'compact' && !isAskMode
           ? "border-0"
           : "border-b border-border",
         "transition-colors duration-200"
@@ -99,8 +92,6 @@ export function CommandPaletteHeader({
           onOpenMCPModal={onOpenMCPModal}
           webSearchEnabled={webSearchEnabled}
           onToggleWebSearch={onToggleWebSearch}
-          desktopControlEnabled={desktopControlEnabled}
-          onToggleDesktopControl={onToggleDesktopControl}
           attachedFiles={attachedFiles}
           onRemoveFile={onRemoveFile}
           onAttachFile={onAttachFile}
@@ -110,14 +101,6 @@ export function CommandPaletteHeader({
           onModeChange={onSearchModeChange}
           tabsExpanded={askTabsExpanded}
           onTabsExpanded={handleAskTabsExpanded}
-        />
-      ) : isDesktopMode ? (
-        <DesktopCommandBar
-          value={searchQuery}
-          onChange={onSearchChange}
-          onSend={handleSend}
-          isLoading={false}
-          windowMode={windowMode}
         />
       ) : (
         <SearchBar
@@ -129,6 +112,7 @@ export function CommandPaletteHeader({
           onTabsExpanded={onTabsExpanded}
           windowMode={windowMode}
           onSendMessage={onSendMessage ? () => onSendMessage('') : undefined}
+          onExpandWindow={onExpandWindow}
         />
       )}
     </div>

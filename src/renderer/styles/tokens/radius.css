@@ -1,0 +1,42 @@
+/*
+ * =============================================================================
+ * BORDER RADIUS SCALE
+ * =============================================================================
+ * 
+ * PURPOSE: This file contains radius tokens for the shadcn design system.
+ * 
+ * Current base: 0.625rem (10px), defined in this file and semantic/theme.css line 70
+ */
+
+@theme {
+  /* Base radius */
+  --radius: 0.625rem;  /* 10px - Mockup line 81 */
+  
+  /* Derived scale (from shadcn convention) */
+  --radius-xs: calc(var(--radius) * 0.3);   /* 3px */
+  --radius-sm: calc(var(--radius) * 0.6);   /* 6px - Mockup line 286: calc(var(--radius) - 2px) */
+  --radius-md: calc(var(--radius) * 0.8);   /* 8px */
+  --radius-lg: var(--radius);               /* 10px */
+  --radius-xl: calc(var(--radius) * 1.4);   /* 14px */
+  --radius-2xl: calc(var(--radius) * 1.8);  /* 18px */
+  --radius-3xl: calc(var(--radius) * 2.2);  /* 22px */
+  --radius-4xl: calc(var(--radius) * 2.6);  /* 26px */
+  
+  /* Special values */
+  --radius-full: 9999px;
+  --radius-micro: calc(var(--radius) * 0.3);
+  --radius-arrow: 2px;  /* For tooltip arrow, small decorative elements */
+  
+  /* Component-specific (from mockups) */
+  --radius-shortcut-key: calc(var(--radius) - 2px);  /* Mockup line 286 */
+  --radius-command-palette: var(--radius);           /* Mockup line 81: 10px */
+  
+  /* Named aliases for convenience */
+  --radius-small: calc(var(--radius) * 0.6);
+  --radius-medium: calc(var(--radius) * 0.8);
+  --radius-large: var(--radius);
+  
+  /* Named radius calculations for consistency */
+  --radius-input: calc(var(--radius) + 2px);         /* 12px - search inputs */
+  --radius-chip: calc(var(--radius) - 2px);          /* 8px - compact chips */
+}

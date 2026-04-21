@@ -1,11 +1,18 @@
-import React from 'react';
-import { ThemeToggle } from './ThemeToggle';
+import React, { useState } from 'react';
 import type { SearchMode } from './SearchBar';
+import { ThemeToggle } from './ThemeToggle';
+import { FooterTips } from './FooterTips';
+import { ShortcutsReference } from './ShortcutsReference';
+import { useRotatingTips } from '@/hooks/useRotatingTips';
+import { cn } from '@/lib/utils';
+import { Question } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 
 export interface CommandPaletteFooterProps {
   showFooter: boolean;
   footerRef: React.RefObject<HTMLDivElement | null>;
   searchMode?: SearchMode;
+  searchQuery?: string;
   windowMode?: 'expanded' | 'compact' | 'custom';
 }
 
@@ -13,55 +20,55 @@ export function CommandPaletteFooter({
   showFooter,
   footerRef,
   searchMode = 'file',
-  windowMode = 'expanded',
+  searchQuery = '',
+  windowMode: _windowMode,
 }: CommandPaletteFooterProps) {
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const hasQuery = searchQuery.trim().length > 0;
+  const { currentTip, isPaused, hoverHandlers } = useRotatingTips(searchMode, hasQuery);
+
   if (!showFooter) {
     return null;
   }
 
-  const isAiMode = searchMode === 'ai';
-  const isExpandedWindow = windowMode === 'expanded';
-
   return (
-    <div ref={footerRef} className="command-palette-footer">
-      <div className="footer-section">
-        <div className="shortcut-hint">
-          <kbd>↑↓</kbd> Navigate
-        </div>
-        <div className="shortcut-hint">
-          <kbd>Enter</kbd> {isAiMode && isExpandedWindow ? 'Send' : 'Execute'}
-        </div>
-        {isAiMode && (
-          <div className="shortcut-hint">
-            <kbd>⇧</kbd><kbd>Enter</kbd> New line
-          </div>
+    <>
+      <div
+        ref={footerRef}
+        {...hoverHandlers}
+        className={cn(
+          'flex items-center justify-between px-4 py-2.5',
+          'bg-muted border-t border-border',
+          'rounded-b-[var(--radius-command-palette)]',
+          'min-h-[var(--container-input-height)]'
         )}
-        <div className="shortcut-hint">
-          <kbd>Esc</kbd> {isExpandedWindow ? 'Minimize' : 'Close'}
+      >
+        <div className="flex items-center">
+          <FooterTips
+            tip={currentTip}
+            isPaused={isPaused}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setShowShortcuts(true)}
+            title="Keyboard shortcuts"
+          >
+            <Question className="h-4 w-4" />
+          </Button>
+          <ThemeToggle />
         </div>
       </div>
-      {!isAiMode && (
-        <>
-          <div className="footer-divider" />
-          <div className="footer-section">
-            <div className="shortcut-hint">
-              <kbd>Home</kbd><kbd>End</kbd> Jump
-            </div>
-            <div className="shortcut-hint">
-              <kbd>PgUp</kbd><kbd>PgDn</kbd> Page
-            </div>
-          </div>
-        </>
-      )}
-      <div className="footer-section footer-section-right">
-        <div className="shortcut-hint">
-          <kbd>Alt+Shift+M</kbd> Mode
-        </div>
-        <div className="shortcut-hint">
-          <kbd>Alt+Shift+T</kbd> Theme
-        </div>
-        <ThemeToggle />
-      </div>
-    </div>
+
+      <ShortcutsReference
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
+      />
+    </>
   );
 }

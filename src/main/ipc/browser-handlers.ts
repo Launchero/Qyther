@@ -4,7 +4,6 @@ import { browserSessionManager } from '../services/browser/browser-session-manag
 import { langChainAgent } from '../services/langchain/agent';
 
 export function registerBrowserHandlers(): void {
-  // Initialize browser agent
   ipcMain.handle('browser:initialize', async (_, config?: { headed?: boolean }) => {
     try {
       await statefulBrowserAgent.initialize(config);
@@ -21,7 +20,6 @@ export function registerBrowserHandlers(): void {
     }
   });
 
-  // Create new browser session
   ipcMain.handle('browser:createSession', async (_, config?: { headed?: boolean }) => {
     try {
       const sessionId = await browserSessionManager.createSession(config);
@@ -38,7 +36,6 @@ export function registerBrowserHandlers(): void {
     }
   });
 
-  // Execute browser task with streaming
   ipcMain.handle('browser:executeTask', async (event, task: string, sessionId: string) => {
     try {
       if (!statefulBrowserAgent.isReady()) {
@@ -60,7 +57,6 @@ export function registerBrowserHandlers(): void {
         });
       };
 
-      // Execute task and stream results
       const stream = await statefulBrowserAgent.executeTask(task, sessionId, onProgress);
 
       for await (const chunk of stream) {
@@ -98,10 +94,8 @@ export function registerBrowserHandlers(): void {
     }
   });
 
-  // Close browser session
   ipcMain.handle('browser:closeSession', async (_, sessionId?: string) => {
     try {
-      // Use langChainAgent's close method which handles the current session
       await langChainAgent.closeBrowserSession();
       
       return {
@@ -152,7 +146,6 @@ export function registerBrowserHandlers(): void {
     };
   });
 
-  // Cleanup all browser resources
   ipcMain.handle('browser:cleanup', async () => {
     try {
       await statefulBrowserAgent.cleanup();
@@ -171,7 +164,6 @@ export function registerBrowserHandlers(): void {
     }
   });
   
-  // Extract all links from current page
   ipcMain.handle('browser:extractLinks', async () => {
     try {
       const sessionId = langChainAgent.getCurrentBrowserSessionId();

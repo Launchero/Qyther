@@ -2,7 +2,6 @@ import { globalShortcut } from 'electron';
 import { toggleMainWindow, toggleWindowMode } from './windows';
 
 export function registerGlobalShortcuts(): void {
-  // Register Alt+Space as the global shortcut to show/hide window
   const ret = globalShortcut.register('Alt+Space', () => {
     toggleMainWindow();
   });
@@ -13,7 +12,6 @@ export function registerGlobalShortcuts(): void {
     console.log('Global shortcut Alt+Space registered successfully');
   }
 
-  // Register Alt+Shift+M to toggle window mode (compact/expanded)
   const retMode = globalShortcut.register('Alt+Shift+M', () => {
     const newMode = toggleWindowMode();
     console.log(`Window mode toggled to: ${newMode}`);

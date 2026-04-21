@@ -9,6 +9,7 @@ import { logSystemInfo, getPlatformName, isWindows, isMacOS } from './utils/plat
 import { mcpService } from './services/mcp/client';
 import { registerBrowserHandlers } from './ipc/browser-handlers';
 import { statefulBrowserAgent } from './services/browser/stateful-browser-agent';
+import { getAskGraph } from './services/langgraph/research-agent';
 import { execSync } from 'child_process';
 
 // Load environment variables from .env file
@@ -44,17 +45,19 @@ app.commandLine.appendSwitch('disable-direct-composition');
 // These errors occur when Chromium can't access quota database files
 app.commandLine.appendSwitch('disable-features', 'PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies');
 
-// Log app startup with platform info
+// Enable CDP (Chrome DevTools Protocol) on default port for external debugging
+app.commandLine.appendSwitch('remote-debugging-port', '9222');
+// Allow remote origins to connect to CDP (needed for debugging tools)
+app.commandLine.appendSwitch('remote-allow-origins', '*');
+
 log('🚀 Electron app starting...');
 logSystemInfo();
 
 app.whenReady().then(async () => {
   log('✅ App ready');
   
-  // Initialize preferences (create directory and files if needed)
   initializePreferences();
   
-  // Initialize es.exe for file search (Windows only)
   if (isWindows()) {
     log('🔍 Initializing file search...');
     const esInitialized = await initializeEs();
@@ -70,15 +73,17 @@ app.whenReady().then(async () => {
   // Remove default menu bar
   Menu.setApplicationMenu(null);
   
-  // Register IPC handlers
   registerIPCHandlers();
   log('📡 IPC handlers registered');
   
-  // Register browser handlers
   registerBrowserHandlers();
   log('🌐 Browser handlers registered');
   
-  // Check if Playwright browsers are installed
+  // Pre-compile LangGraph in background - shifts cost from first message to startup
+  getAskGraph()
+    .then(() => log('🧠 LangGraph compiled and cached'))
+    .catch((err) => log('⚠️  LangGraph pre-compilation failed (will retry on first chat):', err));
+
   try {
     log('🔍 Checking Playwright installation...');
     execSync('npx playwright install chromium', { stdio: 'ignore' });
@@ -88,7 +93,6 @@ app.whenReady().then(async () => {
     log('ℹ️  Browser automation will install Playwright on first use');
   }
   
-  // Register global shortcuts
   registerGlobalShortcuts();
   log('⌨️  Global shortcuts registered');
   
@@ -126,18 +130,15 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Cleanup shortcuts and tray on quit
 app.on('will-quit', () => {
   log('👋 App quitting...');
   unregisterGlobalShortcuts();
   destroyTray();
   
-  // Cleanup MCP
   mcpService.cleanup().catch(err => {
     log('⚠️  MCP cleanup error:', err);
   });
   
-  // Cleanup browser agent
   statefulBrowserAgent.cleanup().catch(err => {
     log('⚠️  Browser agent cleanup error:', err);
   });

@@ -1,5 +1,26 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ChatMessageActions } from './ask-mode/ChatMessageActions';
+import { GenerativeUI, GenerativeUIType } from './ask-mode/GenerativeUI';
+import { GenerativeUISkeleton } from './ask-mode/GenerativeUI/GenerativeUISkeleton';
+import { GenerativeUIProgress } from './ask-mode/GenerativeUI/GenerativeUIProgress';
+import { SourcesPanel } from './ask-mode/SourcesPanel';
+import { TaskMetricsDisplay } from './ask-mode/Transparency/TaskMetrics';
+import { CodeBlock } from './ask-mode/CodeBlock';
+import { CitationBracket } from './ask-mode/CitationBracket';
+import { RelatedQuestions } from './ask-mode/RelatedQuestions';
+import { ThinkingSteps } from './ask-mode/ThinkingSteps';
+import { ConfidenceBadge } from './ask-mode/ConfidenceBadge';
+import { cn } from '@/lib/utils';
+import type { TaskMetrics } from '../utils/costCalculator';
+import { CheckCircle } from '@phosphor-icons/react';
+
+export interface ThinkingStep {
+  type: string;
+  step: string;
+  status: string;
+  detail: string;
+  data?: any;
+}
 
 export interface ChatMessage {
   id: string;
@@ -7,6 +28,29 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  hasStructuredData?: boolean;
+  dataType?: GenerativeUIType;
+  structuredData?: any;
+  thinkingSteps?: ThinkingStep[];
+  sources?: Array<{
+    id: string;
+    url: string;
+    title: string;
+    excerpt: string;
+    confidence?: number;
+    accessedAt?: Date;
+    isWebSource?: boolean;
+  }>;
+  metrics?: TaskMetrics;
+  relatedQuestions?: string[];
+  selfCorrected?: boolean;
+  iterationsUsed?: number;
+  validationScore?: number;
+  confidence?: number;
+  verified?: boolean;
+  uiPayloadPending?: boolean;
+  uiPayloadType?: GenerativeUIType;
+  uiGenerationProgress?: number;
 }
 
 interface ChatMessageBubbleProps {
@@ -15,6 +59,8 @@ interface ChatMessageBubbleProps {
   onExplain?: (content: string) => void;
   onShowCode?: (content: string) => void;
   onRegenerate?: () => void;
+  onRelatedQuestion?: (question: string) => void;
+  onFormSubmit?: (formTitle: string, formData: Record<string, unknown>) => void;
 }
 
 function formatTime(date: Date): string {
@@ -25,7 +71,47 @@ function formatTime(date: Date): string {
   }).format(date);
 }
 
-function SimpleMarkdown({ content }: { content: string }) {
+function renderInlineMarkdownWithCitations(
+  text: string,
+  sources?: Array<{ url: string }>,
+  onCitationClick?: (url: string) => void
+): React.ReactNode {
+  const parts = text.split(/(`[^`]+`|\[\d+\])/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="bg-muted px-1 rounded text-xs">{part.slice(1, -1)}</code>;
+    }
+    const citationMatch = part.match(/^\[(\d+)\]$/);
+    if (citationMatch) {
+      const citationNumber = parseInt(citationMatch[1]);
+      const source = sources?.[citationNumber - 1];
+      return (
+        <CitationBracket
+          key={i}
+          number={citationNumber}
+          onClick={() => onCitationClick?.(source?.url || '')}
+        />
+      );
+    }
+    const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+    return boldParts.map((bp, j) => {
+      if (bp.startsWith('**') && bp.endsWith('**')) {
+        return <strong key={`${i}-${j}`}>{bp.slice(2, -2)}</strong>;
+      }
+      return bp;
+    });
+  });
+}
+
+function SimpleMarkdown({
+  content,
+  sources,
+  onCitationClick,
+}: {
+  content: string;
+  sources?: Array<{ url: string }>;
+  onCitationClick?: (url: string) => void;
+}) {
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
@@ -38,9 +124,9 @@ function SimpleMarkdown({ content }: { content: string }) {
     if (listItems.length > 0) {
       const ListTag = listType || 'ul';
       elements.push(
-        <ListTag key={`list-${elements.length}`}>
+        <ListTag key={`list-${elements.length}`} className="my-2 ml-4 space-y-1">
           {listItems.map((item, i) => (
-            <li key={i}>{renderInlineMarkdown(item)}</li>
+            <li key={i}>{renderInlineMarkdownWithCitations(item, sources, onCitationClick)}</li>
           ))}
         </ListTag>
       );
@@ -49,33 +135,20 @@ function SimpleMarkdown({ content }: { content: string }) {
     }
   };
 
-  const renderInlineMarkdown = (text: string): React.ReactNode => {
-    // Handle inline code
-    const parts = text.split(/(`[^`]+`)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('`') && part.endsWith('`')) {
-        return <code key={i}>{part.slice(1, -1)}</code>;
-      }
-      // Handle bold
-      const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
-      return boldParts.map((bp, j) => {
-        if (bp.startsWith('**') && bp.endsWith('**')) {
-          return <strong key={`${i}-${j}`}>{bp.slice(2, -2)}</strong>;
-        }
-        return bp;
-      });
-    });
+  const renderInline = (text: string): React.ReactNode => {
+    return renderInlineMarkdownWithCitations(text, sources, onCitationClick);
   };
 
-  lines.forEach((line, index) => {
-    // Code block handling
+  lines.forEach((line) => {
     const codeBlockMatch = line.match(/^```(\w*)/);
     if (codeBlockMatch) {
       if (inCodeBlock) {
         elements.push(
-          <pre key={`code-${index}`} className="chat-code-block">
-            <code className={codeLanguage ? `language-${codeLanguage}` : ''}>{codeContent.trim()}</code>
-          </pre>
+          <CodeBlock
+            key={`code-${elements.length}`}
+            language={codeLanguage || 'text'}
+            code={codeContent.trim()}
+          />
         );
         codeContent = '';
         codeLanguage = '';
@@ -93,26 +166,24 @@ function SimpleMarkdown({ content }: { content: string }) {
       return;
     }
 
-    // Heading handling
     if (line.startsWith('### ')) {
       flushList();
-      elements.push(<h4 key={index}>{renderInlineMarkdown(line.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="text-sm font-semibold mt-3 mb-1">{renderInline(line.slice(4))}</h4>);
       return;
     }
 
     if (line.startsWith('## ')) {
       flushList();
-      elements.push(<h3 key={index}>{renderInlineMarkdown(line.slice(3))}</h3>);
+      elements.push(<h3 key={elements.length} className="text-sm font-semibold mt-3 mb-1">{renderInline(line.slice(3))}</h3>);
       return;
     }
 
     if (line.startsWith('# ')) {
       flushList();
-      elements.push(<h2 key={index}>{renderInlineMarkdown(line.slice(2))}</h2>);
+      elements.push(<h2 key={elements.length} className="text-base font-semibold mt-3 mb-1">{renderInline(line.slice(2))}</h2>);
       return;
     }
 
-    // List handling
     const bulletMatch = line.match(/^[-*]\s+(.+)/);
     const numberMatch = line.match(/^\d+\.\s+(.+)/);
 
@@ -134,27 +205,23 @@ function SimpleMarkdown({ content }: { content: string }) {
       return;
     }
 
-    // Empty line
     if (line.trim() === '') {
       flushList();
       return;
     }
 
-    // Regular paragraph
     flushList();
     elements.push(
-      <p key={index}>{renderInlineMarkdown(line)}</p>
+      <p key={elements.length} className="my-2">{renderInline(line)}</p>
     );
   });
 
   flushList();
-
   return <>{elements}</>;
 }
 
-export function ChatMessageBubble({ message, onCopy, onExplain, onShowCode, onRegenerate }: ChatMessageBubbleProps) {
+export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onShowCode, onRegenerate, onRelatedQuestion, onFormSubmit }: ChatMessageBubbleProps) => {
   const messageRef = useRef<HTMLDivElement>(null);
-  const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
     if (messageRef.current) {
@@ -163,57 +230,156 @@ export function ChatMessageBubble({ message, onCopy, onExplain, onShowCode, onRe
   }, []);
 
   const isUser = message.role === 'user';
-  const hasCode = message.content.includes('```');
 
   return (
     <div
       ref={messageRef}
-      className={`chat-message-bubble ${message.role} ${message.isStreaming ? 'streaming' : ''}`}
-      onMouseEnter={() => !message.isStreaming && setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-      onFocus={() => !message.isStreaming && setShowActions(true)}
-      onBlur={() => setShowActions(false)}
+      className={cn(
+        "flex gap-3 max-w-[88%]",
+        isUser ? "self-end flex-row-reverse" : "self-start"
+      )}
       tabIndex={0}
       role="article"
       aria-label={`${message.role} message`}
     >
-      <div className="chat-message-avatar">
+      <div className={cn(
+        "flex-1",
+        isUser ? "message-user" : "answer"
+      )}>
         {isUser ? (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2"/>
-            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-          </svg>
+          <div className="message-user-bubble">
+            <SimpleMarkdown content={message.content} />
+          </div>
         ) : (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" stroke="currentColor" strokeWidth="2"/>
-          </svg>
+          <div className="answer">
+            {/* Thinking block FIRST, collapsed by default (Claude-style) */}
+            {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+              <ThinkingSteps
+                steps={message.thinkingSteps}
+                isComplete={!message.isStreaming}
+                durationMs={message.metrics?.durationMs}
+              />
+            )}
+
+            {/* Answer content — primary */}
+            <div className="answer-content">
+              <SimpleMarkdown content={message.content} />
+
+              {message.isStreaming && (
+                <span className="streaming-cursor">▊</span>
+              )}
+
+              {message.isStreaming && message.uiPayloadPending && (
+                <>
+                  <GenerativeUISkeleton
+                    estimatedType={message.uiPayloadType || 'table'}
+                  />
+                  {message.uiGenerationProgress !== undefined && message.uiGenerationProgress > 0 && (
+                    <GenerativeUIProgress
+                      progress={message.uiGenerationProgress}
+                      message="Generating structured data..."
+                    />
+                  )}
+                </>
+              )}
+
+              {!message.isStreaming && message.hasStructuredData && message.structuredData && (
+                <GenerativeUI
+                  resultType={message.dataType || 'list'}
+                  data={message.structuredData}
+                  title={message.structuredData.title}
+                  onExport={(format) => {
+                    // DataTable and ComparisonTable handle their own file downloads;
+                    // this callback fires for notification/logging purposes.
+                    console.log(`[ChatMessageBubble] Exported as ${format}`);
+                  }}
+                  onConfirm={(formData) => {
+                    const formTitle = message.structuredData?.title || message.structuredData?.targetUrl || 'Configuration';
+                    onFormSubmit?.(formTitle, formData as Record<string, unknown>);
+                  }}
+                  onEdit={() => {
+                    // FormPreview manages local state; edits are handled internally.
+                    // This callback is available for future analytics integration.
+                  }}
+                  onCancel={() => {
+                    console.log('[ChatMessageBubble] Form cancelled');
+                  }}
+                />
+              )}
+
+              {/* Quality badge for self-corrected responses */}
+              {message.selfCorrected && !message.isStreaming && (
+                <div className="quality-badge">
+                  <CheckCircle className="w-3 h-3" weight="fill" />
+                  <span>Reviewed and improved</span>
+                  {message.iterationsUsed && message.iterationsUsed > 1 && (
+                    <span className="quality-badge-iterations">({message.iterationsUsed} iterations)</span>
+                  )}
+                </div>
+              )}
+
+              {/* Confidence badge for confidence-based routing */}
+              {message.confidence !== undefined && message.confidence > 0 && !message.isStreaming && (
+                <ConfidenceBadge
+                  confidence={message.confidence}
+                  verified={message.verified}
+                />
+              )}
+            </div>
+
+            {/* Secondary content — collapsible, below the answer */}
+            <div className="answer-secondary">
+              {message.sources && message.sources.length > 0 && (
+                <SourcesPanel sources={message.sources} />
+              )}
+
+              {message.metrics && (
+                <div className="answer-metrics">
+                  <TaskMetricsDisplay metrics={message.metrics} />
+                </div>
+              )}
+            </div>
+
+            {/* Actions — only after streaming completes */}
+            {!message.isStreaming && (
+              <div className="answer-actions">
+                <ChatMessageActions
+                  onCopy={onCopy ? () => onCopy(message.content) : undefined}
+                  onExplain={onExplain ? () => onExplain(message.content) : undefined}
+                  onShowCode={onShowCode ? () => onShowCode(message.content) : undefined}
+                  onRegenerate={onRegenerate}
+                />
+
+                {message.relatedQuestions && message.relatedQuestions.length > 0 && (
+                  <RelatedQuestions
+                    questions={message.relatedQuestions}
+                    onSelect={(q) => onRelatedQuestion?.(q)}
+                  />
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
-      
-      <div className="chat-message-content">
-        <SimpleMarkdown content={message.content} />
-        
-        {message.isStreaming && (
-          <span className="streaming-cursor">▊</span>
-        )}
-        
-        {!isUser && !message.isStreaming && (
-          <ChatMessageActions
-            messageContent={message.content}
-            hasCode={hasCode}
-            onCopy={onCopy || (() => {})}
-            onExplain={onExplain || (() => {})}
-            onShowCode={onShowCode || (() => {})}
-            onRegenerate={onRegenerate}
-            isVisible={showActions}
-            isActionInProgress={false}
-          />
-        )}
-      </div>
-      
-      <div className="chat-message-time">
-        {formatTime(message.timestamp)}
-      </div>
+
+      {!isUser && (
+        <div className="text-xs text-muted-foreground self-end">
+          {formatTime(message.timestamp)}
+        </div>
+      )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.isStreaming === nextProps.message.isStreaming &&
+    prevProps.message.hasStructuredData === nextProps.message.hasStructuredData &&
+    prevProps.message.sources?.length === nextProps.message.sources?.length &&
+    prevProps.message.thinkingSteps?.length === nextProps.message.thinkingSteps?.length &&
+    prevProps.message.confidence === nextProps.message.confidence &&
+    prevProps.message.verified === nextProps.message.verified
+  );
+});
+
+ChatMessageBubble.displayName = 'ChatMessageBubble';

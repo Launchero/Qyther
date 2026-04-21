@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { ShortcutCombo } from '@/components/common/ShortcutKeys';
+import { XIcon } from '@phosphor-icons/react';
 
 interface BrowserModeTooltipProps {
   isVisible: boolean;
@@ -100,9 +102,7 @@ export function BrowserModeTooltip({
           onClick={onClose}
           aria-label="Close tooltip"
         >
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <XIcon />
         </button>
       </div>
 
@@ -146,11 +146,7 @@ export function BrowserModeTooltip({
 
         <div className="browser-tooltip-hint">
           <span>Toggle with</span>
-          <kbd>Ctrl</kbd>
-          <span>+</span>
-          <kbd>Shift</kbd>
-          <span>+</span>
-          <kbd>B</kbd>
+          <ShortcutCombo keys={["modifier", "Shift", "B"]} />
         </div>
       </div>
     </div>

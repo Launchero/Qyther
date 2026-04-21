@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMCP } from '../hooks/useMCP';
 import { MCPServerCard } from './MCPServerCard';
-
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { getOSDisplayNamesSync } from '@/utils/shortcuts';
 
 interface MCPServer {
   name: string;
@@ -16,9 +18,11 @@ export function MCPToolModal({ onClose }: { onClose: () => void }) {
   const { isLoading } = useMCP();
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  // Focus search input on mount
   useEffect(() => {
-    loadServers();
+    inputRef.current?.focus();
   }, []);
 
   const loadServers = async () => {
@@ -31,57 +35,65 @@ export function MCPToolModal({ onClose }: { onClose: () => void }) {
     await loadServers();
   };
 
-  return (
-    <div className="mcp-tool-modal-overlay" onClick={onClose}>
-      <div className="mcp-tool-modal" onClick={e => e.stopPropagation()}>
-        <div className="mcp-modal-header">
-          <h3 className="mcp-modal-title">MCP Servers</h3>
-          <button className="mcp-modal-close" onClick={onClose}>
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M6 6l12 12M6 18L18 6"/>
-            </svg>
-          </button>
-        </div>
+  // Load servers on mount
+  useEffect(() => {
+    loadServers();
+  }, []);
 
-        <div className="mcp-modal-search">
-          <input
+  const filteredServers = servers.filter(server => 
+    server.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>MCP Servers</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <Input
+            ref={inputRef}
             type="text"
             placeholder="Search servers..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="mcp-search-input"
-            autoFocus
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full"
+            aria-label="Search MCP servers"
           />
-        </div>
 
-        <div className="mcp-modal-body">
-          {isLoading ? (
-            <div className="mcp-loading">Loading servers...</div>
-          ) : servers.length === 0 ? (
-            <div className="mcp-empty">No MCP servers configured</div>
-          ) : (
-            <div className="mcp-servers-list">
-              {servers
-                .filter(server => 
-                  server.name.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map(server => (
-                  <MCPServerCard
-                    key={server.name}
-                    server={server}
-                    onToggle={(enabled) => handleToggleServer(server.name, enabled)}
-                  />
-                ))}
+          <div className="space-y-3 max-h-[var(--max-height-scroll-section)] overflow-y-auto">
+            {isLoading ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Loading servers...
+              </div>
+            ) : filteredServers.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                {searchQuery ? 'No servers match your search' : 'No MCP servers configured'}
+              </div>
+            ) : (
+              filteredServers.map(server => (
+                <MCPServerCard
+                  key={server.name}
+                  server={server}
+                  onToggle={(enabled) => handleToggleServer(server.name, enabled)}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">{getOSDisplayNamesSync().modifierLabel}</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">T</kbd>
+              <span>Close</span>
             </div>
-          )}
-        </div>
-
-        <div className="mcp-modal-footer">
-          <div className="mcp-footer-hint">
-            <kbd>{isMac ? 'Cmd' : 'Ctrl'}</kbd><kbd>T</kbd> Close
+            <Badge variant="outline" className="text-xs">
+              {servers.filter(s => s.enabled).length} / {servers.length} enabled
+            </Badge>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

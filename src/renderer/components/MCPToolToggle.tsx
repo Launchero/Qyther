@@ -1,24 +1,28 @@
 import React from 'react';
 import { useMCP } from '../hooks/useMCP';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { WrenchIcon } from '@phosphor-icons/react';
 
 export function MCPToolToggle() {
   const { mcpEnabled, toggleMCP, toolsCount, isLoading } = useMCP();
 
   return (
-    <button
+    <Button
+      variant={mcpEnabled ? 'secondary' : 'ghost'}
+      size="sm"
       onClick={toggleMCP}
-      className={`mcp-tool-toggle ${mcpEnabled ? 'enabled' : ''}`}
       disabled={isLoading}
+      className="gap-2"
       title={mcpEnabled ? 'MCP tools enabled' : 'MCP tools disabled'}
     >
-      <svg className="mcp-toggle-icon" viewBox="0 0 24 24" fill="none">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" 
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      
+      <WrenchIcon className="h-4 w-4" />
+
       {mcpEnabled && toolsCount > 0 && (
-        <span className="mcp-tools-count">{toolsCount}</span>
+        <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+          {toolsCount}
+        </Badge>
       )}
-    </button>
+    </Button>
   );
 }

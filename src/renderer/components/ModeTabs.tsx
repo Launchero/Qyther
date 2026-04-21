@@ -1,6 +1,10 @@
 import React from 'react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import { Folder, Sparkle } from '@phosphor-icons/react';
+import { getAriaKeyshortcuts } from '@/utils/shortcuts';
 
-export type SearchMode = 'file' | 'ai' | 'code';
+export type SearchMode = 'file' | 'ai';
 
 export interface ModeTabsProps {
   currentMode: SearchMode;
@@ -9,86 +13,100 @@ export interface ModeTabsProps {
   onToggle: () => void;
 }
 
+interface ModeConfig {
+  label: string;
+  icon: React.ReactNode;
+}
+
+const modeConfigs: Record<SearchMode, ModeConfig> = {
+  file: {
+    label: 'Files',
+    icon: <Folder weight="fill" className="h-4 w-4" />,
+  },
+  ai: {
+    label: 'Ask',
+    icon: <Sparkle weight="fill" className="h-4 w-4" />,
+  },
+};
+
 export function ModeTabs({
   currentMode,
   onModeChange,
   expanded,
   onToggle,
 }: ModeTabsProps) {
-  const modeIcons: Record<SearchMode, string> = {
-    file: 'M3 7C3 5.89543 3.89543 5 5 5H9L11 7H19C20.1046 7 21 7.89543 21 9V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z',
-    ai: 'M8 10C8 10 9 8 12 8C15 8 16 10 16 10M12 12V12.01M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z',
-    code: 'M16 18L22 12L16 6M8 6L2 12L8 18'
-  };
-
-  const modeColors: Record<SearchMode, string> = {
-    file: 'var(--kraken-purple)',
-    ai: '#149e61',
-    code: '#d8571d'
-  };
-
-  const modeLabels: Record<SearchMode, string> = {
-    file: 'Files',
-    ai: 'Ask',
-    code: 'Code'
-  };
-
-  const handleModeChange = (mode: SearchMode, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const handleModeChange = (mode: SearchMode) => {
     onModeChange(mode);
   };
 
-  return (
-    <>
-      {/* Collapsed State - Single Tab */}
-      <button 
-        className={`mode-tab-collapsed ${expanded ? 'hidden' : ''}`}
+  const currentModeConfig = modeConfigs[currentMode];
+
+  if (!expanded) {
+    // Collapsed state: Button with icon + label
+    return (
+      <button
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
         }}
+        aria-keyshortcuts={getAriaKeyshortcuts('Control', 'Tab')}
+        aria-label={`Switch mode. Currently: ${currentModeConfig.label}. Press Ctrl+Tab to cycle.`}
+        className={cn(
+          "flex items-center justify-center",
+          "h-10 px-3",
+          "gap-2",
+          "rounded-lg",
+          "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+          "focus:outline-none focus:ring-2 focus:ring-ring",
+          "border border-border bg-background hover:bg-accent hover:border-ring"
+        )}
       >
-        <svg className="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: modeColors[currentMode] }}>
-          <path d={modeIcons[currentMode]} strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span className="mode-label" style={{ color: modeColors[currentMode] }}>{modeLabels[currentMode]}</span>
+        <span className="flex items-center justify-center text-primary">
+          {currentModeConfig.icon}
+        </span>
+        <span className="text-sm font-medium text-primary">
+          {currentModeConfig.label}
+        </span>
       </button>
-      
-      {/* Expanded State - Three Tabs */}
-      <div className={`mode-tabs-expanded ${expanded ? 'visible' : 'hidden'}`}>
-        <button 
-          className={`mode-tab ${currentMode === 'file' ? 'active' : ''}`}
-          onClick={(e) => handleModeChange('file', e)}
-        >
-          <svg className="mode-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 7C3 5.89543 3.89543 5 5 5H9L11 7H19C20.1046 7 21 7.89543 21 9V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="mode-tab-label">Files</span>
-        </button>
-        
-        <button 
-          className={`mode-tab ${currentMode === 'ai' ? 'active' : ''}`}
-          onClick={(e) => handleModeChange('ai', e)}
-        >
-          <svg className="mode-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M8 10C8 10 9 8 12 8C15 8 16 10 16 10" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12 12V12.01" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="12" cy="12" r="9"/>
-          </svg>
-          <span className="mode-tab-label">Ask</span>
-        </button>
-        
-        <button 
-          className={`mode-tab ${currentMode === 'code' ? 'active' : ''}`}
-          onClick={(e) => handleModeChange('code', e)}
-        >
-          <svg className="mode-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M16 18L22 12L16 6" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M8 6L2 12L8 18" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="mode-tab-label">Code</span>
-        </button>
-      </div>
-    </>
+    );
+  }
+
+  // Expanded state: Horizontal tab menu
+  return (
+    <Tabs
+      value={currentMode}
+      onValueChange={(value) => handleModeChange(value as SearchMode)}
+      className="h-10"
+    >
+      <TabsList className={cn(
+        "h-full gap-1 p-1",
+        "bg-muted border border-border",
+        "rounded-lg",
+        "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]"
+      )}>
+        {(Object.keys(modeConfigs) as SearchMode[]).map((mode) => {
+          const config = modeConfigs[mode];
+          return (
+            <TabsTrigger
+              key={mode}
+              value={mode}
+              className={cn(
+                "gap-2 px-4 h-full rounded-md",
+                "text-sm font-medium",
+                "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+                "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground",
+                "data-[state=inactive]:hover:bg-accent data-[state=inactive]:hover:text-foreground"
+              )}
+            >
+              <span className="flex items-center justify-center">
+                {config.icon}
+              </span>
+              <span>{config.label}</span>
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

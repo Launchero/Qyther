@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 128" width="512" height="128">
+  <defs>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#7b61ff"/>
+    </linearGradient>
+    <linearGradient id="accentReverse" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#7b61ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="128" fill="#0a0a0f" rx="16"/>
+
+  <!-- Icon: Stylized Q - geometric command palette launcher -->
+  <g transform="translate(32, 24)" filter="url(#glowSoft)">
+    <!-- Outer ring -->
+    <circle cx="40" cy="40" r="32" fill="none" stroke="url(#accent)" stroke-width="4" opacity="0.9"/>
+    
+    <!-- Inner orbit -->
+    <circle cx="40" cy="40" r="22" fill="none" stroke="url(#accentReverse)" stroke-width="1.5" opacity="0.4"/>
+    
+    <!-- Q tail - a dynamic slash suggesting speed/launch -->
+    <path d="M 58 58 L 72 74" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+    
+    <!-- Center node - representing AI/intelligence -->
+    <circle cx="40" cy="40" r="6" fill="url(#accent)"/>
+    
+    <!-- Orbital arcs suggesting search/command palette -->
+    <path d="M 20 16 A 28 28 0 0 1 60 16" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.6" stroke-linecap="round"/>
+    <path d="M 14 30 A 28 28 0 0 1 22 18" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+    
+    <!-- Subtle sparkle dots -->
+    <circle cx="62" cy="22" r="2" fill="#00d4ff" opacity="0.7"/>
+    <circle cx="18" cy="56" r="1.5" fill="#7b61ff" opacity="0.5"/>
+  </g>
+
+  <!-- App name: qyther -->
+  <text x="130" y="76" font-family="system-ui, -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif" font-size="44" font-weight="300" letter-spacing="4" fill="white">
+    qyther
+  </text>
+
+  <!-- Subtle underline accent -->
+  <line x1="134" y1="86" x2="220" y2="86" stroke="url(#accent)" stroke-width="1" opacity="0.4" stroke-linecap="round"/>
+</svg>

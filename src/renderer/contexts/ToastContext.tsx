@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircleIcon, XCircleIcon, InfoIcon, WarningIcon, XIcon } from '@phosphor-icons/react';
 
 export interface Toast {
   id: string;
@@ -74,30 +75,13 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
+        return <CheckCircleIcon />;
       case 'error':
-        return (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        );
+        return <XCircleIcon />;
       case 'info':
-        return (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
+        return <InfoIcon />;
       case 'warning':
-        return (
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
+        return <WarningIcon />;
     }
   };
 
@@ -128,9 +112,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
       </div>
       <span className="toast-message">{toast.message}</span>
       <button className="toast-dismiss-btn" onClick={onDismiss} aria-label="Dismiss">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <XIcon />
       </button>
       {/* Progress bar for auto-dismiss */}
       {toast.duration && toast.duration > 0 && (

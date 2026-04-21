@@ -23,9 +23,13 @@ export function createMainWindow(): BrowserWindow {
   // Keep consistent top position for both modes (expand downward only)
   const y = Math.floor(screenHeight * 0.15 + currentScreen.bounds.y); // 15% from top
 
+  // Cap height to avoid taskbar occlusion on initial launch
+  const maxAvailableHeight = screenHeight - (y - currentScreen.bounds.y);
+  const effectiveHeight = Math.min(windowHeight, maxAvailableHeight);
+
   const options: Electron.BrowserWindowConstructorOptions = {
     width: windowWidth,
-    height: windowHeight,
+    height: effectiveHeight,
     x,
     y,
     show: false,
@@ -72,12 +76,13 @@ export function createMainWindow(): BrowserWindow {
   mainWindow.on('close', (event) => {
     if (mainWindow?.isVisible()) {
       event.preventDefault();
+      // Notify renderer to store active element before hiding
+      mainWindow.webContents.send('window:will-hide');
       mainWindow.hide();
     }
   });
 
   // Load application
-  // Check if running in development mode (via electron-vite dev)
   const isDev = process.env.DEV === 'true' || process.env.NODE_ENV === 'development';
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
@@ -107,6 +112,8 @@ export function hideMainWindow(): void {
     // Preserve current mode for next open
     const currentMode = windowManager.getCurrentMode();
     console.log(`[${timestamp}] 💾 Preserving window mode: ${currentMode}`);
+    // Notify renderer to store active element before hiding
+    mainWindow.webContents.send('window:will-hide');
     mainWindow.hide();
   }
 }

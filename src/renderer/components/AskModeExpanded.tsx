@@ -1,251 +1,286 @@
-import React, { useState, useEffect } from 'react';
-import { ChatInputArea } from './ChatInputArea';
+import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { useChatSession } from '../hooks/useChatSession';
 import { MCPToolModal } from './MCPToolModal';
 import { useMCPKeyboardShortcuts } from '../hooks/useMCPKeyboardShortcuts';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import { ToastProvider } from '../contexts/ToastContext';
-import { ChatTopBar } from './ask-mode/ChatTopBar';
 import { ChatMessagesList } from './ask-mode/ChatMessagesList';
-import { ChatErrorBanner } from './ask-mode/ChatErrorBanner';
 import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
 import { ChatSession as ChatSessionType } from './ask-mode/ChatHistoryPanel';
-import './BrowserAutomation.css';
+import { browserReducer, initialBrowserState } from '../hooks/useBrowserState';
+import { usesMetaKey } from '@/utils/shortcuts';
+import type { BrowserProgress } from './ask-mode/BrowserProgressPanel';
+import type { InlineChatSession } from './ask-mode/RecentChatsInline';
+import type { AttachedFile } from './ChatInputArea';
+import { XIcon } from '@phosphor-icons/react';
 
 export interface AskModeExpandedProps {
   sessionId?: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onRegisterSendMessage?: (_fn: ((message?: string, files?: AttachedFile[]) => void) | null) => void;
+  onHasSentMessageChange?: (hasSent: boolean) => void;
+  attachedFiles?: AttachedFile[];
+  onRemoveFile?: (index: number) => void;
+  onAttachFile?: () => void;
+  onAttachFolder?: () => void;
+  onClearAttachments?: () => void;
 }
 
-interface BrowserProgress {
-  step: number;
-  maxSteps: number;
-  status: 'navigating' | 'clicking' | 'typing' | 'extracting' | 'complete' | 'error';
-  url?: string;
-  message: string;
-}
-
-export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps) {
+export function AskModeExpanded({
+  sessionId: _sessionId,
+  searchQuery,
+  onSearchChange,
+  onRegisterSendMessage,
+  onHasSentMessageChange,
+  attachedFiles = [],
+  onRemoveFile,
+  onAttachFile,
+  onAttachFolder,
+  onClearAttachments,
+}: AskModeExpandedProps) {
   const {
     messages,
     isLoading,
     error,
     isReady,
     sendMessage,
+    submitForm,
     createNewSession,
     loadSession,
     listSessions,
   } = useChatSession();
 
-  const [selectedModel, setSelectedModel] = useState('Qwen');
   const [showMCPModal, setShowMCPModal] = useState(false);
   const [welcomeState, setWelcomeState] = useState(true);
   const [historyItems, setHistoryItems] = useState<ChatSessionType[]>([]);
-  
-  // Browser automation state
-  const [browserModeEnabled, setBrowserModeEnabled] = useState(false);
-  const [browserSessionActive, setBrowserSessionActive] = useState(false);
-  const [browserStatus, setBrowserStatus] = useState<BrowserProgress | null>(null);
-  const [browserSessionUrl, setBrowserSessionUrl] = useState<string | null>(null);
-  const [isBrowserPaused, setIsBrowserPaused] = useState(false);
-  const [browserStartTime, setBrowserStartTime] = useState<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState(0);
-  
-  // Tooltip preference (reserved for future use)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_browserTooltipDismissed, _setBrowserTooltipDismissed] = useLocalStorage('browserTooltipDismissed', false);
-  
+  const [hasSentMessage, setHasSentMessage] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+
+  // Notify parent when hasSentMessage changes
+  useEffect(() => {
+    onHasSentMessageChange?.(hasSentMessage);
+  }, [hasSentMessage, onHasSentMessageChange]);
+
+  // Browser automation state with useReducer
+  const [browserState, dispatch] = useReducer(browserReducer, initialBrowserState);
+
   // Browser automation event listeners
   useEffect(() => {
     const handleBrowserProgress = (data: { sessionId: string; progress: BrowserProgress }) => {
-      console.log('[AskModeExpanded] Browser progress:', data);
-      setBrowserStatus(data.progress);
-      setBrowserSessionActive(data.progress.status !== 'complete' && data.progress.status !== 'error');
-      
-      // Start timer on first progress update
-      if (!browserStartTime && data.progress.step === 1) {
-        setBrowserStartTime(Date.now());
-      }
+      dispatch({ type: 'SET_PROGRESS', progress: data.progress });
     };
-    
-    const handleBrowserChunk = (data: { sessionId: string; chunk: string }) => {
-      console.log('[AskModeExpanded] Browser chunk:', data.chunk.slice(0, 50));
-    };
-    
+
     const handleBrowserError = (data: { sessionId: string; error: string }) => {
       console.error('[AskModeExpanded] Browser error:', data.error);
-      setBrowserSessionActive(false);
-      setBrowserStatus(null);
+      dispatch({ type: 'SET_SESSION_ACTIVE', active: false });
     };
-    
+
     const cleanupProgress = window.electronAPI.browser.onProgress(handleBrowserProgress);
-    const cleanupChunk = window.electronAPI.browser.onChunk(handleBrowserChunk);
     const cleanupError = window.electronAPI.browser.onError(handleBrowserError);
-    
+
     return () => {
       cleanupProgress();
-      cleanupChunk();
       cleanupError();
     };
-  }, [browserStartTime]);
-  
+  }, []);
+
   // Poll browser session status
   useEffect(() => {
     const pollStatus = async () => {
-      if (browserModeEnabled) {
+      if (browserState.enabled) {
         try {
           const status = await window.electronAPI.browser.getSessionStatus();
-          setBrowserSessionUrl(status.url || null);
-          setBrowserSessionActive(status.active);
+          dispatch({ type: 'SET_SESSION_URL', url: status.url || null });
+          dispatch({ type: 'SET_SESSION_ACTIVE', active: status.active });
         } catch (error) {
           console.error('[AskModeExpanded] Error polling status:', error);
         }
       }
     };
-    
+
     pollStatus();
-    const interval = setInterval(pollStatus, 2000); // Poll every 2 seconds
+    const interval = setInterval(pollStatus, 2000);
     return () => clearInterval(interval);
-  }, [browserModeEnabled]);
-  
+  }, [browserState.enabled]);
+
   // Timer for elapsed time
   useEffect(() => {
-    if (browserSessionActive && browserStartTime && !isBrowserPaused) {
+    if (browserState.sessionActive && browserState.startTime && !browserState.isPaused) {
       const timer = setInterval(() => {
-        setElapsedMs(Date.now() - browserStartTime);
+        dispatch({ type: 'SET_ELAPSED', elapsedMs: Date.now() - browserState.startTime! });
       }, 100);
-      
+
       return () => clearInterval(timer);
     }
-  }, [browserSessionActive, browserStartTime, isBrowserPaused]);
+  }, [browserState.sessionActive, browserState.startTime, browserState.isPaused]);
 
   // Keyboard shortcut for browser mode toggle
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+      const metaOrCtrl = usesMetaKey() ? e.metaKey : e.ctrlKey;
+      if (metaOrCtrl && e.shiftKey && e.key === 'B') {
         e.preventDefault();
         handleToggleBrowserMode();
       }
-      if (e.ctrlKey && e.shiftKey && e.key === 'X') {
+      if (metaOrCtrl && e.shiftKey && e.key === 'X') {
         e.preventDefault();
         handleCloseBrowserSession();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browserModeEnabled, browserSessionActive]);
+  }, [browserState.enabled, browserState.sessionActive]);
 
   const loadHistory = async () => {
     try {
       const sessions = await listSessions();
-      setHistoryItems(sessions.slice(0, 10)); // Limit to 10 recent chats
+      setHistoryItems(sessions.slice(0, 10));
     } catch (err) {
       console.error('[AskModeExpanded] Failed to load history:', err);
     }
   };
 
-  // Load history when needed
   useEffect(() => {
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleNewChat = async () => {
+  const handleNewChat = useCallback(async () => {
+    onClearAttachments?.();
     await createNewSession();
     setWelcomeState(true);
-  };
+    setHasSentMessage(false);
+  }, [createNewSession, onClearAttachments]);
 
-  const handleRetry = () => {
-    // Get last user message and resend
+  // Keep a ref to the latest searchQuery so the registered callback always has current value
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
+  // Keep a ref to the current attachedFiles so the registered callback always has the latest
+  const attachedFilesRef = useRef(attachedFiles);
+  attachedFilesRef.current = attachedFiles;
+
+  const handleSendMessage = useCallback((message: string, files?: AttachedFile[]) => {
+    setHasSentMessage(true);
+    setWelcomeState(false);
+    sendMessage(message, files);
+  }, [sendMessage]);
+
+  // Keep a ref to the latest handleSendMessage so the registered callback uses the current version
+  const handleSendMessageRef = useRef(handleSendMessage);
+  handleSendMessageRef.current = handleSendMessage;
+
+  // Register send function with parent - stable registration that uses passed message
+  // The callback receives the message from UnifiedCommandBar, falling back to searchQueryRef if no message passed
+  useEffect(() => {
+    onRegisterSendMessage?.((message) => {
+      const queryToSend = message?.trim() || searchQueryRef.current.trim();
+      if (queryToSend) {
+        console.log('[AskModeExpanded] Sending message with attachments:', attachedFilesRef.current.map(f => f.name));
+        handleSendMessageRef.current(queryToSend, attachedFilesRef.current);
+      } else {
+        console.warn('[AskModeExpanded] No query to send!');
+      }
+    });
+    return () => {
+      onRegisterSendMessage?.(null);
+    };
+  }, [onRegisterSendMessage]); // Only depends on onRegisterSendMessage, refs are updated during render
+
+  const handleRetry = useCallback(() => {
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
-      sendMessage(lastUserMessage.content);
+      handleSendMessage(lastUserMessage.content);
     }
-  };
+  }, [messages, handleSendMessage]);
 
-  const handleEditQuery = () => {
-    // Focus the input area and keep the last user message
+  const handleEditQuery = useCallback(() => {
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
-      // In a real implementation, this would populate the input field
       console.log('[AskModeExpanded] Edit query:', lastUserMessage.content);
     }
-  };
+  }, [messages]);
 
-  const handleSelectHistory = async (sessionIdToLoad: string) => {
+  const handleSelectHistory = useCallback(async (sessionIdToLoad: string) => {
     await loadSession(sessionIdToLoad);
     setWelcomeState(false);
-  };
+  }, [loadSession]);
 
-  const handleCopy = (content: string) => {
-    console.log('[AskModeExpanded] Content copied:', content.slice(0, 50));
-  };
+  const handleCopy = useCallback(async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      console.log('[AskModeExpanded] Content copied to clipboard');
+    } catch (err) {
+      console.error('[AskModeExpanded] Failed to copy content:', err);
+    }
+  }, []);
 
-  const handleExplain = (content: string) => {
-    sendMessage(`Please explain this in simpler terms: ${content.slice(0, 200)}`);
-  };
+  const handleExplain = useCallback((content: string) => {
+    handleSendMessage(`Please explain this in simpler terms: ${content.slice(0, 200)}`);
+  }, [handleSendMessage]);
 
-  const handleShowCode = (content: string) => {
-    sendMessage(`Please show me code examples related to: ${content.slice(0, 200)}`);
-  };
+  const handleShowCode = useCallback((content: string) => {
+    handleSendMessage(`Please show me code examples related to: ${content.slice(0, 200)}`);
+  }, [handleSendMessage]);
 
-  const handleRegenerate = () => {
-    // Get last user message and resend
+  const handleRegenerate = useCallback(() => {
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
-      sendMessage(lastUserMessage.content);
+      handleSendMessage(lastUserMessage.content);
     }
-  };
+  }, [messages, handleSendMessage]);
 
-  const handleToggleBrowserMode = async () => {
-    const newEnabled = !browserModeEnabled;
-    setBrowserModeEnabled(newEnabled);
-    
+  const handleRelatedQuestion = useCallback((question: string) => {
+    handleSendMessage(question);
+  }, [handleSendMessage]);
+
+  const handleToggleBrowserMode = useCallback(async () => {
+    const newEnabled = !browserState.enabled;
+    dispatch({ type: 'TOGGLE_MODE', enabled: newEnabled });
+    setWebSearchEnabled(newEnabled);
+
     try {
       const result = await window.electronAPI.browser.setMode(newEnabled);
       console.log('[AskModeExpanded] Browser mode:', result);
-      
-      if (newEnabled && !browserSessionActive) {
-        // Initialize browser agent on first enable
+
+      if (newEnabled && !browserState.sessionActive) {
         await window.electronAPI.browser.initializeAgent();
       }
     } catch (error) {
       console.error('[AskModeExpanded] Failed to toggle browser mode:', error);
     }
-  };
-  
-  const handleCloseBrowserSession = async () => {
+  }, [browserState.enabled, browserState.sessionActive]);
+
+  const handleCloseBrowserSession = useCallback(async () => {
     try {
       await window.electronAPI.browser.closeSession('');
-      setBrowserSessionActive(false);
-      setBrowserSessionUrl(null);
+      dispatch({ type: 'SET_SESSION_ACTIVE', active: false });
+      dispatch({ type: 'SET_SESSION_URL', url: null });
       console.log('[AskModeExpanded] Browser session closed');
     } catch (error) {
       console.error('[AskModeExpanded] Failed to close browser session:', error);
     }
-  };
-  
-  const handlePauseBrowser = async () => {
+  }, []);
+
+  const handlePauseBrowser = useCallback(async () => {
     try {
-      // In a real implementation, this would call IPC to pause
-      setIsBrowserPaused(true);
+      dispatch({ type: 'SET_PAUSED', paused: true });
       console.log('[AskModeExpanded] Browser automation paused');
     } catch (error) {
       console.error('[AskModeExpanded] Failed to pause browser:', error);
     }
-  };
-  
-  const handleResumeBrowser = async () => {
+  }, []);
+
+  const handleResumeBrowser = useCallback(async () => {
     try {
-      // In a real implementation, this would call IPC to resume
-      setIsBrowserPaused(false);
+      dispatch({ type: 'SET_PAUSED', paused: false });
       console.log('[AskModeExpanded] Browser automation resumed');
     } catch (error) {
       console.error('[AskModeExpanded] Failed to resume browser:', error);
     }
-  };
-  
+  }, []);
 
   // MCP keyboard shortcuts
   useMCPKeyboardShortcuts({
@@ -253,6 +288,16 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
     closeModal: () => setShowMCPModal(false),
     isModalOpen: showMCPModal,
   });
+
+  // Note: Query transfer from header to expanded Ask mode is handled by parent
+  // The UnifiedCommandBar handles sending via Enter key - no auto-send needed here
+  // Auto-send during typing causes race conditions with isLoading state
+
+  // Map history to inline sessions
+  const recentSessions: InlineChatSession[] = historyItems.map(item => ({
+    id: item.id,
+    title: item.title,
+  }));
 
   if (!isReady) {
     return (
@@ -267,80 +312,60 @@ export function AskModeExpanded({ sessionId: _sessionId }: AskModeExpandedProps)
 
   return (
     <ToastProvider>
-      <div className="ask-mode-expanded">
-      {/* Compact Top Bar with Browser Controls, Model Selector, and History */}
-      <ChatTopBar
-        selectedModel={selectedModel}
-        onModelSelect={setSelectedModel}
-        historySessions={historyItems}
-        onSelectSession={handleSelectHistory}
-        onNewChat={handleNewChat}
-        browserModeEnabled={browserModeEnabled}
-        browserSessionActive={browserSessionActive}
-        browserSessionUrl={browserSessionUrl}
-        onToggleBrowserMode={handleToggleBrowserMode}
-        onCloseBrowserSession={handleCloseBrowserSession}
-        onBrowserExample={sendMessage}
-      />
+      <div className="ask-mode-expanded flex flex-col flex-1 min-h-0 overflow-hidden" style={{ position: 'relative' }}>
+        {/* Browser Session Status Indicator */}
+        {browserState.sessionActive && browserState.progress && (
+          <BrowserProgressPanel
+            progress={browserState.progress}
+            reasoning={browserState.progress.status === 'navigating' ? 'Accessing the requested page to gather information' : undefined}
+            upcomingSteps={
+              browserState.progress.status === 'navigating'
+                ? ['Extract content from page', 'Process and format results', 'Present findings']
+                : undefined
+            }
+            metrics={{
+              elapsedMs: browserState.elapsedMs,
+              estimatedTokens: Math.floor(browserState.elapsedMs / 100),
+              confidence: Math.max(70, 100 - Math.floor(browserState.elapsedMs / 1000)),
+            }}
+            onPause={handlePauseBrowser}
+            onResume={handleResumeBrowser}
+            onStop={handleCloseBrowserSession}
+            isPaused={browserState.isPaused}
+          />
+        )}
 
-      {/* Browser Session Status Indicator */}
-      {browserSessionActive && browserStatus && (
-        <BrowserProgressPanel
-          progress={browserStatus}
-          reasoning={browserStatus.status === 'navigating' ? 'Accessing the requested page to gather information' : undefined}
-          upcomingSteps={
-            browserStatus.status === 'navigating' 
-              ? ['Extract content from page', 'Process and format results', 'Present findings']
-              : undefined
-          }
-          metrics={{
-            elapsedMs,
-            estimatedTokens: Math.floor(elapsedMs / 100), // Rough estimate
-            confidence: Math.max(70, 100 - Math.floor(elapsedMs / 1000)), // Decreases over time
-          }}
-          onPause={handlePauseBrowser}
-          onResume={handleResumeBrowser}
-          onStop={handleCloseBrowserSession}
-          isPaused={isBrowserPaused}
-        />
-      )}
+        {/* Main Chat Area with Welcome State and Messages */}
+        <div className="chat-body">
+          <ChatMessagesList
+            messages={messages}
+            isLoading={isLoading}
+            welcomeState={welcomeState}
+            browserModeEnabled={browserState.enabled}
+            onSendExample={(query) => {
+              handleSendMessage(query);
+              setWelcomeState(false);
+            }}
+            onEnableBrowserMode={handleToggleBrowserMode}
+            onCopy={handleCopy}
+            onExplain={handleExplain}
+            onShowCode={handleShowCode}
+            onRegenerate={handleRegenerate}
+            onRelatedQuestion={handleRelatedQuestion}
+            recentSessions={recentSessions}
+            onSelectSession={handleSelectHistory}
+            onNewChat={handleNewChat}
+            error={error}
+            onRetry={handleRetry}
+            onEditQuery={handleEditQuery}
+            onFormSubmit={submitForm}
+          />
+        </div>
 
-      {/* Main Chat Area with Welcome State and Messages */}
-      <ChatMessagesList
-        messages={messages}
-        isLoading={isLoading}
-        welcomeState={welcomeState}
-        browserModeEnabled={browserModeEnabled}
-        onSendExample={sendMessage}
-        onEnableBrowserMode={handleToggleBrowserMode}
-        onCopy={handleCopy}
-        onExplain={handleExplain}
-        onShowCode={handleShowCode}
-        onRegenerate={handleRegenerate}
-      />
-
-      {/* Input Area */}
-      <ChatInputArea
-        onSend={sendMessage}
-        placeholder="Reply to AI..."
-        disabled={!isReady}
-        isLoading={isLoading}
-      />
-
-      {/* Error Display with Smart Recovery */}
-      {error && (
-        <ChatErrorBanner
-          error={error}
-          onRetry={handleRetry}
-          onNewChat={handleNewChat}
-          onEditQuery={handleEditQuery}
-        />
-      )}
-
-      {/* MCP Tool Modal */}
-      {showMCPModal && (
-        <MCPToolModal onClose={() => setShowMCPModal(false)} />
-      )}
+        {/* MCP Tool Modal */}
+        {showMCPModal && (
+          <MCPToolModal onClose={() => setShowMCPModal(false)} />
+        )}
       </div>
     </ToastProvider>
   );

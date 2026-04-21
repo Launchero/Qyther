@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { CommandPaletteHeader } from './CommandPaletteHeader';
 import { CommandPaletteBody } from './CommandPaletteBody';
 import { CommandPaletteFooter } from './CommandPaletteFooter';
@@ -26,8 +26,6 @@ export interface CommandPaletteProps {
   onOpenMCPModal?: () => void;
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
-  desktopControlEnabled?: boolean;
-  onToggleDesktopControl?: () => void;
   attachedFiles?: AttachedFile[];
   onRemoveFile?: (index: number) => void;
   onAttachFile?: () => void;
@@ -38,6 +36,8 @@ export interface CommandPaletteProps {
   fileSearchError?: string | null;
   recentFiles?: RecentFile[];
   onQuickAction?: (action: string) => void;
+  onExpandWindow?: () => void;
+  onAskAboutFile?: (result: SearchResult) => void;
 }
 
 export function CommandPalette({
@@ -57,8 +57,6 @@ export function CommandPalette({
   onOpenMCPModal,
   webSearchEnabled = false,
   onToggleWebSearch,
-  desktopControlEnabled = false,
-  onToggleDesktopControl,
   attachedFiles = [],
   onRemoveFile,
   onAttachFile,
@@ -69,6 +67,8 @@ export function CommandPalette({
   fileSearchError,
   recentFiles = [],
   onQuickAction,
+  onExpandWindow,
+  onAskAboutFile,
 }: CommandPaletteProps) {
   const [localSearchMode, setLocalSearchMode] = useState<SearchMode>('file');
   const searchMode = parentSearchMode ?? localSearchMode;
@@ -170,46 +170,6 @@ export function CommandPalette({
     onTabsExpanded?.(expanded);
     console.log('[CommandPalette] Tabs expanded:', expanded);
   };
-
-  // Window resize handle (bottom drag) - only in expanded mode
-  const isResizingRef = useRef(false);
-  const resizeStartY = useRef(0);
-  const resizeStartHeight = useRef(0);
-
-  const handleResizeMouseDown = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    isResizingRef.current = true;
-    resizeStartY.current = e.clientY;
-    try {
-      const currentHeight = await window.electronAPI.window.getHeight();
-      resizeStartHeight.current = currentHeight;
-    } catch {
-      resizeStartHeight.current = 600;
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingRef.current) return;
-      const delta = e.clientY - resizeStartY.current;
-      const newHeight = Math.max(300, resizeStartHeight.current + delta);
-      window.electronAPI.window.resizeHeight(newHeight).catch(console.error);
-    };
-
-    const handleMouseUp = () => {
-      if (isResizingRef.current) {
-        isResizingRef.current = false;
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
   
   return (
     // Use plain div instead of Card to avoid Card's built-in py-6 and gap-6
@@ -245,19 +205,18 @@ export function CommandPalette({
         onTabsExpanded={handleTabsExpanded}
         windowMode={currentMode}
         headerRef={headerRef}
-        onSendMessage={searchMode === 'ai' || searchMode === 'desktop' ? handleSendMessage : undefined}
+        onSendMessage={searchMode === 'ai' ? handleSendMessage : undefined}
         hasSentMessage={hasSentMessage}
         mcpCount={mcpCount}
         onOpenMCPModal={onOpenMCPModal}
         webSearchEnabled={webSearchEnabled}
         onToggleWebSearch={onToggleWebSearch}
-        desktopControlEnabled={desktopControlEnabled}
-        onToggleDesktopControl={onToggleDesktopControl}
         attachedFiles={attachedFiles}
         onRemoveFile={onRemoveFile}
         onAttachFile={onAttachFile}
         onAttachFolder={onAttachFolder}
         onAddFile={onAddFile}
+        onExpandWindow={onExpandWindow}
       />
       
       <CommandPaletteBody
@@ -282,6 +241,7 @@ export function CommandPalette({
         fileSearchError={fileSearchError}
         recentFiles={recentFiles}
         onQuickAction={onQuickAction}
+        onAskAboutFile={onAskAboutFile}
       />
       
       <CommandPaletteFooter
@@ -291,15 +251,6 @@ export function CommandPalette({
         searchQuery={searchQuery}
         windowMode={currentMode}
       />
-
-      {/* Resize Handle - Bottom edge for vertical resizing (expanded mode only) */}
-      {currentMode === 'expanded' && (
-        <div
-          className="window-resize-handle"
-          onMouseDown={handleResizeMouseDown}
-          style={{ cursor: 'ns-resize' }}
-        />
-      )}
     </div>
   );
 }

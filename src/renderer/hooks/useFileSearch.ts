@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SearchResult } from '../components/ResultsList';
+import { getFileTypeFromName } from '../utils/fileUtils';
 
 export interface FileSearchResult {
   path: string;
@@ -16,6 +17,9 @@ interface UseFileSearchOptions {
   enabled: boolean;
   debounceMs?: number;
   maxResults?: number;
+  excludeHidden?: boolean;
+  excludeSystem?: boolean;
+  includeMetadata?: boolean;
 }
 
 // NEW: LRU Cache implementation for better memory management
@@ -74,6 +78,22 @@ const CACHE_TTL_MS = 30000; // 30 seconds
 const lruCache = new LRUCache<string, FileSearchResult[]>(CACHE_MAX_SIZE, CACHE_TTL_MS);
 
 /**
+ * Clear the file search cache. Useful for testing and HMR cleanup.
+ */
+export function clearFileSearchCache(): void {
+  lruCache.clear();
+}
+
+// Cleanup cache on Vite HMR
+// @ts-expect-error - vite/client types provide import.meta.hot
+if (typeof import.meta !== 'undefined' && import.meta.hot) {
+  // @ts-expect-error - vite/client types provide import.meta.hot
+  import.meta.hot.dispose(() => {
+    lruCache.clear();
+  });
+}
+
+/**
  * Hook for file search with debouncing and caching
  */
 export function useFileSearch(query: string, options: UseFileSearchOptions) {
@@ -86,7 +106,6 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -97,18 +116,8 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     };
   }, []);
 
-  // Clear cache periodically (LRU auto-manages size, this just handles TTL)
-  useEffect(() => {
-    const cleanupInterval = setInterval(() => {
-      // LRU cache handles TTL internally, but we can force cleanup if needed
-      lruCache.size(); // Touch the cache to trigger cleanup
-    }, 60000); // Run every minute
 
-    return () => clearInterval(cleanupInterval);
-  }, []);
-
-  // NEW: AbortController for cancelling in-flight searches
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Note: IPC calls cannot be cancelled. The isMountedRef pattern prevents stale state updates.
 
   // NEW: Retry with exponential backoff
   const searchWithRetry = useCallback(async (
@@ -149,7 +158,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     }
     
     throw lastError;
-  }, [options.maxResults]);
+  }, [options.maxResults, options.excludeHidden, options.excludeSystem, options.includeMetadata]);
 
   const searchFiles = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -175,17 +184,9 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     setError(null);
 
     try {
-      // Cancel any in-flight search
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-      
-      // Search with retry logic
       const fileResults = await searchWithRetry(trimmedQuery);
       
       if (isMountedRef.current) {
-        // Cache the results (LRU automatically manages size)
         lruCache.set(trimmedQuery, fileResults);
         
         console.log(`[useFileSearch] Found ${fileResults.length} results for "${searchQuery}"`);
@@ -193,7 +194,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
         setError(null);
       }
     } catch (err) {
-      if (isMountedRef.current && !((err as Error).message.includes('aborted'))) {
+      if (isMountedRef.current) {
         const errorMessage = err instanceof Error ? err.message : 'Search failed';
         console.error('[useFileSearch] Search error:', errorMessage, err);
         setError(errorMessage);
@@ -208,10 +209,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
 
   // Debounced search effect
   useEffect(() => {
-    console.log('[useFileSearch] Effect triggered:', { query, enabled, debounceMs });
-    
     if (!enabled) {
-      console.log('[useFileSearch] Not enabled, clearing results');
       setResults([]);
       setIsLoading(false);
       setError(null);
@@ -225,43 +223,44 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
 
     // Don't search if query is empty
     if (!query || !query.trim()) {
-      console.log('[useFileSearch] Empty query, clearing results');
       setResults([]);
       setIsLoading(false);
       setError(null);
       return;
     }
 
-    console.log('[useFileSearch] Scheduling search for:', query);
     // Debounce the search
     debounceTimeoutRef.current = setTimeout(() => {
-      console.log('[useFileSearch] Executing search for:', query);
       searchFiles(query);
     }, debounceMs);
 
     return () => {
       if (debounceTimeoutRef.current) {
-        console.log('[useFileSearch] Clearing timeout');
         clearTimeout(debounceTimeoutRef.current);
       }
     };
   }, [query, enabled, debounceMs, searchFiles]);
 
-  // Convert file results to SearchResult format for display
-  const searchResults: SearchResult[] = results.map((file, index) => ({
-    id: `file-${index}-${file.path}`,
-    title: file.name,
-    subtitle: `${file.path}${file.size ? ` • ${file.size}` : ''}${file.dateModified ? ` • ${file.dateModified}` : ''}`,
-    icon: file.isFolder ? '📁' : '📄',
-    type: 'file',
-    action: file.path,
-    metadata: {
-      path: file.path,
-      isFolder: file.isFolder,
-      size: file.size,
-      dateModified: file.dateModified,
-    },
-  }));
+  const searchResults: SearchResult[] = results.map((file, index) => {
+    // Normalize folder detection: path ending with separator is always a folder
+    const isFolder = file.isFolder || file.path.endsWith('\\') || file.path.endsWith('/');
+    const fileType = getFileTypeFromName(file.name, isFolder);
+    return ({
+      id: `file-${index}-${file.path}`,
+      title: file.name,
+      subtitle: `${file.path}${file.size ? ` • ${file.size}` : ''}${file.dateModified ? ` • ${file.dateModified}` : ''}`,
+      icon: isFolder ? '📁' : '📄',
+      type: 'file',
+      action: file.path,
+      metadata: {
+        path: file.path,
+        isFolder,
+        size: file.size,
+        dateModified: file.dateModified,
+        fileType,
+      },
+    });
+  });
 
   return {
     fileResults: searchResults,

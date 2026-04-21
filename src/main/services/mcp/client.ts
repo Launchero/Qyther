@@ -7,6 +7,7 @@ export class MCPService {
   private client: MultiServerMCPClient | null = null;
   private tools: (RunnableToolLike | DynamicStructuredTool)[] = [];
   private isInitializedFlag = false;
+  private serverToolCounts: Map<string, number> = new Map();
 
   async initialize(): Promise<void> {
     if (this.isInitializedFlag) return;
@@ -20,11 +21,13 @@ export class MCPService {
     }
 
     try {
-      // Build server config from preferences
       const mcpServers: Record<string, any> = {};
+      const enabledServers: string[] = [];
       
       for (const server of mcpConfig.servers || []) {
         if (!server.enabled) continue;
+
+        enabledServers.push(server.name);
 
         if (server.type === 'stdio' && server.command && server.args) {
           mcpServers[server.name] = {
@@ -49,7 +52,26 @@ export class MCPService {
       this.tools = await this.client.getTools();
       this.isInitializedFlag = true;
       
-      console.log(`[MCP] Initialized with ${this.tools.length} tools`);
+      // Track tool counts per server
+      // MultiServerMCPClient doesn't expose per-server counts, so we use a heuristic:
+      // iterate enabled servers and check if they have tools by filtering tool names
+      // that typically include server prefixes
+      this.serverToolCounts.clear();
+      const toolNames = this.tools.map(t => t.name ?? '');
+      for (const serverName of enabledServers) {
+        // Tools from a server often have names that include the server name as prefix
+        const serverTools = toolNames.filter(name => 
+          name.startsWith(`${serverName}-`) || name === serverName
+        );
+        this.serverToolCounts.set(serverName, serverTools.length);
+        
+        // If no tools matched by prefix, assign total tools if only one server
+        if (serverTools.length === 0 && enabledServers.length === 1) {
+          this.serverToolCounts.set(serverName, this.tools.length);
+        }
+      }
+      
+      console.log(`[MCP] Initialized with ${this.tools.length} tools across ${enabledServers.length} servers`);
     } catch (error) {
       console.error('[MCP] Initialization failed:', error);
       throw error;
@@ -79,12 +101,17 @@ export class MCPService {
     return this.isInitializedFlag;
   }
 
+  getServerToolCounts(): Map<string, number> {
+    return new Map(this.serverToolCounts);
+  }
+
   async cleanup(): Promise<void> {
     if (this.client) {
       await this.client.close();
       this.client = null;
       this.tools = [];
       this.isInitializedFlag = false;
+      this.serverToolCounts.clear();
       console.log('[MCP] Cleanup complete');
     }
   }

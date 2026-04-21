@@ -92,7 +92,6 @@ export function useSessionHistory() {
     }
   }, [isAvailable]);
 
-  // Delete a session
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
     if (!isAvailable) {
       throw new Error('IndexedDB is not available');
@@ -108,7 +107,6 @@ export function useSessionHistory() {
     }
   }, [isAvailable, loadHistory]);
 
-  // Add a message to a session
   const addMessage = useCallback(async (
     sessionId: string,
     message: StoredMessage
@@ -126,7 +124,6 @@ export function useSessionHistory() {
     }
   }, [isAvailable]);
 
-  // Update a message in a session
   const updateMessage = useCallback(async (
     sessionId: string,
     messageId: string,
@@ -158,9 +155,9 @@ export function useSessionHistory() {
     }
   }, [isAvailable]);
 
-  // Create a new session
   const createSession = useCallback(async (title: string = 'New Chat'): Promise<StoredSession> => {
-    // Create session in memory if IndexedDB is not available
+    // Create session in memory
+    // Don't save to IndexedDB yet - only save when first message is added
     const session: StoredSession = {
       id: `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       title,
@@ -171,20 +168,10 @@ export function useSessionHistory() {
       lastAccessed: Date.now(),
     };
 
-    if (isAvailable) {
-      try {
-        await saveSessionToDB(session);
-        await loadHistory();
-      } catch (err) {
-        console.warn('[useSessionHistory] Failed to save session to IndexedDB:', err);
-        // Continue anyway - session will be in-memory only
-      }
-    } else {
-      console.log('[useSessionHistory] IndexedDB not available, using in-memory session');
-    }
-
+    // Session will be saved to IndexedDB when first message is added via addMessage()
+    
     return session;
-  }, [isAvailable, loadHistory]);
+  }, []);
 
   // Refresh history
   const refresh = useCallback(async () => {
@@ -240,7 +227,6 @@ export function useStreamingSession(sessionId: string | null) {
   const startStreaming = useCallback((messageId: string) => {
     setIsStreaming(true);
     setCurrentMessage('');
-    // Add a placeholder message that will be updated
     const placeholder: StoredMessage = {
       id: messageId,
       role: 'assistant',

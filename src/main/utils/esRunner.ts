@@ -136,7 +136,6 @@ function deduplicateResults(results: FileSearchResult[]): FileSearchResult[] {
   const seen = new Map<string, FileSearchResult>();
   
   for (const result of results) {
-    // Use lowercase path as key to catch case variations
     const key = result.path.toLowerCase();
     
     if (!seen.has(key)) {
@@ -199,14 +198,16 @@ function processEsItem(json: any): FileSearchResult {
   const fileName = path.basename(fullPath);
   const extension = path.extname(fullPath).toLowerCase();
   
-  // Determine if it's a folder
-  const isFolder = extension === '' || json.Extension === 'Folder';
+  // Determine if it's a folder - primary check: Extension === 'Folder' (from -ext flag)
+  // Fallback: folders report no Size, files always have a Size
+  const isFolder = json.Extension === 'Folder' || json.FileKind === 'Folder'
+    || (!json.Size && !json.size && !json.file_size && !json.FileSize);
   
   return {
     path: fullPath,
     name: fileName,
-    size: json.size || json.Size,
-    dateModified: json['date_modified'] || json['Date Modified'],
+    size: json.size || json.Size || json.file_size || json.FileSize,
+    dateModified: json['date_modified'] || json['Date Modified'] || json.dateModified || json.DateModified,
     isFolder,
   };
 }
@@ -316,9 +317,6 @@ export async function searchFiles(
   
   const esPath = getEsPath();
   
-  // Build es.exe command with JSON output
-  // Using -json flag for structured output
-  // -size for file sizes, -date-modified for modification dates
   const command = `"${esPath}" "${normalizedQuery}" -json -size -date-modified -n ${maxResults}`;
   
   log(`Executing: ${command}`);
@@ -334,10 +332,8 @@ export async function searchFiles(
       log('es.exe stderr:', stderr);
     }
     
-    // Log raw output for debugging (first 500 chars)
     log(`Raw stdout length: ${stdout.length}, preview: ${stdout.substring(0, 500)}...`);
     
-    // Parse results from es.exe output
     let results = parseEsOutput(stdout);
     
     // Step 3: Apply enhancements if metadata is requested
@@ -360,10 +356,8 @@ export async function searchFiles(
         },
       }));
       
-      // Apply deduplication
       results = deduplicateResults(results);
       
-      // Apply system/hidden file filtering
       results = filterSystemFiles(results, excludeHidden, excludeSystem);
       
       // Sort by relevance score (highest first)
@@ -372,7 +366,6 @@ export async function searchFiles(
     
     log(`Found ${results.length} results for query: "${normalizedQuery}"`);
     
-    // Log first few results for debugging
     if (results.length > 0) {
       log(`First result: ${results[0].path}`);
       if (includeMetadata) {
@@ -432,6 +425,9 @@ export function formatDate(dateString?: string): string {
   
   try {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return '';
+    }
     return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -440,6 +436,6 @@ export function formatDate(dateString?: string): string {
       minute: '2-digit',
     });
   } catch {
-    return dateString;
+    return '';
   }
 }

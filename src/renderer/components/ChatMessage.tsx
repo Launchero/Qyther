@@ -14,10 +14,10 @@ interface ChatMessageProps {
 
 function ToolCallIndicator({ toolCall }: { toolCall: ExtendedToolCall }) {
   const statusColors: Record<string, string> = {
-    pending: 'var(--kraken-yellow)',
-    running: 'var(--kraken-purple)',
-    completed: 'var(--kraken-green)',
-    error: 'var(--kraken-red)',
+    pending: 'var(--color-gray-500)',
+    running: 'var(--primary)',
+    completed: 'var(--color-green-500)',
+    error: 'var(--color-red-500)',
   };
 
   const [expanded, setExpanded] = React.useState(false);
@@ -34,7 +34,7 @@ function ToolCallIndicator({ toolCall }: { toolCall: ExtendedToolCall }) {
             : toolCall.status}
         </span>
         {toolCall.logs && toolCall.logs.length > 0 && (
-          <span className="tool-call-expand" style={{ marginLeft: '8px', fontSize: '10px' }}>
+          <span className="tool-call-expand" style={{ marginLeft: 'var(--spacing-2)', fontSize: 'var(--text-2xs)' }}>
             {expanded ? '▼' : '▶'} {toolCall.logs.length} logs
           </span>
         )}

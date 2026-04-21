@@ -1,20 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { SearchMode } from '../types/commandPalette';
 
 export type WindowMode = 'compact' | 'expanded' | 'custom';
 
 interface UseWindowModeOptions {
   searchQuery?: string;
+  searchMode?: SearchMode;
 }
+
+const AUTO_EXPAND_CHAR_THRESHOLD = 2;
+const AUTO_EXPAND_DEBOUNCE_MS = 150;
 
 /**
  * Hook for managing window mode state
- * Consolidates window mode polling, visibility sync, and auto-expand logic
+ * Uses IPC events instead of polling for mode change detection
  */
 export function useWindowMode(options: UseWindowModeOptions = {}) {
-  const { searchQuery = '' } = options;
+  const { searchQuery = '', searchMode } = options;
   
   const [windowMode, setWindowMode] = useState<WindowMode>('expanded');
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load current window mode on mount
   useEffect(() => {
@@ -31,13 +37,29 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
     loadWindowMode();
   }, []);
   
+  // Listen for mode changes from main process via IPC event (replaces polling)
+  useEffect(() => {
+    const handleModeChanged = (event: Event) => {
+      const mode = (event as CustomEvent<WindowMode>).detail;
+      if (mode !== windowMode) {
+        console.log(`[useWindowMode] IPC mode change: ${windowMode} -> ${mode}`);
+        setWindowMode(mode);
+        setIsManuallyExpanded(mode === 'expanded');
+      }
+    };
+    
+    window.addEventListener('electron-window-mode-changed', handleModeChanged);
+    return () => {
+      window.removeEventListener('electron-window-mode-changed', handleModeChanged);
+    };
+  }, [windowMode]);
+  
   // Sync state when window becomes visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
         try {
           const mode = await window.electronAPI.window.getMode();
-          // Set isManuallyExpanded based on whether the mode is expanded
           if (mode === 'compact') {
             setIsManuallyExpanded(false);
           } else if (mode === 'expanded') {
@@ -57,30 +79,9 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
     };
   }, []);
   
-  // Listen for window mode changes (e.g., from Alt+Shift+M toggle)
-  // Using polling with reduced frequency to avoid excessive IPC calls
+  // Auto-expand/collapse logic with debounce and character threshold
   useEffect(() => {
-    const checkModeChange = setInterval(async () => {
-      try {
-        const currentMode = await window.electronAPI.window.getMode();
-        if (currentMode !== windowMode) {
-          // Mode was changed externally (e.g., by keyboard shortcut)
-          console.log(`[useWindowMode] Detected mode change: ${windowMode} -> ${currentMode}`);
-          setWindowMode(currentMode);
-          // Update isManuallyExpanded based on the new mode
-          setIsManuallyExpanded(currentMode === 'expanded');
-        }
-      } catch (error) {
-        // Ignore errors
-      }
-    }, 500); // Check every 500ms
-    
-    return () => clearInterval(checkModeChange);
-  }, [windowMode]);
-  
-  // Auto-expand/collapse logic
-  useEffect(() => {
-    const hasQuery = searchQuery.trim().length > 0;
+    const queryLength = searchQuery.trim().length;
     
     // If user manually expanded, keep expanded regardless of query
     if (isManuallyExpanded) {
@@ -92,15 +93,31 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
       return;
     }
     
-    // Auto-expand when there's a query (but respect manual collapse)
-    // If no query and not manually expanded, use compact mode
-    const targetMode = hasQuery ? 'expanded' : 'compact';
-    if (windowMode !== targetMode) {
-      console.log(`[useWindowMode] Search query: "${searchQuery}", targetMode: ${targetMode}`);
-      setWindowMode(targetMode);
-      window.electronAPI.window.setMode(targetMode).catch(console.error);
+    // In AI mode, always expand immediately
+    // In other modes, require minimum character threshold before expanding
+    const isAskMode = searchMode === 'ai';
+    const hasQuery = queryLength >= AUTO_EXPAND_CHAR_THRESHOLD;
+    const targetMode = isAskMode || hasQuery ? 'expanded' : 'compact';
+
+    // Debounce the mode change to prevent rapid toggling during typing
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  }, [searchQuery, isManuallyExpanded]);
+
+    if (windowMode !== targetMode) {
+      debounceTimerRef.current = setTimeout(() => {
+        console.log(`[useWindowMode] Search query: "${searchQuery}", searchMode: ${searchMode}, targetMode: ${targetMode}`);
+        setWindowMode(targetMode);
+        window.electronAPI.window.setMode(targetMode).catch(console.error);
+      }, AUTO_EXPAND_DEBOUNCE_MS);
+    }
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchQuery, searchMode, isManuallyExpanded, windowMode]);
 
   const setMode = useCallback(async (mode: WindowMode) => {
     setWindowMode(mode);

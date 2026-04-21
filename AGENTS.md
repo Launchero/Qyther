@@ -1,7 +1,7 @@
 # Agent Instructions
 
 ## Stack
-- Electron 35, React 19, TypeScript 5.7, Vite 6
+- Electron 41, React 19, TypeScript 5.7, Vite 6
 - Global shortcut: Alt+Space
 - Performance target: <500ms cold start
 
@@ -25,22 +25,111 @@ npm run lint       # ESLint check
 - IPC handlers: `src/main/ipc/handlers.ts`
 - Custom hook: `src/renderer/hooks/useKeyboard.ts`
 
-## Design Systems
-
-- **Kraken Design Language**: Follow `@design-systems/kraken/DESIGN.md` for alternative UI implementation
-  - Brand: Kraken Purple (`#7132f5`) with darker variants (`#5741d8`, `#5b1ecf`)
-  - Background: White (`#ffffff`) with near-black text (`#101114`)
-  - Typography: Kraken-Brand (display) + Kraken-Product/UI (IBM Plex Sans fallback)
-  - Buttons: 12px radius (rounded, not pill)
-  - Shadows: Subtle (`rgba(0,0,0,0.03) 0px 4px 24px`)
-  - Preview: Open `@design-systems/kraken/preview.html` (light) or `preview-dark.html` (dark)
-
 ## Web & MCP Tools
 - Use WebSearch for current info (2025-2026)
 - Use WebFetch for documentation URLs
 - Use Context7 MCP for library APIs
 - Use browser for frontend testing
 
+## Karpathy Principles
+
+### 12 Core Operating Principles (from Andrej Karpathy, 2026)
+
+1. **Sync in macro actions** - Think in features, not lines. Delegate whole features, review system-level.
+2. **Skill issue first** - When agents fail, fix instructions/context before fixing code.
+3. **Remove yourself as bottleneck** - Autonomous loops > interactive sessions.
+4. **Muscle memory for orchestration** - Parallel agents, batch review rhythm.
+5. **Instructions as tunable code** - SKILL.md files are code you iterate on.
+6. **Replace apps with agent API glue** - Natural language over manual UIs.
+7. **Persistent looping setups** - Run overnight, keep what works.
+8. **Jagged model improvements** - Know agent blind spots, design around them.
+9. **Context engineering over implementation** - Context quality dominates output.
+10. **Simplicity bias** - "All else equal, simpler is better." No speculative code.
+11. **Bounded autonomy** - Maximum freedom within tight constraints.
+12. **Instruction-first development** - Write intent before opening editor.
+
+### Skill Navigation
+
+| Situation | Use This Skill |
+|-----------|---------------|
+| Starting any task (master entry point) | `karpathy-universal` |
+| Agent produced wrong output | `skill-issue-diagnosis` |
+| Delegating multi-part work | `parallel-orchestration` |
+| Structuring intent before coding | `instruction-first` |
+| Plan mode research | `plan-mode-enhancement` (rule) |
+| Electron main process / architecture | `electron-core` |
+| Electron + React integration | `electron-react-core` |
+| IPC patterns (main <-> renderer) | `electron-react-ipc` |
+| Security best practices | `electron-react-security` |
+| Performance optimization | `electron-react-performance` |
+| Component design patterns | `electron-react-components` |
+| React fundamentals | `react-core` |
+| TypeScript type patterns | `typescript-core` |
+| Library API research | `context7-integration` |
+| Browser UI testing | `browser-use-testing` |
+| Electron-vite build config | `electron-react-build` |
+| React 19 state patterns | `electron-react-state` |
+| Parallel Context7 research | `context7-parallel-research` |
+| Web tool selection logic | `web-tools-decision-tree` |
+| Search/install skills from skills.sh | `skill-installer` |
+
+### Simplicity Rules (Enforced)
+
+- Maximum 50 lines per function; extract helpers beyond that
+- No error handling for impossible scenarios
+- No "flexibility" or "configurability" not requested
+- No abstractions for single-use code
+- Every changed line must trace to the user's request
+
+### Bounded Autonomy Defaults
+
+| Constraint | Default |
+|------------|---------|
+| Scope | 1-3 files max per agent |
+| Time budget | 300s per experiment |
+| Metric | One unambiguous metric |
+| Rollback | Git reset on failure |
+| Max experiments | 100 (standard) |
+
+## UI & Design System
+
+### Token-Driven Architecture (MANDATORY)
+All UI features MUST use the design token system. See `@design-tokens-enforcement` rule for full token documentation, usage rules, and Tailwind v4 guidance.
+
+Key rules: NEVER hardcode pixel values or OKLCH colors. ALWAYS use `var(--token-name)` or Tailwind utilities from `@theme inline`.
+
+### shadcn/ui Patterns
+- **Components are source code**: Treat `components/ui/` as owned code, not dependencies
+- **File organization**:
+  - `components/ui/` - shadcn primitives (keep pristine for updates)
+  - `components/common/` - Wrapper components with custom logic (USE FOR DOMAIN-SPECIFIC)
+  - `components/ask-mode/` - Ask mode domain components (chat, browser, generative UI)
+  - `components/` root - Top-level app components (CommandPalette, SearchBar, etc)
+- **Theming**: Use CSS variables in token files (never hardcode colors)
+  - Follow `name` / `name-foreground` convention
+  - OKLCH color format (REQUIRED)
+  - Dark mode via `.dark` selector + `@variant dark`
+- **Component patterns**:
+  - Use `cn()` for class merging (clsx + tailwind-merge)
+  - Use CVA for component variants
+  - Preserve Radix UI accessibility attributes
+  - Test in light + dark mode
+- **Updates**: Run `npx shadcn@latest diff` monthly, apply selectively
+
+### Best Practices
+- ✅ ALWAYS use design tokens (see Token Usage Rules above)
+- ✅ Use semantic color tokens (`bg-primary`, not `bg-blue-500`)
+- ✅ Create wrapper components for domain-specific logic in `components/common/`
+- ✅ Preserve all ARIA attributes from Radix
+- ✅ Lazy load heavy components (Dialog, Sheet, Calendar, Chart)
+- ❌ NEVER use arbitrary values (e.g., `h-[44px]`, `rounded-[10px]`)
+- ❌ NEVER hardcode OKLCH colors in components
+- ❌ Don't modify base components directly (use wrappers)
+- ❌ Don't put business logic in `components/ui/`
+- ❌ Don't remove accessibility attributes
+
+### Documentation
+- See `design-systems/SHADCN-DESIGN-SYSTEM.md` for design system guide (audited for accuracy)
 
 ## Auto-Update Rule
 This file is automatically maintained by Cursor subagents. Before updating, subagents MUST reference `@AGENT-INSTRUCTION-BEST-PRACTICES.md` to ensure minimal, relevant context only.

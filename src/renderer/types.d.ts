@@ -49,6 +49,8 @@ export interface ElectronAPI {
     getMode: () => Promise<WindowMode>;
     toggleMode: () => Promise<WindowMode>;
     setCustomDimensions: (width: number, height: number) => Promise<void>;
+    resizeHeight: (height: number) => Promise<void>;
+    getHeight: () => Promise<number>;
   };
 
   // Command execution
@@ -91,6 +93,12 @@ export interface ElectronAPI {
   // App lifecycle
   quit: () => Promise<void>;
 
+  // Dialog API
+  dialog: {
+    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ path?: string; cancelled?: boolean }>;
+    openFolder: (options?: { defaultPath?: string }) => Promise<{ path?: string; cancelled?: boolean }>;
+  };
+
   // Debug logging
   debug: {
     log: (message: string, data?: any) => Promise<void>;
@@ -100,6 +108,7 @@ export interface ElectronAPI {
   chat: {
     initialize: () => Promise<{ success: boolean; ready: boolean; error?: string }>;
     sendMessage: (content: string, sessionId?: string) => Promise<{ success: boolean; response?: string; error?: string }>;
+    sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => Promise<{ success: boolean; response?: string; error?: string }>;
     createSession: (title?: string) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
     getCurrentSession: () => Promise<any>;
     getSession: (sessionId: string) => Promise<any>;
@@ -108,7 +117,13 @@ export interface ElectronAPI {
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     clearHistory: () => Promise<{ success: boolean; error?: string }>;
     isReady: () => Promise<boolean>;
-    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean }) => void) => () => void;
+    resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) => Promise<{ success: boolean; error?: string }>;
+    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; confidence?: number; verificationSkipped?: boolean }) => void) => () => void;
+    onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => () => void;
+    onThinkingStep: (callback: (data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => void) => () => void;
+    onUIPayloadStarted: (callback: (data: { type: string }) => void) => () => void;
+    onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => () => void;
+    onFormSubmit: (callback: (data: { formTitle: string; formData: Record<string, unknown> }) => void) => () => void;
   };
   
   // MCP API

@@ -1,0 +1,62 @@
+/*
+ * =============================================================================
+ * MOTION TOKENS
+ * =============================================================================
+ * 
+ * PURPOSE: This file contains motion tokens for the shadcn design system.
+ * 
+ * Critical for: Mode transitions, hover states, loading animations
+ */
+
+@theme {
+  /* Duration scale */
+  --duration-75: 75ms;
+  --duration-100: 100ms;
+  --duration-150: 150ms;   /* Fast */
+  --duration-200: 200ms;   /* Normal */
+  --duration-300: 300ms;   /* Slow */
+  --duration-500: 500ms;
+  --duration-700: 700ms;
+  --duration-1000: 1000ms;
+  
+  /* Easing curves */
+  --easing-linear: linear;
+  --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);  /* Mockup line 242 */
+  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --easing-snap: cubic-bezier(0.4, 0, 0.6, 1);
+  
+  /* Animation tokens */
+  --animate-spin: spin 1s linear infinite;
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-bounce: bounce 1s ease-in-out infinite;
+  --animate-cursor-blink: cursorBlink 1s step-end infinite;
+  
+  /* Transition presets */
+  --transition-fast: var(--duration-150) var(--easing-smooth);
+  --transition-normal: var(--duration-200) var(--easing-smooth);
+  --transition-slow: var(--duration-300) var(--easing-smooth);
+  
+  /* Panel expansion transitions (from mockup) */
+  --transition-morph: var(--duration-300) var(--easing-smooth);
+  --transition-morph-slow: var(--duration-500) var(--easing-smooth);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(-25%); }
+  50% { transform: translateY(0); }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

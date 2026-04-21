@@ -31,6 +31,36 @@ ipcRenderer.on('window:shown', () => {
   window.dispatchEvent(new CustomEvent('electron-window-shown'));
 });
 
+// Listen for window will-hide event so renderer can store active element
+ipcRenderer.on('window:will-hide', () => {
+  window.dispatchEvent(new CustomEvent('electron-window-will-hide'));
+});
+
+// Listen for window mode change event from main process
+ipcRenderer.on('window:modeChanged', (_event, mode: WindowMode) => {
+  window.dispatchEvent(new CustomEvent('electron-window-mode-changed', { detail: mode }));
+});
+
+// Listen for screenshot capture requests from main process
+ipcRenderer.on('desktop:screenshot:capture', async (_event, reqId: string) => {
+  try {
+    const { desktopCapturer } = await import('electron');
+    const width = window.screen.width;
+    const height = window.screen.height;
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width, height },
+    });
+    if (sources.length === 0) {
+      throw new Error('No screen sources available');
+    }
+    const result = sources[0].thumbnail.toDataURL();
+    ipcRenderer.send('desktop:screenshot:result', reqId, result);
+  } catch (error) {
+    ipcRenderer.send('desktop:screenshot:error', reqId, error instanceof Error ? error.message : 'Unknown error');
+  }
+});
+
 // Define strict API surface for renderer
 export const electronAPI = {
   // App info
@@ -49,6 +79,8 @@ export const electronAPI = {
     getMode: () => ipcRenderer.invoke('window:getMode'),
     toggleMode: () => ipcRenderer.invoke('window:toggleMode'),
     setCustomDimensions: (width: number, height: number) => ipcRenderer.invoke('window:setCustomDimensions', width, height),
+    resizeHeight: (height: number) => ipcRenderer.invoke('window:resizeHeight', height),
+    getHeight: () => ipcRenderer.invoke('window:getHeight'),
   },
   
   // Command execution
@@ -135,6 +167,8 @@ export const electronAPI = {
     initialize: () => ipcRenderer.invoke('chat:initialize'),
     sendMessage: (content: string, sessionId?: string) => 
       ipcRenderer.invoke('chat:sendMessage', { content, sessionId }),
+    sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => 
+      ipcRenderer.invoke('chat:sendStreamMessage', { content, sessionId, attachmentPaths }),
     createSession: (title?: string) => ipcRenderer.invoke('chat:createSession', title),
     getCurrentSession: () => ipcRenderer.invoke('chat:getCurrentSession'),
     getSession: (sessionId: string) => ipcRenderer.invoke('chat:getSession', sessionId),
@@ -143,10 +177,41 @@ export const electronAPI = {
     deleteSession: (sessionId: string) => ipcRenderer.invoke('chat:deleteSession', sessionId),
     clearHistory: () => ipcRenderer.invoke('chat:clearHistory'),
     isReady: () => ipcRenderer.invoke('chat:isReady'),
+    resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) =>
+      ipcRenderer.invoke('chat:resumeGraph', { threadId, resumeValue }),
     onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean }) => void) => {
-      ipcRenderer.on('chat:stream-chunk', (_event, data) => callback(data));
+      const handler = (_event: Electron.IpcRendererEvent, data: { chunk: string; isComplete: boolean }) => callback(data);
+      ipcRenderer.on('chat:stream-chunk', handler);
       return () => {
-        ipcRenderer.removeAllListeners('chat:stream-chunk');
+        ipcRenderer.removeListener('chat:stream-chunk', handler);
+      };
+    },
+    onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { content: string; isComplete: boolean }) => callback(data);
+      ipcRenderer.on('chat:stream-replace', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:stream-replace', handler);
+      };
+    },
+    onThinkingStep: (callback: (data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => callback(data);
+      ipcRenderer.on('chat:thinking-step', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:thinking-step', handler);
+      };
+    },
+    onUIPayloadStarted: (callback: (data: { type: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { type: string }) => callback(data);
+      ipcRenderer.on('chat:ui-payload-started', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:ui-payload-started', handler);
+      };
+    },
+    onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { progress: number; message: string }) => callback(data);
+      ipcRenderer.on('chat:ui-payload-progress', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:ui-payload-progress', handler);
       };
     },
   },
@@ -162,21 +227,24 @@ export const electronAPI = {
     closeSession: (sessionId: string) => ipcRenderer.invoke('browser:closeSession', sessionId),
     extractLinks: () => ipcRenderer.invoke('browser:extractLinks'),
     onProgress: (callback: (data: { sessionId: string; progress: any }) => void) => {
-      ipcRenderer.on('browser:progress', (_event, data) => callback(data));
+      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string; progress: any }) => callback(data);
+      ipcRenderer.on('browser:progress', handler);
       return () => {
-        ipcRenderer.removeAllListeners('browser:progress');
+        ipcRenderer.removeListener('browser:progress', handler);
       };
     },
     onChunk: (callback: (data: { sessionId: string; chunk: string }) => void) => {
-      ipcRenderer.on('browser:chunk', (_event, data) => callback(data));
+      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string; chunk: string }) => callback(data);
+      ipcRenderer.on('browser:chunk', handler);
       return () => {
-        ipcRenderer.removeAllListeners('browser:chunk');
+        ipcRenderer.removeListener('browser:chunk', handler);
       };
     },
     onError: (callback: (data: { sessionId: string; error: string }) => void) => {
-      ipcRenderer.on('browser:error', (_event, data) => callback(data));
+      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string; error: string }) => callback(data);
+      ipcRenderer.on('browser:error', handler);
       return () => {
-        ipcRenderer.removeAllListeners('browser:error');
+        ipcRenderer.removeListener('browser:error', handler);
       };
     },
   },
@@ -191,6 +259,15 @@ export const electronAPI = {
     getTools: () => ipcRenderer.invoke('mcp:getTools'),
     toggleTool: (toolName: string) => ipcRenderer.invoke('mcp:toggleTool', toolName),
   },
+
+  // Dialog API
+  dialog: {
+    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => 
+      ipcRenderer.invoke('dialog:openFile', options),
+    openFolder: (options?: { defaultPath?: string }) => 
+      ipcRenderer.invoke('dialog:openFolder', options),
+  },
+
 };
 
 // Expose with type safety

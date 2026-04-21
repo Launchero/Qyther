@@ -1,6 +1,6 @@
-# Raycast Clone
+# Qyther
 
-A Raycast-style launcher application built with Electron 35 and React 19. Features a sleek command palette interface, keyboard-first navigation, and extensible command system.
+A command launcher application built with Electron and React. Features a sleek command palette interface, keyboard-first navigation, and extensible command system.
 
 Version
 Electron
@@ -10,7 +10,7 @@ TypeScript
 ## Features
 
 - ⚡ **Lightning Fast**: Optimized for cold start < 500ms
-- 🎨 **Modern UI**: Clean, minimal dark theme inspired by Raycast
+- 🎨 **Modern UI**: Clean, minimal dark theme
 - ⌨️ **Keyboard-First**: Global hotkey (`Alt+Space`) to toggle
 - 🔍 **Smart Search**: Fuzzy search with relevance ranking
 - 🚀 **App Launcher**: Quick access to installed applications
@@ -71,7 +71,7 @@ See `.env.example` for all available configuration options.
 1. **Install dependencies:**
 
 ```bash
-cd raycast-clone
+cd qyther
 npm install
 ```
 
@@ -113,7 +113,7 @@ npm run build:linux  # Linux
 
 The app includes a system tray icon (Windows) or menu bar icon (macOS) with the following options:
 
-- **Show Raycast Clone**: Opens the launcher window
+- **Show Qyther**: Opens the launcher window
 - **Hide Window**: Hides the launcher window
 - **Quit**: Exits the application completely
 
@@ -146,7 +146,7 @@ Then handle the action in the `onExecute` function.
 ## Project Structure
 
 ```
-raycast-clone/
+qyther/
 ├── src/
 │   ├── main/                    # Electron main process
 │   │   ├── main.ts              # App entry point
@@ -264,7 +264,7 @@ MIT License - feel free to use this project for learning or building your own la
 
 ## Acknowledgments
 
-- Inspired by [Raycast](https://www.raycast.com/)
+- Inspired by modern launcher applications
 - Built with [Electron](https://www.electronjs.org/)
 - UI inspired by modern launcher applications
 

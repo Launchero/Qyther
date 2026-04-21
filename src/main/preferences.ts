@@ -84,7 +84,6 @@ export function loadPreferences(): Preferences {
   const prefsPath = getPreferencesPath();
   
   if (!existsSync(prefsPath)) {
-    // Return defaults
     return {
       mcp: getDefaultMCPConfig(),
     };
@@ -94,7 +93,6 @@ export function loadPreferences(): Preferences {
     const data = readFileSync(prefsPath, 'utf-8');
     const prefs = JSON.parse(data) as Preferences;
     
-    // Merge with defaults if mcp config is missing
     if (!prefs.mcp) {
       prefs.mcp = getDefaultMCPConfig();
     }
@@ -112,10 +110,8 @@ export function savePreferences(prefs: Partial<Preferences>): void {
   const prefsPath = getPreferencesPath();
   
   try {
-    // Load existing preferences
     const existingPrefs = loadPreferences();
     
-    // Merge with new preferences
     const updatedPrefs = { ...existingPrefs, ...prefs };
     
     // Write to file (creates the file if it doesn't exist)
@@ -135,7 +131,6 @@ export function savePreferences(prefs: Partial<Preferences>): void {
   }
 }
 
-// Initialize preferences on module load
 export function initializePreferences(): void {
   try {
     // Ensure user data directory exists

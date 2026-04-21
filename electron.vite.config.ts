@@ -11,8 +11,8 @@ export default defineConfig({
         formats: ['es'],
       },
       rollupOptions: {
-        // Externalize native modules so they're not bundled
-        external: ['better-sqlite3'],
+        // Externalize native modules and CJS-only packages so they're not bundled
+        external: ['better-sqlite3', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core'],
         output: {
           // Keep external modules as require() calls
           format: 'es',

@@ -5,7 +5,6 @@ import { savePreferences, loadPreferences } from '../preferences';
 import { registerBrowserHandlers } from './browser-handlers';
 
 export function registerMCPHandlers(): void {
-  // Initialize MCP
   ipcMain.handle('mcp:initialize', async () => {
     try {
       await mcpService.initialize();
@@ -71,13 +70,14 @@ export function registerMCPHandlers(): void {
     const prefs = loadPreferences();
     const enabledServers = prefs.mcp?.enabledServers || [];
     const serverConfigs = prefs.mcp?.servers || [];
+    const serverToolCounts = mcpService.getServerToolCounts();
     
     return serverConfigs.map(server => ({
       name: server.name,
       type: server.type,
       enabled: enabledServers.includes(server.name),
-      toolCount: 0,
-      status: 'connected',
+      toolCount: serverToolCounts.get(server.name) ?? 0,
+      status: mcpService.isInitialized() && enabledServers.includes(server.name) ? 'connected' : 'disconnected',
     }));
   });
 

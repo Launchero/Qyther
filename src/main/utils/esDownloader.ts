@@ -53,7 +53,7 @@ async function getDownloadUrl(): Promise<string> {
   return new Promise((resolve, reject) => {
     https.get(GITHUB_API_URL, {
       headers: {
-        'User-Agent': 'Raycast-Clone-Launcher',
+        'User-Agent': 'Qyther-Launcher',
         'Accept': 'application/vnd.github.v3+json',
       },
     }, (response) => {
@@ -66,7 +66,6 @@ async function getDownloadUrl(): Promise<string> {
       response.on('end', () => {
         try {
           const release = JSON.parse(data);
-          // Find the x64 ZIP asset (64-bit Windows)
           const asset = release.assets?.find((a: any) => a.name === 'ES-1.1.0.36.x64.zip' || a.name.endsWith('.x64.zip'));
           
           if (!asset) {
@@ -109,7 +108,6 @@ export async function downloadEs(): Promise<void> {
   }
 
   try {
-    // Get the actual download URL from GitHub API
     const downloadUrl = await getDownloadUrl();
     log(`Download URL: ${downloadUrl}`);
 
@@ -117,8 +115,6 @@ export async function downloadEs(): Promise<void> {
     await downloadFile(downloadUrl, zipPath);
     log('ZIP download complete');
 
-    // Extract ZIP
-    log('Extracting ZIP...');
     await extractZip(zipPath, { dir: esDir });
     log('ZIP extracted');
 
@@ -149,11 +145,8 @@ export async function downloadEs(): Promise<void> {
       }
     }
 
-    // Clean up ZIP file
-    if (fs.existsSync(zipPath)) {
-      fs.unlinkSync(zipPath);
-      log('Cleaned up ZIP file');
-    }
+    fs.unlinkSync(zipPath);
+    log('Cleaned up ZIP file');
 
     // Verify es.exe exists
     if (!fs.existsSync(esPath)) {

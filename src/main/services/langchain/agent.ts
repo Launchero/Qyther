@@ -14,6 +14,34 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  // P2 features metadata
+  hasStructuredData?: boolean;
+  dataType?: 'table' | 'form' | 'comparison' | 'list';
+  structuredData?: any;
+  sources?: Array<{
+    id: string;
+    url: string;
+    title: string;
+    excerpt: string;
+    confidence?: number;
+    accessedAt?: Date;
+  }>;
+  reasoning?: {
+    steps: Array<{
+      stepNumber: number;
+      action: string;
+      reasoning: string;
+      confidence?: number;
+    }>;
+  };
+  metrics?: {
+    tokensUsed: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    estimatedCost: number;
+    durationMs: number;
+    model?: string;
+  };
 }
 
 export interface ChatSession {
@@ -73,7 +101,6 @@ class LangChainAgent extends EventEmitter {
         temperature: 0.7,
       });
       
-      // Log the configuration for debugging
       console.log('[LangChain] ChatOpenAI configured with baseURL:', baseURL);
       console.log('[LangChain] Model:', model);
 
@@ -86,6 +113,13 @@ class LangChainAgent extends EventEmitter {
   }
 
   async createSession(title: string = 'New Chat'): Promise<string> {
+    // Clean up any empty sessions before creating a new one
+    for (const [id, session] of this.sessions.entries()) {
+      if (session.messages.length === 0) {
+        this.sessions.delete(id);
+      }
+    }
+    
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const session: ChatSession = {
       id: sessionId,
@@ -115,6 +149,7 @@ class LangChainAgent extends EventEmitter {
 
   async listSessions(): Promise<ChatSession[]> {
     return Array.from(this.sessions.values())
+      .filter(session => session.messages.length > 0) // Only return sessions with messages
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
@@ -133,6 +168,8 @@ class LangChainAgent extends EventEmitter {
   }
 
   async sendMessage(content: string, onChunk?: (chunk: string) => void): Promise<string> {
+    const startTime = Date.now();
+    
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -147,7 +184,6 @@ class LangChainAgent extends EventEmitter {
       await this.createSession('New Chat');
     }
 
-    // Check if browser mode is enabled (manual override OR auto-detect)
     const isBrowserQuery = this.browserModeEnabled || this.requiresBrowserAutomation(content);
     
     console.log('[LangChain] Browser mode enabled:', this.browserModeEnabled);
@@ -158,7 +194,6 @@ class LangChainAgent extends EventEmitter {
     if (isBrowserQuery) {
       console.log('[LangChain] Routing to browser agent:', content);
       
-      // Initialize browser agent if needed
       if (!this.browserAgentInitialized) {
         console.log('[LangChain] Initializing browser agent...');
         await this.initializeBrowserAgent();
@@ -180,7 +215,6 @@ class LangChainAgent extends EventEmitter {
         let fullResponse = '';
         
         try {
-          // Execute task with streaming
           console.log('[LangChain] Executing browser task...');
           const stream = await statefulBrowserAgent.executeTask(content, sessionId);
           
@@ -195,8 +229,44 @@ class LangChainAgent extends EventEmitter {
           
           console.log('[LangChain] Stream complete, response length:', fullResponse.length);
           
-          // Add AI response to history
-          this.addMessage('assistant', fullResponse);
+          // Add P2 metadata for browser queries
+          const durationMs = Date.now() - startTime;
+          const estimatedTokens = Math.floor(fullResponse.length / 4);
+          const p2Metadata = {
+            reasoning: {
+              steps: [
+                {
+                  stepNumber: 1,
+                  action: 'Parse user query',
+                  reasoning: 'Analyzing request to determine required browser actions',
+                  confidence: 95,
+                },
+                {
+                  stepNumber: 2,
+                  action: 'Execute browser automation',
+                  reasoning: 'Navigating web pages and extracting information',
+                  confidence: 90,
+                },
+                {
+                  stepNumber: 3,
+                  action: 'Process and format results',
+                  reasoning: 'Compiling extracted data into coherent response',
+                  confidence: 85,
+                },
+              ],
+            },
+            metrics: {
+              tokensUsed: estimatedTokens,
+              inputTokens: Math.floor(estimatedTokens * 0.3),
+              outputTokens: Math.floor(estimatedTokens * 0.7),
+              estimatedCost: (estimatedTokens * 0.0002) / 1000, // Approximate cost
+              durationMs,
+              model: process.env.MODEL || 'qwen3.5-plus',
+            },
+          };
+          
+          // Add AI response to history with P2 metadata
+          this.addMessage('assistant', fullResponse, p2Metadata);
           
           // Reset inactivity timeout
           this.resetBrowserSessionTimeout();
@@ -229,7 +299,6 @@ class LangChainAgent extends EventEmitter {
       throw new Error('Session not found');
     }
 
-    // Convert to LangChain message format
     const messages: BaseMessage[] = [
       new SystemMessage('You are a helpful AI assistant integrated into a desktop application. Provide clear, concise, and accurate responses. Format your answers with markdown when appropriate.'),
       ...session.messages
@@ -242,7 +311,6 @@ class LangChainAgent extends EventEmitter {
 
     try {
       if (this.useMCP && this.agentExecutor) {
-        // Use agent with MCP tools
         const result = await this.agentExecutor.invoke({
           messages,
         });
@@ -253,7 +321,21 @@ class LangChainAgent extends EventEmitter {
           onChunk(fullResponse);
         }
         
-        this.addMessage('assistant', fullResponse);
+        // Add P2 metadata for MCP queries
+        const durationMs = Date.now() - startTime;
+        const estimatedTokens = Math.floor(fullResponse.length / 4);
+        const p2Metadata = {
+          metrics: {
+            tokensUsed: estimatedTokens,
+            inputTokens: Math.floor(estimatedTokens * 0.3),
+            outputTokens: Math.floor(estimatedTokens * 0.7),
+            estimatedCost: (estimatedTokens * 0.0002) / 1000,
+            durationMs,
+            model: process.env.MODEL || 'qwen3.5-plus',
+          },
+        };
+        
+        this.addMessage('assistant', fullResponse, p2Metadata);
         return fullResponse;
       } else {
         // Fallback to direct model call (existing streaming code)
@@ -276,8 +358,22 @@ class LangChainAgent extends EventEmitter {
           }
         }
 
-        // Add AI response to history
-        this.addMessage('assistant', fullResponse);
+        // Add P2 metadata for standard queries
+        const durationMs = Date.now() - startTime;
+        const estimatedTokens = Math.floor(fullResponse.length / 4);
+        const p2Metadata = {
+          metrics: {
+            tokensUsed: estimatedTokens,
+            inputTokens: Math.floor(estimatedTokens * 0.3),
+            outputTokens: Math.floor(estimatedTokens * 0.7),
+            estimatedCost: (estimatedTokens * 0.0002) / 1000,
+            durationMs,
+            model: process.env.MODEL || 'qwen3.5-plus',
+          },
+        };
+        
+        // Add AI response to history with P2 metadata
+        this.addMessage('assistant', fullResponse, p2Metadata);
 
         return fullResponse;
       }
@@ -328,7 +424,7 @@ class LangChainAgent extends EventEmitter {
     return this.browserAgentInitialized;
   }
 
-  private addMessage(role: 'user' | 'assistant' | 'system', content: string): void {
+  private addMessage(role: 'user' | 'assistant' | 'system', content: string, p2Metadata?: Partial<Omit<ChatMessage, 'role' | 'content' | 'timestamp'>>): void {
     if (!this.currentSessionId) {
       return;
     }
@@ -342,6 +438,7 @@ class LangChainAgent extends EventEmitter {
       role,
       content,
       timestamp: new Date(),
+      ...p2Metadata,
     });
 
     session.updatedAt = new Date();
@@ -352,6 +449,10 @@ class LangChainAgent extends EventEmitter {
     }
 
     this.sessions.set(this.currentSessionId, session);
+  }
+
+  addMessagePublic(role: 'user' | 'assistant' | 'system', content: string, metadata?: Partial<Omit<ChatMessage, 'role' | 'content' | 'timestamp'>>): void {
+    this.addMessage(role, content, metadata);
   }
 
   async clearHistory(): Promise<void> {

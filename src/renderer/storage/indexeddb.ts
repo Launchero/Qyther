@@ -3,7 +3,7 @@
  * Provides offline storage for chat sessions
  */
 
-const DB_NAME = 'raycast-ask-sessions';
+const DB_NAME = 'qyther-ask-sessions';
 const DB_VERSION = 1;
 const SESSION_STORE = 'sessions';
 
@@ -75,6 +75,12 @@ export async function openSessionDB(): Promise<IDBDatabase> {
  * Save a session to IndexedDB
  */
 export async function saveSessionToDB(session: StoredSession): Promise<void> {
+  // Don't save empty sessions
+  if (session.messages.length === 0) {
+    console.log('[IndexedDB] Skipping save of empty session:', session.id);
+    return;
+  }
+
   const db = await openSessionDB();
 
   return new Promise((resolve, reject) => {
@@ -163,14 +169,17 @@ export async function getSessionHistoryFromDB(limit: number = 20): Promise<Array
 }>> {
   const sessions = await getAllSessionsFromDB();
 
+  // Filter out empty sessions
+  const nonEmptySessions = sessions.filter(session => session.messages.length > 0);
+
   // Sort by lastAccessed or updatedAt
-  sessions.sort((a, b) => {
+  nonEmptySessions.sort((a, b) => {
     const aTime = a.lastAccessed || new Date(a.updatedAt).getTime();
     const bTime = b.lastAccessed || new Date(b.updatedAt).getTime();
     return bTime - aTime;
   });
 
-  return sessions.slice(0, limit).map(session => ({
+  return nonEmptySessions.slice(0, limit).map(session => ({
     id: session.id,
     title: session.title,
     createdAt: session.createdAt,
@@ -254,10 +263,14 @@ export async function updateMessageInDB(
  * Get the most recent session
  */
 export async function getMostRecentSession(): Promise<StoredSession | null> {
-  const history = await getSessionHistoryFromDB(1);
+  const history = await getSessionHistoryFromDB(10);
+  
+  // Find first session with messages (history is already filtered)
   if (history.length === 0) {
     return null;
   }
+  
+  // Return the full session data for the most recent one
   return loadSessionFromDB(history[0].id);
 }
 
@@ -266,7 +279,6 @@ export async function getMostRecentSession(): Promise<StoredSession | null> {
  */
 export function isIndexedDBAvailable(): boolean {
   try {
-    // Check if indexedDB exists and is accessible
     if (typeof indexedDB === 'undefined') {
       return false;
     }

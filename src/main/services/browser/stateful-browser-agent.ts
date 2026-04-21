@@ -49,7 +49,6 @@ export class StatefulBrowserAgent extends EventEmitter {
     try {
       this.headedMode = config?.headed ?? false;
       
-      // Initialize MCP client with Playwright
       this.mcpClient = new MultiServerMCPClient({
         playwright: {
           command: 'npx',
@@ -72,7 +71,6 @@ export class StatefulBrowserAgent extends EventEmitter {
 
       console.log(`[BrowserAgent] Loaded ${browserTools.length} browser tools`);
 
-      // Initialize ChatOpenAI model
       const apiKey = process.env.API_KEY;
       const baseURL = process.env.BASE_URL;
       const model = process.env.MODEL || 'qwen3.5-plus';
@@ -136,81 +134,101 @@ Current session: ${sessionId}`),
       new HumanMessage(task),
     ];
 
-    try {
-      // Execute the agent with invoke (not stream) and get final result
-      console.log('[BrowserAgent] Invoking agent with thread_id:', sessionId);
-      const result = await this.agentExecutor.invoke(
-        { messages },
-        {
-          configurable: {
-            thread_id: sessionId,
-          },
-        }
-      );
-      
-      console.log('[BrowserAgent] Agent execution complete, result:', JSON.stringify(result, null, 2));
-      
-      // Extract the final response from the result
-      let finalResponse = '';
-      if (result.messages && result.messages.length > 0) {
-        const lastMessage = result.messages[result.messages.length - 1];
-        finalResponse = lastMessage.content || '';
-        console.log('[BrowserAgent] Final response length:', finalResponse.length);
-      }
-      
-      // Create a simple async generator that yields the final response
-      async function* generateResponse() {
-        if (finalResponse) {
-          yield finalResponse;
-        }
-      }
-      
-      return generateResponse();
-    } catch (error) {
-      console.error('[BrowserAgent] Execution error:', error);
-      
-      // Create error response generator
-      async function* generateError() {
-        yield `Error executing browser task: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      }
-      
-      return generateError();
-    }
+    const stream = this.agentExecutor.streamEvents(
+      { messages },
+      { version: "v2", configurable: { thread_id: sessionId } }
+    );
+
+    return this.createStreamFromEvents(stream, sessionId, onProgress);
   }
 
-  private async *createProgressStream(
-    originalStream: AsyncIterable<any>,
+  async *executeTaskStream(
+    task: string,
+    sessionId: string,
+    onProgress?: (progress: BrowserTaskProgress) => void
+  ): AsyncGenerator<string> {
+    if (!this.isInitialized) {
+      throw new Error('Browser agent not initialized');
+    }
+
+    const messages: BaseMessage[] = [
+      new SystemMessage(`You are a browser automation assistant. You can navigate web pages, click elements, fill forms, and extract information.
+      
+Important guidelines:
+- Use browser_navigate to go to URLs
+- Use browser_snapshot to see what's on the page
+- Use browser_click to interact with elements
+- Use browser_type to fill in text fields
+- Be concise and efficient
+- Complete the task in as few steps as possible
+- Report progress clearly to the user
+
+Current session: ${sessionId}`),
+      new HumanMessage(task),
+    ];
+
+    const stream = this.agentExecutor.streamEvents(
+      { messages },
+      { version: "v2", configurable: { thread_id: sessionId } }
+    );
+
+    yield* this.createStreamFromEvents(stream, sessionId, onProgress);
+  }
+
+  private async *createStreamFromEvents(
+    stream: AsyncIterable<any>,
     sessionId: string,
     onProgress?: (progress: BrowserTaskProgress) => void
   ): AsyncGenerator<string> {
     let stepCount = 0;
     let lastUrl: string | undefined;
-    let currentStatus: BrowserTaskProgress['status'] = 'navigating';
 
     try {
-      for await (const chunk of originalStream) {
-        stepCount++;
-        
-        // Extract content from chunk
-        const content = this.extractContentFromChunk(chunk);
-        
-        if (content) {
-          // Emit progress update
+      for await (const event of stream) {
+        const eventName = event.event;
+        const toolName = event.name as string | undefined;
+
+        if (eventName === "on_tool_start") {
+          stepCount++;
+          const status = this.inferStatusFromTool(toolName);
+          const url = this.extractUrlFromToolInput(event.data?.input);
+          if (url) lastUrl = url;
+
           const progress: BrowserTaskProgress = {
             step: stepCount,
             maxSteps: this.maxSteps,
-            status: currentStatus,
-            url: lastUrl,
-            message: content.slice(0, 100),
+            status,
+            url,
+            message: `Executing ${toolName}`,
           };
-          
-          if (onProgress) {
-            onProgress(progress);
-          }
-          
+
+          if (onProgress) onProgress(progress);
           this.emit('progress', progress);
-          
-          yield content;
+        } else if (eventName === "on_tool_end") {
+          stepCount++;
+          const progress: BrowserTaskProgress = {
+            step: stepCount,
+            maxSteps: this.maxSteps,
+            status: 'complete',
+            url: lastUrl,
+            message: `Completed ${toolName}`,
+          };
+
+          if (onProgress) onProgress(progress);
+          this.emit('progress', progress);
+        } else if (eventName === "on_chat_model_stream") {
+          const content = event.data?.chunk?.content;
+          if (content) {
+            const textContent = typeof content === 'string'
+              ? content
+              : Array.isArray(content)
+                ? content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+                : '';
+
+            if (textContent) {
+              yield textContent;
+            }
+          }
         }
       }
 
@@ -222,14 +240,10 @@ Current session: ${sessionId}`),
         url: lastUrl,
         message: 'Task completed',
       };
-      
-      if (onProgress) {
-        onProgress(completionProgress);
-      }
-      
+
+      if (onProgress) onProgress(completionProgress);
       this.emit('progress', completionProgress);
     } catch (error) {
-      // Emit error
       const errorProgress: BrowserTaskProgress = {
         step: stepCount,
         maxSteps: this.maxSteps,
@@ -237,49 +251,32 @@ Current session: ${sessionId}`),
         url: lastUrl,
         message: error instanceof Error ? error.message : 'Unknown error',
       };
-      
-      if (onProgress) {
-        onProgress(errorProgress);
-      }
-      
+
+      if (onProgress) onProgress(errorProgress);
       this.emit('progress', errorProgress);
       throw error;
     }
   }
 
-  private extractContentFromChunk(chunk: any): string {
-    try {
-      // Handle different chunk formats from LangGraph
-      if (typeof chunk === 'string') {
-        return chunk;
-      }
-      
-      if (chunk.messages && Array.isArray(chunk.messages)) {
-        const lastMessage = chunk.messages[chunk.messages.length - 1];
-        if (lastMessage?.content) {
-          return typeof lastMessage.content === 'string' 
-            ? lastMessage.content 
-            : JSON.stringify(lastMessage.content);
-        }
-      }
-      
-      if (chunk.content) {
-        return typeof chunk.content === 'string' 
-          ? chunk.content 
-          : JSON.stringify(chunk.content);
-      }
-      
-      return '';
-    } catch (error) {
-      console.warn('[BrowserAgent] Error extracting content from chunk:', error);
-      return '';
+  private inferStatusFromTool(toolName: string | undefined): BrowserTaskProgress['status'] {
+    if (!toolName) return 'navigating';
+    if (toolName.includes('navigate')) return 'navigating';
+    if (toolName.includes('click')) return 'clicking';
+    if (toolName.includes('type') || toolName.includes('fill')) return 'typing';
+    if (toolName.includes('snapshot') || toolName.includes('extract')) return 'extracting';
+    return 'navigating';
+  }
+
+  private extractUrlFromToolInput(input: any): string | undefined {
+    if (input && typeof input === 'object') {
+      return input.url || input.href || undefined;
     }
+    return undefined;
   }
 
   async closeSession(sessionId: string): Promise<void> {
     console.log(`[BrowserAgent] Closing session: ${sessionId}`);
     
-    // Close the browser by calling browser_close tool if available
     if (this.agentExecutor) {
       try {
         await this.agentExecutor.invoke(
@@ -350,7 +347,6 @@ Current session: ${sessionId}`),
         return [];
       }
       
-      // Execute JavaScript to extract all links
       const result = await evaluateTool.invoke({
         script: `() => {
           const links = Array.from(document.querySelectorAll('a[href]'));

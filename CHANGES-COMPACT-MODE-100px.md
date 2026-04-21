@@ -23,11 +23,6 @@ Updated the compact mode command palette height from **80px to 100px** to fill t
 **File**: `src/renderer/components/CommandPaletteHeader.tsx`
 - Updated comments to reflect 100px height
 
-### 4. Design System Mockups
-**File**: `design-systems/mode-switcher-mockups/command-palette-compact.html`
-- Updated mockup container height from `80px` to `100px`
-- Updated presentation label to reflect new dimensions
-
 ## Before vs After
 
 ### Before (80px compact mode)
@@ -88,7 +83,6 @@ The command palette and header now:
 2. `src/main/windowManager.ts`
 3. `src/renderer/components/SearchBar.tsx`
 4. `src/renderer/components/CommandPaletteHeader.tsx`
-5. `design-systems/mode-switcher-mockups/command-palette-compact.html`
 
 ## Next Steps
 

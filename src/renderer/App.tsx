@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CommandPalette } from './components/CommandPalette';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useSearch } from './hooks/useSearch';
 import { useFileSearch } from './hooks/useFileSearch';
 import { useCommandExecution } from './hooks/useCommandExecution';
 import { useWindowMode } from './hooks/useWindowMode';
+import { useContextAttachments } from './hooks/useContextAttachments';
+import { useRecentFiles } from './hooks/useRecentFiles';
 import type { SearchResult } from './components/ResultsList';
+import type { SearchMode } from './components/SearchBar';
+import type { AttachedFile } from './components/ChatInputArea';
 import { useTheme } from './context/ThemeProvider';
-
-type SearchMode = 'file' | 'ai' | 'code';
 
 // Default commands for the palette
 const DEFAULT_COMMANDS: SearchResult[] = [
@@ -75,22 +77,31 @@ export function App() {
     setSelectedIndex,
   } = useSearch(allItems);
   
-  // Use custom hooks for state management (pass searchQuery for auto-expand)
-  const { windowMode, isManuallyExpanded, setIsManuallyExpanded } = useWindowMode({ searchQuery });
-  const { executingId, execute } = useCommandExecution();
   const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
+  const { windowMode, isManuallyExpanded, setIsManuallyExpanded } = useWindowMode({ searchQuery, searchMode });
+  const { recentFiles, addRecentFile } = useRecentFiles(4);
+  const { executingId, execute } = useCommandExecution({
+    onExecuted: (result) => {
+      if ((result.type === 'file' || result.type === 'app') && result.action) {
+        addRecentFile(result.action, result.title);
+      }
+    },
+  });
   
-  // Debug: Log on mount
-  React.useEffect(() => {
-    const hasElectronAPI = !!window.electronAPI;
-    const hasWindowProp = !!window.electronAPI?.window;
-    const hasAppsProp = !!window.electronAPI?.apps;
-    
-    console.log('[App] Mounted! window.electronAPI exists:', hasElectronAPI);
-    console.log('[App] window.electronAPI.window exists:', hasWindowProp);
-    console.log('[App] window.electronAPI.apps exists:', hasAppsProp);
-  }, []);
+  // Unified input state management
+  const [hasSentMessage, setHasSentMessage] = useState(false);
+  const [mcpCount] = useState(2);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
+  const {
+    attachedFiles,
+    addFile: addAttachedFile,
+    removeFile: removeAttachedFile,
+    openFilePicker,
+    openFolderPicker,
+    clearFiles: clearAttachedFiles,
+  } = useContextAttachments();
+  
   // File search hook - only enabled when there's a query AND not in AI mode
   const {
     fileResults,
@@ -112,6 +123,15 @@ export function App() {
     return baseResults;
   }, [baseResults, fileResults, searchQuery]);
 
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
+    console.debug('[App] Final results merged:', {
+      count: results.length,
+      fileResults: fileResults.length,
+      baseResults: baseResults.length,
+      items: results.map(r => ({ id: r.id, title: r.title, type: r.type })),
+    });
+  }
+
   // Keyboard navigation hook
   useKeyboard({
     selectedIndex,
@@ -121,29 +141,17 @@ export function App() {
     onClose: async () => {
       await window.electronAPI.window.hide();
     },
+    searchMode,
+    setSearchMode,
   });
 
-  // Listen for mode switching shortcuts (⌘1, ⌘2, ⌘3 or Ctrl+1/2/3)
+  // Theme toggle shortcut (Alt+Shift+T)
   React.useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      // Check for Alt+Shift+T
       if (event.altKey && event.shiftKey && event.key === 'T') {
         event.preventDefault();
         toggleTheme();
         console.log('[App] Theme toggled via keyboard shortcut');
-      }
-      
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
-        if (event.key === '1') {
-          event.preventDefault();
-          console.log('[App] Switching to File Search mode');
-        } else if (event.key === '2') {
-          event.preventDefault();
-          console.log('[App] Switching to AI Assistant mode');
-        } else if (event.key === '3') {
-          event.preventDefault();
-          console.log('[App] Switching to Code Search mode');
-        }
       }
     };
     
@@ -154,35 +162,138 @@ export function App() {
     };
   }, [toggleTheme]);
 
+  // Window resize handle (bottom drag) - at App level to avoid being clipped by rounded container
+  const isResizingRef = useRef(false);
+  const resizeStartY = useRef(0);
+  const resizeStartHeight = useRef(0);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleResizeMouseDown = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingRef.current = true;
+    setIsResizing(true);
+    resizeStartY.current = e.clientY;
+    try {
+      const currentHeight = await window.electronAPI.window.getHeight();
+      resizeStartHeight.current = currentHeight;
+    } catch {
+      resizeStartHeight.current = 600;
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = e.clientY - resizeStartY.current;
+      const newHeight = Math.max(300, resizeStartHeight.current + delta);
+      window.electronAPI.window.resizeHeight(newHeight).catch(console.error);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        setIsResizing(false);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   return (
-    <div className="app">
-      <div className="app-backdrop visible" />
-      <CommandPalette
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        results={isLoading ? [] : results}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
-        onExecute={execute}
-        currentMode={windowMode}
-        executingId={executingId}
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
-      />
+    <div className="w-full h-full max-w-full flex flex-col relative overflow-hidden m-0 p-0">
+      {/* Background overlay - MUST be behind CommandPalette (z-0) */}
+      <div className="fixed inset-0 bg-transparent z-0" />
+      
+      {/* CommandPalette - MUST be above overlay (z-10) */}
+      <div className="relative z-10 h-full flex flex-col">
+        <CommandPalette
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          results={isLoading ? [] : results}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+          onExecute={execute}
+          currentMode={windowMode}
+          executingId={executingId}
+          searchMode={searchMode}
+          onSearchModeChange={setSearchMode}
+          hasSentMessage={hasSentMessage}
+          mcpCount={mcpCount}
+          webSearchEnabled={webSearchEnabled}
+          onToggleWebSearch={() => setWebSearchEnabled(prev => !prev)}
+          attachedFiles={attachedFiles}
+          onRemoveFile={removeAttachedFile}
+          onAttachFile={openFilePicker}
+          onAttachFolder={openFolderPicker}
+          onAddFile={addAttachedFile}
+          onClearAttachments={clearAttachedFiles}
+          isFileSearchLoading={isFileSearchLoading}
+          fileSearchError={fileSearchError}
+          recentFiles={recentFiles}
+          onQuickAction={(action) => {
+            switch (action) {
+              case 'find-in-folder':
+                window.electronAPI.dialog.openFolder().then((result) => {
+                  if (result.path) {
+                    setSearchQuery(result.path);
+                  }
+                }).catch(console.error);
+                break;
+              case 'recent-files':
+                // Recent files already shown in SearchEmptyState
+                break;
+              case 'open-terminal':
+                console.log('[App] Quick action "open-terminal" - requires new IPC handler');
+                break;
+              case 'git-status':
+                console.log('[App] Quick action "git-status" - requires new IPC handler');
+                break;
+            }
+          }}
+          onExpandWindow={() => {
+            window.electronAPI.window.setMode('expanded').catch(console.error);
+          }}
+          onAskAboutFile={(result) => {
+            // Add file to attachments
+            const file: AttachedFile = {
+              name: result.title,
+              path: result.metadata?.path || result.subtitle || '',
+              type: result.metadata?.fileType || 'file'
+            };
+            addAttachedFile(file);
+            // Switch to AI mode
+            setSearchMode('ai');
+          }}
+        />
+      </div>
+      
+      {/* Initial app loading overlay - only blocks during first render */}
       {isLoading && (
-        <div className="loading-indicator">
-          <p>Loading applications...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-20">
+          <p className="text-muted-foreground">Loading applications...</p>
         </div>
       )}
-      {isFileSearchLoading && searchQuery.trim().length > 0 && (
-        <div className="loading-indicator">
-          <p>Searching files...</p>
-        </div>
-      )}
-      {fileSearchError && searchQuery.trim().length > 0 && (
-        <div className="error-indicator">
-          <p>File search unavailable: {fileSearchError}</p>
-        </div>
+
+      {/* Window Resize Handle - at App level to avoid being clipped by CommandPalette's rounded corners */}
+      {windowMode === 'expanded' && (
+        <div
+          className="window-resize-handle"
+          onMouseDown={handleResizeMouseDown}
+          style={{ 
+            cursor: isResizing ? 'ns-resize' : 'ns-resize',
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 60
+          }}
+        />
       )}
     </div>
   );

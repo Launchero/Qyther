@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { usesMetaKey } from '@/utils/shortcuts';
 
 interface UseMCPKeyboardShortcutsProps {
   onToggleMCP?: () => void;
@@ -15,8 +16,7 @@ export function useMCPKeyboardShortcuts({
 }: UseMCPKeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modifierKey = isMac ? e.metaKey : e.ctrlKey;
+      const modifierKey = usesMetaKey() ? e.metaKey : e.ctrlKey;
       
       // Cmd/Ctrl+Shift+M - Toggle MCP
       if (modifierKey && e.shiftKey && e.key === 'm') {
@@ -34,9 +34,10 @@ export function useMCPKeyboardShortcuts({
         }
       }
       
-      // Escape - Close modal
+      // Escape - Close modal (consume event to prevent global handler from firing)
       if (e.key === 'Escape' && isModalOpen && closeModal) {
         e.preventDefault();
+        e.stopPropagation();
         closeModal();
       }
     };

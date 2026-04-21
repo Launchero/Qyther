@@ -1,0 +1,26 @@
+/*
+ * =============================================================================
+ * Z-INDEX SCALE
+ * =============================================================================
+ * 
+ * PURPOSE: This file contains z-index tokens for the shadcn design system.
+ * 
+ * Current usage in App.tsx: z-0 (overlay), z-10 (CommandPalette), z-20 (overlays)
+ */
+
+@theme {
+  /* Z-index scale */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;      /* Currently z-10 in App.tsx line 163 */
+  --z-modal: 40;         /* Currently z-20 in App.tsx line 179 */
+  --z-popover: 50;
+  --z-tooltip: 60;
+  --z-toast: 70;
+  
+  /* Component-specific */
+  --z-command-palette: var(--z-overlay);
+  --z-command-palette-overlay: var(--z-base);
+  --z-command-palette-modal: var(--z-modal);
+}

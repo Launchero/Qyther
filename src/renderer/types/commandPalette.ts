@@ -10,7 +10,7 @@ export type { WindowMode, FileSearchResult };
 /**
  * Search mode for command palette
  */
-export type SearchMode = 'file' | 'ai' | 'code';
+export type SearchMode = 'file' | 'ai';
 
 /**
  * Command Palette Configuration

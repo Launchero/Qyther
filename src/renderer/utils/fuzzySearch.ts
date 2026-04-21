@@ -75,6 +75,35 @@ export function calculateResultScore(query: string, result: SearchResult): numbe
 }
 
 /**
+ * Returns the character indices in text that match the query using fuzzy matching.
+ * Uses the same greedy left-to-right algorithm as fuzzyMatch for consistency.
+ */
+export function getFuzzyMatchIndices(query: string, text: string): number[] {
+  if (!query || query.trim().length === 0 || !text) return [];
+
+  const lowerQuery = query.toLowerCase();
+  const lowerText = text.toLowerCase();
+
+  // Check substring first for exact match (all chars match contiguously)
+  const substringIndex = lowerText.indexOf(lowerQuery);
+  if (substringIndex !== -1) {
+    return Array.from({ length: lowerQuery.length }, (_, i) => substringIndex + i);
+  }
+
+  // Fuzzy match: greedy left-to-right
+  const indices: number[] = [];
+  let queryIndex = 0;
+  for (let i = 0; i < lowerText.length && queryIndex < lowerQuery.length; i++) {
+    if (lowerText[i] === lowerQuery[queryIndex]) {
+      indices.push(i);
+      queryIndex++;
+    }
+  }
+
+  return queryIndex === lowerQuery.length ? indices : [];
+}
+
+/**
  * Test helper: Create mock search result
  */
 export function createMockSearchResult(overrides: Partial<SearchResult>): SearchResult {
