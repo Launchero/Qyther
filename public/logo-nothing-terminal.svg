@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="30" fill="#1a1a1a"/>
+  <!-- Nothing OS style: bracket/terminal style Q -->
+  <!-- Left bracket half -->
+  <path d="M 52 28 L 28 28 L 28 88 L 52 88" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="miter"/>
+  <!-- Right bracket half -->
+  <path d="M 76 28 L 100 28 L 100 88 L 76 88" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="miter"/>
+  <!-- Horizontal connector top -->
+  <line x1="52" y1="28" x2="76" y2="28" stroke="#ffffff" stroke-width="2.5"/>
+  <!-- Horizontal connector bottom -->
+  <line x1="52" y1="88" x2="76" y2="88" stroke="#ffffff" stroke-width="2.5"/>
+  <!-- Q tail - brand primary -->
+  <line x1="84" y1="78" x2="108" y2="102" stroke="#5283e0" stroke-width="3" stroke-linecap="round"/>
+  <!-- Center terminal dot - brand primary -->
+  <circle cx="64" cy="58" r="5" fill="#5283e0"/>
+</svg>

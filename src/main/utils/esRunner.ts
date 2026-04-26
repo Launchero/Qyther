@@ -3,8 +3,11 @@ import { promisify } from 'util';
 import * as path from 'path';
 import { getEsPath } from './esDownloader';
 import { isWindows } from './platform';
+import { createLogger } from './logger';
 
 const execAsync = promisify(exec);
+
+const log = createLogger('ESRunner');
 
 // Interface for file search results (extended with optional fields for backward compatibility)
 export interface FileSearchResult {
@@ -31,11 +34,6 @@ interface EsJsonOutput {
   Size?: number;
   'Date Modified'?: string;
   Extension?: string;
-}
-
-function log(message: string, ...args: unknown[]) {
-  const timestamp = new Date().toLocaleTimeString();
-  console.log(`[${timestamp}] [ES Runner] ${message}`, ...args);
 }
 
 /**
@@ -228,18 +226,18 @@ function parseEsOutput(stdout: string): FileSearchResult[] {
     const dataArray = JSON.parse(cleanedStdout);
     
     if (Array.isArray(dataArray)) {
-      log(`Parsed ${dataArray.length} items from JSON array`);
+      log.info(`Parsed ${dataArray.length} items from JSON array`);
       for (const item of dataArray) {
         try {
           results.push(processEsItem(item));
         } catch (itemError) {
-          log('Warning: Could not process array item:', itemError);
+          log.warn('Could not process array item:', itemError);
         }
       }
       return results;
     }
   } catch (arrayParseError) {
-    log('Failed to parse as JSON array, trying line-by-line:', arrayParseError);
+    log.debug('Failed to parse as JSON array, trying line-by-line:', arrayParseError);
     
     // Fallback: line-by-line parsing for NDJSON format
     const lines = stdout.split('\n').filter(line => line.trim());
@@ -266,7 +264,7 @@ function parseEsOutput(stdout: string): FileSearchResult[] {
         results.push(processEsItem(json));
       } catch (parseError) {
         // Skip lines that can't be parsed as JSON
-        log('Warning: Could not parse JSON line:', line.substring(0, 100));
+        log.debug('Could not parse JSON line:', line.substring(0, 100));
       }
     }
   }
@@ -319,7 +317,7 @@ export async function searchFiles(
   
   const command = `"${esPath}" "${normalizedQuery}" -json -size -date-modified -n ${maxResults}`;
   
-  log(`Executing: ${command}`);
+  log.info(`Executing: ${command}`);
   
   try {
     const { stdout, stderr } = await execAsync(command, {
@@ -329,10 +327,10 @@ export async function searchFiles(
     });
     
     if (stderr) {
-      log('es.exe stderr:', stderr);
+      log.debug('es.exe stderr:', stderr);
     }
     
-    log(`Raw stdout length: ${stdout.length}, preview: ${stdout.substring(0, 500)}...`);
+    log.debug('Raw stdout length:', stdout.length, 'preview:', stdout.substring(0, 500) + '...');
     
     let results = parseEsOutput(stdout);
     
@@ -364,19 +362,19 @@ export async function searchFiles(
       results.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
     }
     
-    log(`Found ${results.length} results for query: "${normalizedQuery}"`);
+    log.info(`Found ${results.length} results for query: "${normalizedQuery}"`);
     
     if (results.length > 0) {
-      log(`First result: ${results[0].path}`);
+      log.info('First result:', results[0].path);
       if (includeMetadata) {
-        log(`First result score: ${results[0].relevanceScore}, category: ${results[0].category}`);
+        log.debug('First result score:', results[0].relevanceScore, 'category:', results[0].category);
       }
     }
     
     return results;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log('Search error:', errorMessage);
+    log.error('Search error:', errorMessage);
     
     // Check for specific error conditions
     if (errorMessage.includes('timeout')) {

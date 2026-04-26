@@ -50,7 +50,7 @@ export function ModeTabs({
           onToggle();
         }}
         aria-keyshortcuts={getAriaKeyshortcuts('Control', 'Tab')}
-        aria-label={`Switch mode. Currently: ${currentModeConfig.label}. Press Ctrl+Tab to cycle.`}
+        aria-label={`Switch mode. Currently: ${currentModeConfig.label}. Press Shift+Tab to cycle.`}
         className={cn(
           "flex items-center justify-center",
           "h-10 px-3",

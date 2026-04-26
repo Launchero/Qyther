@@ -38,9 +38,9 @@ export function ChatErrorBanner({
   };
 
   return (
-    <div className="chat-error-banner" role="alert" aria-live="assertive">
+    <div className="chat-error-banner error-banner-enter" role="alert" aria-live="assertive">
       <div className="chat-error-content">
-        <div className="chat-error-icon">{getIcon()}</div>
+        <div className="chat-error-icon error-icon-shake">{getIcon()}</div>
         <div className="chat-error-body">
           <div className="chat-error-title">{errorData.title}</div>
           <div className="chat-error-message">{errorData.message}</div>

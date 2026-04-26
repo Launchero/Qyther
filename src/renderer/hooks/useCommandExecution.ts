@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { SearchResult } from '../components/ResultsList';
+import { logInfo, logError } from '../utils/debugLogger';
 
 /**
  * Hook for managing command execution
@@ -14,7 +15,7 @@ export function useCommandExecution({
 
   const execute = useCallback(
     async (result: SearchResult) => {
-      console.log('Executing:', result);
+      logInfo('[useCommandExecution] Executing:', result);
 
       // Set executing state
       setExecutingId(result.id);
@@ -42,7 +43,7 @@ export function useCommandExecution({
         // Notify caller of successful execution
         onExecuted?.(result);
       } catch (error) {
-        console.error('Execution error:', error);
+        logError('[useCommandExecution] Execution error:', error);
       } finally {
         // Clear executing state after a delay
         setTimeout(() => setExecutingId(null), 500);

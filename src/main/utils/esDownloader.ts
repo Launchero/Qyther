@@ -7,18 +7,16 @@ import { promisify } from 'util';
 import extractZip from 'extract-zip';
 import type { IncomingMessage } from 'http';
 import { isWindows } from './platform';
+import { createLogger } from './logger';
 
 const pipelineAsync = promisify(pipeline);
+
+const log = createLogger('ESDownloader');
 
 // GitHub API URL to get latest release
 const GITHUB_API_URL = 'https://api.github.com/repos/voidtools/ES/releases/latest';
 const ES_FILENAME = 'es.exe';
 const ES_ZIP_FILENAME = 'es.zip';
-
-function log(message: string, ...args: unknown[]) {
-  const timestamp = new Date().toLocaleTimeString();
-  console.log(`[${timestamp}] [ES Downloader] ${message}`, ...args);
-}
 
 /**
  * Get the directory where es.exe should be stored
@@ -27,7 +25,7 @@ function log(message: string, ...args: unknown[]) {
 function getEsDirectory(): string {
   // Always use the app's user data directory for consistency
   const userDataPath = app.getPath('userData');
-  log('Using userData path:', userDataPath);
+  log.debug('Using userData path:', userDataPath);
   return userDataPath;
 }
 
@@ -98,25 +96,25 @@ export async function downloadEs(): Promise<void> {
   const esDir = getEsDirectory();
   const zipPath = path.join(esDir, ES_ZIP_FILENAME);
 
-  log('Starting es.exe download');
-  log(`Destination directory: ${esDir}`);
+  log.info('Starting es.exe download');
+  log.debug('Destination directory:', esDir);
 
   // Ensure directory exists
   if (!fs.existsSync(esDir)) {
     fs.mkdirSync(esDir, { recursive: true });
-    log(`Created directory: ${esDir}`);
+    log.debug('Created directory:', esDir);
   }
 
   try {
     const downloadUrl = await getDownloadUrl();
-    log(`Download URL: ${downloadUrl}`);
+    log.debug('Download URL:', downloadUrl);
 
     // Download ZIP file
     await downloadFile(downloadUrl, zipPath);
-    log('ZIP download complete');
+    log.debug('ZIP download complete');
 
     await extractZip(zipPath, { dir: esDir });
-    log('ZIP extracted');
+    log.debug('ZIP extracted');
 
     // Find es.exe in extracted files
     const extractedEsPath = path.join(esDir, 'es.exe');
@@ -132,7 +130,7 @@ export async function downloadEs(): Promise<void> {
             if (subFile === 'es.exe' || subFile === 'es64.exe') {
               const sourcePath = path.join(fullPath, subFile);
               fs.copyFileSync(sourcePath, esPath);
-              log('Found and copied es.exe from subdirectory');
+              log.debug('Found and copied es.exe from subdirectory');
               break;
             }
           }
@@ -146,7 +144,7 @@ export async function downloadEs(): Promise<void> {
     }
 
     fs.unlinkSync(zipPath);
-    log('Cleaned up ZIP file');
+    log.debug('Cleaned up ZIP file');
 
     // Verify es.exe exists
     if (!fs.existsSync(esPath)) {
@@ -154,11 +152,11 @@ export async function downloadEs(): Promise<void> {
     }
 
     const stats = fs.statSync(esPath);
-    log(`es.exe size: ${(stats.size / 1024).toFixed(2)} KB`);
+    log.debug('es.exe size:', `${(stats.size / 1024).toFixed(2)} KB`);
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log('Download/extract error:', errorMessage);
+    log.error('Download/extract error:', errorMessage);
     throw new Error(`Failed to download es.exe: ${errorMessage}`);
   }
 }
@@ -176,13 +174,13 @@ function downloadFile(url: string, destPath: string, redirectCount = 0): Promise
     const file = fs.createWriteStream(destPath);
 
     https.get(url, (response) => {
-      log(`Download response status: ${response.statusCode}`);
+      log.debug('Download response status:', response.statusCode);
       
       // Handle redirects
       if (response.statusCode === 302 || response.statusCode === 301 || response.statusCode === 307) {
         const redirectUrl = response.headers.location;
         if (redirectUrl) {
-          log(`Following redirect to: ${redirectUrl}`);
+          log.debug('Following redirect to:', redirectUrl);
           file.close();
           // Consume response data
           response.resume();
@@ -203,7 +201,7 @@ function downloadFile(url: string, destPath: string, redirectCount = 0): Promise
 
       pipelineAsync(response, file)
         .then(() => {
-          log(`Downloaded ${(fs.statSync(destPath).size / 1024).toFixed(2)} KB to ${destPath}`);
+          log.debug('Downloaded', `${(fs.statSync(destPath).size / 1024).toFixed(2)} KB`, 'to', destPath);
           resolve();
         })
         .catch((err) => {
@@ -239,11 +237,11 @@ function handleDownloadResponse(
 
   pipelineAsync(response, file)
     .then(() => {
-      log(`Download complete: ${esPath}`);
+      log.debug('Download complete:', esPath);
       
       // Verify file was downloaded
       const stats = fs.statSync(esPath);
-      log(`File size: ${(stats.size / 1024).toFixed(2)} KB`);
+      log.debug('File size:', `${(stats.size / 1024).toFixed(2)} KB`);
       
       if (stats.size < 1000) {
         // File too small, likely an error page
@@ -255,7 +253,7 @@ function handleDownloadResponse(
       resolve();
     })
     .catch((err) => {
-      log('Pipeline error:', err.message);
+      log.error('Pipeline error:', err.message);
       file.close();
       if (fs.existsSync(esPath)) {
         fs.unlinkSync(esPath);
@@ -270,29 +268,29 @@ function handleDownloadResponse(
  */
 export async function initializeEs(): Promise<boolean> {
   if (!isWindows()) {
-    log('Skipping es.exe initialization - not on Windows');
+    log.debug('Skipping es.exe initialization - not on Windows');
     return false;
   }
 
   try {
     if (esExists()) {
-      log('es.exe already exists');
+      log.info('es.exe already exists');
       return true;
     }
 
-    log('es.exe not found, downloading...');
+    log.info('es.exe not found, downloading...');
     await downloadEs();
-    log('es.exe downloaded successfully');
+    log.info('es.exe downloaded successfully');
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log('Failed to initialize es.exe:', errorMessage);
+    log.error('Failed to initialize es.exe:', errorMessage);
     
     // Provide helpful error message
     if (errorMessage.includes('404')) {
-      log('es.exe not found in GitHub Releases. Please download manually from: https://github.com/voidtools/ES/releases');
+      log.error('es.exe not found in GitHub Releases. Please download manually from: https://github.com/voidtools/ES/releases');
     } else if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('network')) {
-      log('Network error - please check your internet connection');
+      log.error('Network error - please check your internet connection');
     }
     
     return false;

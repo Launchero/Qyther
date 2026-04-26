@@ -2,11 +2,11 @@ import React, { useState, useRef, useCallback } from 'react';
 import { CommandPaletteHeader } from './CommandPaletteHeader';
 import { CommandPaletteBody } from './CommandPaletteBody';
 import { CommandPaletteFooter } from './CommandPaletteFooter';
-import { type SearchMode } from './SearchBar';
+import { type SearchMode } from './ModeTabs';
 import { type SearchResult } from './ResultsList';
-import type { AttachedFile } from './ChatInputArea';
+import type { AttachedFile } from '../types/ask-types';
 import type { RecentFile } from '@/hooks/useRecentFiles';
-import { logComponentSizes } from '../utils/debugLogger';
+import { logComponentSizes, logInfo } from '../utils/debugLogger';
 import { cn } from '@/lib/utils';
 
 export interface CommandPaletteProps {
@@ -21,11 +21,7 @@ export interface CommandPaletteProps {
   searchMode?: SearchMode;
   onSearchModeChange?: (mode: SearchMode) => void;
   onTabsExpanded?: (expanded: boolean) => void;
-  hasSentMessage?: boolean;
-  mcpCount?: number;
-  onOpenMCPModal?: () => void;
-  webSearchEnabled?: boolean;
-  onToggleWebSearch?: () => void;
+  onRegisterSendMessage?: (fn: ((message?: string, files?: AttachedFile[]) => void) | null) => void;
   attachedFiles?: AttachedFile[];
   onRemoveFile?: (index: number) => void;
   onAttachFile?: () => void;
@@ -36,8 +32,11 @@ export interface CommandPaletteProps {
   fileSearchError?: string | null;
   recentFiles?: RecentFile[];
   onQuickAction?: (action: string) => void;
-  onExpandWindow?: () => void;
   onAskAboutFile?: (result: SearchResult) => void;
+  showShortcuts?: boolean;
+  onToggleShortcuts?: () => void;
+  isCollapsing?: boolean;
+  mcpCount?: number;
 }
 
 export function CommandPalette({
@@ -52,11 +51,6 @@ export function CommandPalette({
   searchMode: parentSearchMode,
   onSearchModeChange,
   onTabsExpanded,
-  hasSentMessage = false,
-  mcpCount = 0,
-  onOpenMCPModal,
-  webSearchEnabled = false,
-  onToggleWebSearch,
   attachedFiles = [],
   onRemoveFile,
   onAttachFile,
@@ -67,8 +61,11 @@ export function CommandPalette({
   fileSearchError,
   recentFiles = [],
   onQuickAction,
-  onExpandWindow,
   onAskAboutFile,
+  showShortcuts: parentShowShortcuts,
+  onToggleShortcuts,
+  isCollapsing = false,
+  mcpCount = 0,
 }: CommandPaletteProps) {
   const [localSearchMode, setLocalSearchMode] = useState<SearchMode>('file');
   const searchMode = parentSearchMode ?? localSearchMode;
@@ -77,20 +74,15 @@ export function CommandPalette({
   const headerRef = React.useRef<HTMLDivElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
+  const [localShowShortcuts, setLocalShowShortcuts] = useState(false);
+  const showShortcuts = parentShowShortcuts !== undefined ? parentShowShortcuts : localShowShortcuts;
+  const toggleShortcuts = onToggleShortcuts ?? (() => setLocalShowShortcuts(prev => !prev));
 
   // Ref to store the ask mode send handler registered by AskModeExpanded
   const askModeSendRef = useRef<((message?: string, files?: AttachedFile[]) => void) | null>(null);
 
   const handleAskModeSendRegister = useCallback((fn: ((message?: string, files?: AttachedFile[]) => void) | null) => {
     askModeSendRef.current = fn;
-  }, []);
-
-  const handleSendMessage = useCallback((message?: string, files?: AttachedFile[]) => {
-    if (askModeSendRef.current) {
-      askModeSendRef.current(message, files);
-    } else {
-      console.warn('[CommandPalette] askModeSendRef.current is null!');
-    }
   }, []);
   
   // Show results and footer in expanded or custom mode (not in compact)
@@ -100,7 +92,7 @@ export function CommandPalette({
   
   // Debug: Log mode changes and measure sizes to main process terminal
   React.useEffect(() => {
-    const logData: any = {};
+    const logData: Record<string, string> = {};
     
     // Debug: Log the actual CSS token value being used
     const compactHeightToken = getComputedStyle(document.documentElement)
@@ -163,12 +155,12 @@ export function CommandPalette({
   
   const handleModeChange = (mode: SearchMode) => {
     setSearchMode(mode);
-    console.log('[CommandPalette] Mode changed to:', mode);
+    logInfo('[CommandPalette] Mode changed to:', mode);
   };
 
   const handleTabsExpanded = (expanded: boolean) => {
     onTabsExpanded?.(expanded);
-    console.log('[CommandPalette] Tabs expanded:', expanded);
+    logInfo('[CommandPalette] Tabs expanded:', expanded);
   };
   
   return (
@@ -186,8 +178,8 @@ export function CommandPalette({
         "shadow-[var(--shadow-command-palette)]",
         // Radius: from radius.css --radius-command-palette (Mockup line 81: 10px)
         "rounded-[var(--radius-command-palette)]",
-        // Motion: using transition-fast token from motion.css
-        "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+        // Motion: only transition height on mode changes, not every property
+        "transition-[height] duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
         // Heights: compact mode is fixed, expanded mode fills available window space
         currentMode === 'compact' 
           ? "h-[var(--container-compact-height)] min-h-[var(--container-compact-height)] max-h-[var(--container-compact-height)]" 
@@ -197,7 +189,7 @@ export function CommandPalette({
         position: 'relative'
       }}
     >
-      <CommandPaletteHeader
+        <CommandPaletteHeader
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
         searchMode={searchMode}
@@ -205,19 +197,8 @@ export function CommandPalette({
         onTabsExpanded={handleTabsExpanded}
         windowMode={currentMode}
         headerRef={headerRef}
-        onSendMessage={searchMode === 'ai' ? handleSendMessage : undefined}
-        hasSentMessage={hasSentMessage}
-        mcpCount={mcpCount}
-        onOpenMCPModal={onOpenMCPModal}
-        webSearchEnabled={webSearchEnabled}
-        onToggleWebSearch={onToggleWebSearch}
-        attachedFiles={attachedFiles}
-        onRemoveFile={onRemoveFile}
-        onAttachFile={onAttachFile}
-        onAttachFolder={onAttachFolder}
-        onAddFile={onAddFile}
-        onExpandWindow={onExpandWindow}
-      />
+        isCollapsing={isCollapsing}
+        />
       
       <CommandPaletteBody
         showResults={showResults}
@@ -237,11 +218,13 @@ export function CommandPalette({
         onAttachFile={onAttachFile}
         onAttachFolder={onAttachFolder}
         onClearAttachments={onClearAttachments}
+        onAddFile={onAddFile}
         isFileSearchLoading={isFileSearchLoading}
         fileSearchError={fileSearchError}
         recentFiles={recentFiles}
         onQuickAction={onQuickAction}
         onAskAboutFile={onAskAboutFile}
+        mcpCount={mcpCount}
       />
       
       <CommandPaletteFooter
@@ -249,7 +232,8 @@ export function CommandPalette({
         footerRef={footerRef}
         searchMode={searchMode}
         searchQuery={searchQuery}
-        windowMode={currentMode}
+        showShortcuts={showShortcuts}
+        onToggleShortcuts={toggleShortcuts}
       />
     </div>
   );

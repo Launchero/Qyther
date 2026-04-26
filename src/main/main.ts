@@ -1,6 +1,8 @@
 import { app, Menu } from 'electron';
 import { createMainWindow } from './windows';
 import { registerIPCHandlers } from './ipc/handlers';
+import { registerLicenseHandlers } from './ipc/license-verify';
+import { registerApiConfigHandlers } from './ipc/api-config';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
@@ -11,6 +13,7 @@ import { registerBrowserHandlers } from './ipc/browser-handlers';
 import { statefulBrowserAgent } from './services/browser/stateful-browser-agent';
 import { getAskGraph } from './services/langgraph/research-agent';
 import { execSync } from 'child_process';
+import { createLogger } from './utils/logger';
 
 // Load environment variables from .env file
 import 'dotenv/config';
@@ -21,17 +24,7 @@ import { dirname } from 'path';
 globalThis.__filename = fileURLToPath(import.meta.url);
 globalThis.__dirname = dirname(globalThis.__filename);
 
-// Note: electron-squirrel-startup is optional for Windows installer handling
-// Uncomment if you need Windows installer support:
-// if (require('electron-squirrel-startup')) app.quit();
-
-// Enable verbose logging to terminal
-const isDev = process.env.ELECTRON_VITE_DEV_MODE;
-
-function log(message: string, ...args: any[]) {
-  const timestamp = new Date().toLocaleTimeString();
-  console.log(`[${timestamp}] ${message}`, ...args);
-}
+const log = createLogger('App');
 
 // Enable security features
 app.enableSandbox();
@@ -45,64 +38,71 @@ app.commandLine.appendSwitch('disable-direct-composition');
 // These errors occur when Chromium can't access quota database files
 app.commandLine.appendSwitch('disable-features', 'PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies');
 
-// Enable CDP (Chrome DevTools Protocol) on default port for external debugging
-app.commandLine.appendSwitch('remote-debugging-port', '9222');
-// Allow remote origins to connect to CDP (needed for debugging tools)
-app.commandLine.appendSwitch('remote-allow-origins', '*');
+// Enable CDP (Chrome DevTools Protocol) on default port for external debugging (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.commandLine.appendSwitch('remote-debugging-port', '9222');
+  app.commandLine.appendSwitch('remote-allow-origins', '*');
+}
 
-log('🚀 Electron app starting...');
+log.info('Electron app starting...');
 logSystemInfo();
 
 app.whenReady().then(async () => {
-  log('✅ App ready');
+  log.info('App ready');
   
   initializePreferences();
   
   if (isWindows()) {
-    log('🔍 Initializing file search...');
+    log.info('Initializing file search...');
     const esInitialized = await initializeEs();
     if (esInitialized) {
-      log('✅ File search ready');
+      log.info('File search ready');
     } else {
-      log('⚠️  File search initialization failed');
+      log.warn('File search initialization failed');
     }
   } else {
-    log(`ℹ️  File search not available on ${getPlatformName()}`);
+    log.info('File search not available on', getPlatformName());
   }
   
   // Remove default menu bar
   Menu.setApplicationMenu(null);
   
   registerIPCHandlers();
-  log('📡 IPC handlers registered');
+  log.info('IPC handlers registered');
+  
+  registerLicenseHandlers();
+  log.info('License handlers registered');
+
+  registerApiConfigHandlers();
+  log.info('API config handlers registered');
   
   registerBrowserHandlers();
-  log('🌐 Browser handlers registered');
+  log.info('Browser handlers registered');
   
   // Pre-compile LangGraph in background - shifts cost from first message to startup
   getAskGraph()
-    .then(() => log('🧠 LangGraph compiled and cached'))
-    .catch((err) => log('⚠️  LangGraph pre-compilation failed (will retry on first chat):', err));
+    .then(() => log.info('LangGraph compiled and cached'))
+    .catch((err) => log.warn('LangGraph pre-compilation failed (will retry on first chat):', err));
 
   try {
-    log('🔍 Checking Playwright installation...');
+    log.info('Checking Playwright installation...');
     execSync('npx playwright install chromium', { stdio: 'ignore' });
-    log('✅ Playwright Chromium installed');
+    log.info('Playwright Chromium installed');
   } catch (error) {
-    log('⚠️  Playwright installation failed:', error instanceof Error ? error.message : 'Unknown error');
-    log('ℹ️  Browser automation will install Playwright on first use');
+    log.warn('Playwright installation failed:', error instanceof Error ? error.message : 'Unknown error');
+    log.info('Browser automation will install Playwright on first use');
   }
   
   registerGlobalShortcuts();
-  log('⌨️  Global shortcuts registered');
+  log.info('Global shortcuts registered');
   
   // Create system tray
   createTray();
-  log('📍 System tray created');
+  log.info('System tray created');
   
   // Create main window
   createMainWindow();
-  log('🪟 Main window created');
+  log.info('Main window created');
   
   // Prevent menu bar from appearing on Alt key press
   app.on('browser-window-focus', (_, window) => {
@@ -114,41 +114,41 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (require('electron').BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
-      log('🪟 Window recreated (macOS activate)');
+      log.info('Window recreated (macOS activate)');
     }
   });
   
-  log('✨ App initialization complete');
+  log.info('App initialization complete');
 });
 
 // Quit when all windows are closed (except macOS)
 app.on('window-all-closed', () => {
-  log('🚪 All windows closed');
+  log.info('All windows closed');
   if (!isMacOS()) {
-    log(`👋 Quitting app (${getPlatformName()})`);
+    log.info('Quitting app', getPlatformName());
     app.quit();
   }
 });
 
 app.on('will-quit', () => {
-  log('👋 App quitting...');
+  log.info('App quitting...');
   unregisterGlobalShortcuts();
   destroyTray();
   
   mcpService.cleanup().catch(err => {
-    log('⚠️  MCP cleanup error:', err);
+    log.warn('MCP cleanup error:', err);
   });
   
   statefulBrowserAgent.cleanup().catch(err => {
-    log('⚠️  Browser agent cleanup error:', err);
+    log.warn('Browser agent cleanup error:', err);
   });
   
-  log('✅ Cleanup complete');
+  log.info('Cleanup complete');
 });
 
 // Security: Prevent new window creation
 app.on('web-contents-created', (_, contents) => {
-  log('🔒 Web contents created (security enabled)');
+  log.info('Web contents created (security enabled)');
   
   contents.setWindowOpenHandler(() => {
     return { action: 'deny' };
@@ -158,7 +158,7 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (event, url) => {
     const parsedUrl = new URL(url);
     if (parsedUrl.origin !== 'http://localhost:5173' && !url.startsWith('file://')) {
-      log(`⛔ Blocked navigation to: ${url}`);
+      log.info('Blocked navigation to:', url);
       event.preventDefault();
     }
   });

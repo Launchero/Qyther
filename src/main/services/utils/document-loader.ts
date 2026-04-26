@@ -2,6 +2,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as unzipper from 'unzipper';
 import { createRequire } from 'node:module';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('DocLoader');
 
 // CJS-only modules must be loaded via createRequire for electron-vite ESM bundling
 const require = createRequire(import.meta.url);
@@ -78,13 +81,13 @@ function chunkDocument(text: string, fileName: string, maxChars: number = 50000)
 // ===== PDF Extraction =====
 
 async function extractPdf(filePath: string, fileName: string): Promise<string> {
-  console.log(`[DocumentLoader] Extracting PDF: ${filePath}`);
+  log.info('Extracting PDF:', filePath);
   const buffer = await fs.readFile(filePath);
-  console.log(`[DocumentLoader] PDF buffer size: ${buffer.length} bytes, starts with: ${buffer.slice(0, 5).toString('ascii')}`);
+  log.debug('PDF buffer size:', buffer.length, 'bytes, starts with:', buffer.slice(0, 5).toString('ascii'));
 
   try {
     const data = await pdfParse(buffer);
-    console.log(`[DocumentLoader] PDF parse result - pages: ${data.numpages}, text length: ${data.text?.length || 0}`);
+    log.debug('PDF parse result - pages:', data.numpages, ', text length:', data.text?.length || 0);
 
     if (!data.text || data.text.trim().length === 0) {
       return `[PDF "${fileName}" appears to be image-only or scanned. OCR is required to extract text — convert to text-based PDF or paste content manually.]`;
@@ -93,7 +96,7 @@ async function extractPdf(filePath: string, fileName: string): Promise<string> {
     const pageNote = data.numpages > 1 ? `\n[PDF: ${data.numpages} pages]` : '';
     return data.text.trim() + pageNote;
   } catch (err: any) {
-    console.error(`[DocumentLoader] PDF extraction error:`, err?.message || err);
+    log.error('PDF extraction error:', err?.message || err);
     const message = err?.message?.toLowerCase() || '';
 
     if (message.includes('password') || message.includes('encrypt')) {

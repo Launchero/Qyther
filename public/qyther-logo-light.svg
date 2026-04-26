@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" width="400" height="100">
+  <!-- Light version with icon + text -->
+  <rect width="400" height="100" rx="20" fill="#ffffff"/>
+  
+  <!-- Icon on the left -->
+  <g transform="translate(20, 14)">
+    <!-- Left bracket half -->
+    <path d="M 32 0 L 8 0 L 8 56 L 32 56" fill="none" stroke="#262626" stroke-width="2" stroke-linejoin="miter"/>
+    <!-- Right bracket half -->
+    <path d="M 48 0 L 72 0 L 72 56 L 48 56" fill="none" stroke="#262626" stroke-width="2" stroke-linejoin="miter"/>
+    <!-- Horizontal connector top -->
+    <line x1="32" y1="0" x2="48" y2="0" stroke="#262626" stroke-width="2"/>
+    <!-- Horizontal connector bottom -->
+    <line x1="32" y1="56" x2="48" y2="56" stroke="#262626" stroke-width="2"/>
+    <!-- Q tail -->
+    <line x1="56" y1="48" x2="80" y2="72" stroke="#5283e0" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Center terminal dot -->
+    <circle cx="40" cy="28" r="4" fill="#5283e0"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="118" y="58" font-family="'Poppins', system-ui, -apple-system, sans-serif" font-size="32" font-weight="500" letter-spacing="4" fill="#262626">
+    qyther
+  </text>
+</svg>

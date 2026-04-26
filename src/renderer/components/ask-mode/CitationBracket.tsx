@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface CitationBracketProps {
   number: number;
@@ -9,7 +10,7 @@ interface CitationBracketProps {
 export function CitationBracket({ number, onClick, className }: CitationBracketProps) {
   return (
     <span
-      className={`inline-citation ${className || ''}`}
+      className={cn('inline-citation', className)}
       onClick={onClick}
       role="button"
       tabIndex={0}

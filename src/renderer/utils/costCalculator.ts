@@ -63,10 +63,6 @@ export function calculateTokensPerSecond(tokens: number, durationMs: number): nu
   return Math.round((tokens / durationMs) * 1000);
 }
 
-export function estimateReadTime(tokens: number, wordsPerToken: number = 0.75, wordsPerMinute: number = 200): number {
-  const words = tokens * wordsPerToken;
-  return Math.ceil(words / wordsPerMinute);
-}
 
 /**
  * Mapping from API model identifiers to user-friendly display names

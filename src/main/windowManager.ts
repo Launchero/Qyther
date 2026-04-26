@@ -1,5 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 import { loadPreferences, savePreferences } from './preferences';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('WindowMgr');
 
 export type WindowMode = 'compact' | 'expanded' | 'custom';
 
@@ -74,7 +77,7 @@ class WindowManager {
     if (prefs.windowMode === 'custom' && prefs.customDimensions) {
       this.customDimensions = prefs.customDimensions;
     } else if (prefs.customDimensions) {
-      console.log('[WindowManager] Clearing stale custom dimensions from preferences');
+      log.debug('Clearing stale custom dimensions from preferences');
       savePreferences({ customDimensions: undefined });
     }
   }
@@ -100,8 +103,7 @@ class WindowManager {
     
     if (window && MODE_CONFIGS[mode]) {
       const config = MODE_CONFIGS[mode];
-      const timestamp = new Date().toLocaleTimeString();
-      console.log(`[${timestamp}] 🪟 Setting window mode: ${mode} (${config.width}x${config.height})`);
+      log.info('Setting window mode:', mode, `${config.width}x${config.height}`);
       
       // Tell renderer to update layout for the new mode
       window.webContents.send('window:modeChanged', mode);
@@ -141,8 +143,7 @@ class WindowManager {
           window.setMinimumSize(config.width, config.height);
           window.setMaximumSize(config.width, config.height);
           window.setResizable(false);
-          const lockTime = new Date().toLocaleTimeString();
-          console.log(`[${lockTime}] 🔒 Window locked at ${config.width}x${config.height}`);
+        log.debug('Window locked at', `${config.width}x${config.height}`);
         });
       }
     }

@@ -37,10 +37,13 @@ export function useSearch(allItems: SearchResult[]) {
     return matchingItems.slice(0, 20);
   }, [searchQuery, allItems]);
 
+  // Memoize the results key to avoid creating new string on every render
+  const resultsKey = useMemo(() => results.map(r => r.id).join(','), [results]);
+
   // Reset selection when results change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [results.map(r => r.id).join(',')]);
+  }, [resultsKey]);
 
   return {
     searchQuery,

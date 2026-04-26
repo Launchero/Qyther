@@ -1,65 +1,65 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { CopyIcon, QuestionIcon, CodeIcon, ArrowsClockwiseIcon } from '@phosphor-icons/react';
+import { cn } from '@/lib/utils';
 
 interface ChatMessageActionsProps {
   onCopy?: () => void;
   onExplain?: () => void;
   onShowCode?: () => void;
   onRegenerate?: () => void;
+  className?: string;
 }
 
-export function ChatMessageActions({ 
-  onCopy, 
-  onExplain, 
-  onShowCode, 
-  onRegenerate 
+export function ChatMessageActions({
+  onCopy,
+  onExplain,
+  onShowCode,
+  onRegenerate,
+  className,
 }: ChatMessageActionsProps) {
+  const buttonClass = 'chat-message-action-btn';
+
   return (
-    <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/30">
+    <div className={cn('chat-message-actions', className)}>
       {onCopy && (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          className={buttonClass}
           onClick={onCopy}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Copy response"
         >
-          <CopyIcon className="h-3 w-3 mr-1" />
+          <CopyIcon className="chat-message-action-icon" />
           Copy
-        </Button>
+        </button>
       )}
       {onExplain && (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          className={buttonClass}
           onClick={onExplain}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Explain response"
         >
-          <QuestionIcon className="h-3 w-3 mr-1" />
+          <QuestionIcon className="chat-message-action-icon" />
           Explain
-        </Button>
+        </button>
       )}
       {onShowCode && (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          className={buttonClass}
           onClick={onShowCode}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Show code"
         >
-          <CodeIcon className="h-3 w-3 mr-1" />
+          <CodeIcon className="chat-message-action-icon" />
           Code
-        </Button>
+        </button>
       )}
       {onRegenerate && (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          className={buttonClass}
           onClick={onRegenerate}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Regenerate response"
         >
-          <ArrowsClockwiseIcon className="h-3 w-3 mr-1" />
+          <ArrowsClockwiseIcon className="chat-message-action-icon" />
           Regenerate
-        </Button>
+        </button>
       )}
     </div>
   );

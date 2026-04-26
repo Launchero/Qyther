@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { SearchMode } from './SearchBar';
+import type { SearchMode } from './ModeTabs';
 import { ThemeToggle } from './ThemeToggle';
 import { FooterTips } from './FooterTips';
 import { ShortcutsReference } from './ShortcutsReference';
@@ -13,7 +13,8 @@ export interface CommandPaletteFooterProps {
   footerRef: React.RefObject<HTMLDivElement | null>;
   searchMode?: SearchMode;
   searchQuery?: string;
-  windowMode?: 'expanded' | 'compact' | 'custom';
+  showShortcuts?: boolean;
+  onToggleShortcuts?: () => void;
 }
 
 export function CommandPaletteFooter({
@@ -21,9 +22,12 @@ export function CommandPaletteFooter({
   footerRef,
   searchMode = 'file',
   searchQuery = '',
-  windowMode: _windowMode,
+  showShortcuts: parentShowShortcuts,
+  onToggleShortcuts,
 }: CommandPaletteFooterProps) {
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [localShowShortcuts, setLocalShowShortcuts] = useState(false);
+  const showShortcuts = parentShowShortcuts !== undefined ? parentShowShortcuts : localShowShortcuts;
+  const handleToggleShortcuts = onToggleShortcuts ?? (() => setLocalShowShortcuts(prev => !prev));
 
   const hasQuery = searchQuery.trim().length > 0;
   const { currentTip, isPaused, hoverHandlers } = useRotatingTips(searchMode, hasQuery);
@@ -56,7 +60,7 @@ export function CommandPaletteFooter({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setShowShortcuts(true)}
+            onClick={handleToggleShortcuts}
             title="Keyboard shortcuts"
           >
             <Question className="h-4 w-4" />
@@ -67,7 +71,7 @@ export function CommandPaletteFooter({
 
       <ShortcutsReference
         open={showShortcuts}
-        onOpenChange={setShowShortcuts}
+        onOpenChange={handleToggleShortcuts}
       />
     </>
   );

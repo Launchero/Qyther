@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
-import { useChatSession } from '../hooks/useChatSession';
+import { useChatSession, type ChatSession } from '../hooks/useChatSession';
 import { MCPToolModal } from './MCPToolModal';
 import { useMCPKeyboardShortcuts } from '../hooks/useMCPKeyboardShortcuts';
 import { ToastProvider } from '../contexts/ToastContext';
 import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
-import { ChatSession as ChatSessionType } from './ask-mode/ChatHistoryPanel';
+import { UnifiedCommandBar } from './ask-mode/UnifiedCommandBar';
 import { browserReducer, initialBrowserState } from '../hooks/useBrowserState';
 import { usesMetaKey } from '@/utils/shortcuts';
 import type { BrowserProgress } from './ask-mode/BrowserProgressPanel';
 import type { InlineChatSession } from './ask-mode/RecentChatsInline';
-import type { AttachedFile } from './ChatInputArea';
-import { XIcon } from '@phosphor-icons/react';
+import type { AttachedFile } from '@/types/ask-types';
+import { logInfo, logWarn, logError } from '../utils/debugLogger';
 
 export interface AskModeExpandedProps {
   sessionId?: string;
@@ -24,6 +24,9 @@ export interface AskModeExpandedProps {
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onClearAttachments?: () => void;
+  onAddFile?: (file: AttachedFile) => void;
+  recentSearchResults?: Array<{ title: string; type: string }>;
+  mcpCount?: number;
 }
 
 export function AskModeExpanded({
@@ -33,10 +36,13 @@ export function AskModeExpanded({
   onRegisterSendMessage,
   onHasSentMessageChange,
   attachedFiles = [],
-  onRemoveFile,
-  onAttachFile,
+  onRemoveFile = () => {},
+  onAttachFile = () => {},
   onAttachFolder,
   onClearAttachments,
+  onAddFile,
+  recentSearchResults = [],
+  mcpCount = 0,
 }: AskModeExpandedProps) {
   const {
     messages,
@@ -52,7 +58,7 @@ export function AskModeExpanded({
 
   const [showMCPModal, setShowMCPModal] = useState(false);
   const [welcomeState, setWelcomeState] = useState(true);
-  const [historyItems, setHistoryItems] = useState<ChatSessionType[]>([]);
+  const [historyItems, setHistoryItems] = useState<ChatSession[]>([]);
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
@@ -71,7 +77,7 @@ export function AskModeExpanded({
     };
 
     const handleBrowserError = (data: { sessionId: string; error: string }) => {
-      console.error('[AskModeExpanded] Browser error:', data.error);
+      logError('[AskModeExpanded] Browser error:', data.error);
       dispatch({ type: 'SET_SESSION_ACTIVE', active: false });
     };
 
@@ -93,7 +99,7 @@ export function AskModeExpanded({
           dispatch({ type: 'SET_SESSION_URL', url: status.url || null });
           dispatch({ type: 'SET_SESSION_ACTIVE', active: status.active });
         } catch (error) {
-          console.error('[AskModeExpanded] Error polling status:', error);
+          logError('[AskModeExpanded] Error polling status:', error);
         }
       }
     };
@@ -138,7 +144,7 @@ export function AskModeExpanded({
       const sessions = await listSessions();
       setHistoryItems(sessions.slice(0, 10));
     } catch (err) {
-      console.error('[AskModeExpanded] Failed to load history:', err);
+      logError('[AskModeExpanded] Failed to load history:', err);
     }
   };
 
@@ -152,6 +158,7 @@ export function AskModeExpanded({
     await createNewSession();
     setWelcomeState(true);
     setHasSentMessage(false);
+    loadHistory(); // Refresh list after creating a new session
   }, [createNewSession, onClearAttachments]);
 
   // Keep a ref to the latest searchQuery so the registered callback always has current value
@@ -178,10 +185,10 @@ export function AskModeExpanded({
     onRegisterSendMessage?.((message) => {
       const queryToSend = message?.trim() || searchQueryRef.current.trim();
       if (queryToSend) {
-        console.log('[AskModeExpanded] Sending message with attachments:', attachedFilesRef.current.map(f => f.name));
+        logInfo('[AskModeExpanded] Sending message with attachments:', attachedFilesRef.current.map(f => f.name));
         handleSendMessageRef.current(queryToSend, attachedFilesRef.current);
       } else {
-        console.warn('[AskModeExpanded] No query to send!');
+        logWarn('[AskModeExpanded] No query to send!');
       }
     });
     return () => {
@@ -199,21 +206,23 @@ export function AskModeExpanded({
   const handleEditQuery = useCallback(() => {
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
-      console.log('[AskModeExpanded] Edit query:', lastUserMessage.content);
+      onSearchChange(lastUserMessage.content);
+      logInfo('[AskModeExpanded] Edit query populated:', lastUserMessage.content);
     }
-  }, [messages]);
+  }, [messages, onSearchChange]);
 
   const handleSelectHistory = useCallback(async (sessionIdToLoad: string) => {
     await loadSession(sessionIdToLoad);
     setWelcomeState(false);
+    loadHistory(); // Refresh list after switching sessions
   }, [loadSession]);
 
   const handleCopy = useCallback(async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      console.log('[AskModeExpanded] Content copied to clipboard');
+      logInfo('[AskModeExpanded] Content copied to clipboard');
     } catch (err) {
-      console.error('[AskModeExpanded] Failed to copy content:', err);
+      logError('[AskModeExpanded] Failed to copy content:', err);
     }
   }, []);
 
@@ -239,17 +248,16 @@ export function AskModeExpanded({
   const handleToggleBrowserMode = useCallback(async () => {
     const newEnabled = !browserState.enabled;
     dispatch({ type: 'TOGGLE_MODE', enabled: newEnabled });
-    setWebSearchEnabled(newEnabled);
 
     try {
       const result = await window.electronAPI.browser.setMode(newEnabled);
-      console.log('[AskModeExpanded] Browser mode:', result);
+      logInfo('[AskModeExpanded] Browser mode:', result);
 
       if (newEnabled && !browserState.sessionActive) {
         await window.electronAPI.browser.initializeAgent();
       }
     } catch (error) {
-      console.error('[AskModeExpanded] Failed to toggle browser mode:', error);
+      logError('[AskModeExpanded] Failed to toggle browser mode:', error);
     }
   }, [browserState.enabled, browserState.sessionActive]);
 
@@ -258,27 +266,27 @@ export function AskModeExpanded({
       await window.electronAPI.browser.closeSession('');
       dispatch({ type: 'SET_SESSION_ACTIVE', active: false });
       dispatch({ type: 'SET_SESSION_URL', url: null });
-      console.log('[AskModeExpanded] Browser session closed');
+      logInfo('[AskModeExpanded] Browser session closed');
     } catch (error) {
-      console.error('[AskModeExpanded] Failed to close browser session:', error);
+      logError('[AskModeExpanded] Failed to close browser session:', error);
     }
   }, []);
 
   const handlePauseBrowser = useCallback(async () => {
     try {
       dispatch({ type: 'SET_PAUSED', paused: true });
-      console.log('[AskModeExpanded] Browser automation paused');
+      logInfo('[AskModeExpanded] Browser automation paused');
     } catch (error) {
-      console.error('[AskModeExpanded] Failed to pause browser:', error);
+      logError('[AskModeExpanded] Failed to pause browser:', error);
     }
   }, []);
 
   const handleResumeBrowser = useCallback(async () => {
     try {
       dispatch({ type: 'SET_PAUSED', paused: false });
-      console.log('[AskModeExpanded] Browser automation resumed');
+      logInfo('[AskModeExpanded] Browser automation resumed');
     } catch (error) {
-      console.error('[AskModeExpanded] Failed to resume browser:', error);
+      logError('[AskModeExpanded] Failed to resume browser:', error);
     }
   }, []);
 
@@ -359,8 +367,28 @@ export function AskModeExpanded({
             onRetry={handleRetry}
             onEditQuery={handleEditQuery}
             onFormSubmit={submitForm}
+            recentSearchResults={recentSearchResults}
           />
         </div>
+
+        {/* Bottom input */}
+        <UnifiedCommandBar
+          value={searchQuery}
+          onChange={onSearchChange}
+          onSend={(message) => handleSendMessage(message)}
+          windowMode="expanded"
+          hasSentMessage={hasSentMessage}
+          isLoading={isLoading}
+          attachedFiles={attachedFiles}
+          onRemoveFile={onRemoveFile}
+          onAttachFile={onAttachFile}
+          onAttachFolder={onAttachFolder}
+          onAddFile={onAddFile}
+          mcpCount={mcpCount}
+          onOpenMCPModal={() => setShowMCPModal(true)}
+          webSearchEnabled={webSearchEnabled}
+          onToggleWebSearch={() => setWebSearchEnabled(prev => !prev)}
+        />
 
         {/* MCP Tool Modal */}
         {showMCPModal && (

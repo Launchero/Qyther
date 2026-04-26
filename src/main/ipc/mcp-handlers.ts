@@ -33,6 +33,12 @@ export function registerMCPHandlers(): void {
     };
   });
 
+  // Get count of enabled MCP servers
+  ipcMain.handle('mcp:getServerCount', async () => {
+    const prefs = loadPreferences();
+    return prefs.mcp?.enabledServers?.length ?? 0;
+  });
+
   // Toggle MCP enabled
   ipcMain.handle('mcp:toggle', async (_, enabled: boolean) => {
     const prefs = loadPreferences();

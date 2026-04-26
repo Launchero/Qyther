@@ -1,43 +1,9 @@
-// Define types locally - cannot import from preload/main process
-export type WindowMode = 'compact' | 'expanded' | 'custom';
-
-// File Search Result Type
-export interface FileSearchResult {
-  path: string;
-  name: string;
-  size?: string;
-  dateModified?: string;
-  isFolder: boolean;
-  relevanceScore?: number;
-  category?: string;
-}
-
-// System Info Type
-export interface SystemInfo {
-  platform: 'win32' | 'darwin' | 'linux' | 'unknown';
-  platformName: string;
-  platformVersion: string;
-  arch: string;
-  hostname: string;
-  release: string;
-  totalMemory: string;
-  freeMemory: string;
-  cpuCount: number;
-  cpuModel: string;
-  electronVersion: string;
-  chromeVersion: string;
-  nodeVersion: string;
-  appVersion: string;
-  userDataPath: string;
-}
-
 // Define ElectronAPI type locally to avoid cross-context imports
 export interface ElectronAPI {
   // App info
   getVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
   getPlatformName: () => Promise<string>;
-  getSystemInfo: () => Promise<SystemInfo>;
   isWindows: () => Promise<boolean>;
   isMacOS: () => Promise<boolean>;
   isLinux: () => Promise<boolean>;
@@ -45,9 +11,9 @@ export interface ElectronAPI {
   // Window control
   window: {
     hide: () => Promise<void>;
-    setMode: (mode: WindowMode) => Promise<void>;
-    getMode: () => Promise<WindowMode>;
-    toggleMode: () => Promise<WindowMode>;
+    setMode: (mode: 'compact' | 'expanded' | 'custom') => Promise<void>;
+    getMode: () => Promise<'compact' | 'expanded' | 'custom'>;
+    toggleMode: () => Promise<'compact' | 'expanded' | 'custom'>;
     setCustomDimensions: (width: number, height: number) => Promise<void>;
     resizeHeight: (height: number) => Promise<void>;
     getHeight: () => Promise<number>;
@@ -66,6 +32,7 @@ export interface ElectronAPI {
   // File handling
   file: {
     open: (path: string) => Promise<void>;
+    revealInFolder: (path: string) => Promise<void>;
     search: (
       query: string,
       options?: {
@@ -103,7 +70,20 @@ export interface ElectronAPI {
   debug: {
     log: (message: string, data?: any) => Promise<void>;
   };
-  
+
+  // License (Gumroad-based verification)
+  license: {
+    verify: (licenseKey: string) => Promise<{ success: boolean; error?: string; purchase?: any }>;
+  };
+
+  // API Config (buyer-provided API keys)
+  apiConfig: {
+    save: (config: { apiKey: string; baseUrl: string; model: string }) => Promise<{ success: boolean; error?: string }>;
+    load: () => Promise<{ configured: boolean; baseUrl?: string; model?: string; maskedKey?: string }>;
+    delete: () => Promise<{ success: boolean; error?: string }>;
+    test: (config: { apiKey: string; baseUrl: string; model: string }) => Promise<{ success: boolean; error?: string }>;
+  };
+
   // Chat API
   chat: {
     initialize: () => Promise<{ success: boolean; ready: boolean; error?: string }>;
@@ -118,22 +98,30 @@ export interface ElectronAPI {
     clearHistory: () => Promise<{ success: boolean; error?: string }>;
     isReady: () => Promise<boolean>;
     resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) => Promise<{ success: boolean; error?: string }>;
-    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; confidence?: number; verificationSkipped?: boolean }) => void) => () => void;
+    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => void) => () => void;
     onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => () => void;
     onThinkingStep: (callback: (data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => void) => () => void;
     onUIPayloadStarted: (callback: (data: { type: string }) => void) => () => void;
     onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => () => void;
+    onUIPayloadReset: (callback: () => void) => () => void;
     onFormSubmit: (callback: (data: { formTitle: string; formData: Record<string, unknown> }) => void) => () => void;
+    onDesktopConfirmationRequest: (callback: (data: {
+      threadId: string;
+      interruptPayload: { type: string; action: string; description: string };
+      pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
+      planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
+    }) => void) => () => void;
   };
-  
+
   // MCP API
   mcp: {
     getStatus: () => Promise<{ enabled: boolean; initialized: boolean; toolsCount: number }>;
+    getServerCount: () => Promise<number>;
     toggle: (enabled: boolean) => Promise<void>;
-    getServers: () => Promise<Array<{ 
-      name: string; 
-      type: 'stdio' | 'http'; 
-      enabled: boolean; 
+    getServers: () => Promise<Array<{
+      name: string;
+      type: 'stdio' | 'http';
+      enabled: boolean;
       toolCount: number;
       status: 'connected' | 'disconnected' | 'error';
     }>>;
@@ -141,7 +129,7 @@ export interface ElectronAPI {
     getTools: () => Promise<Array<{ name: string; description: string; enabled: boolean }>>;
     toggleTool: (toolName: string) => Promise<void>;
   };
-  
+
   // Browser Automation API
   browser: {
     initializeAgent: (config?: { headed?: boolean }) => Promise<{ success: boolean; error?: string }>;

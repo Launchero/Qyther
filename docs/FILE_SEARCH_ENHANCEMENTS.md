@@ -490,4 +490,4 @@ Enable verbose logging in console:
 
 **Last Updated**: 2026-04-05
 **Version**: 1.0.0
-**Maintained By**: Raycast Clone Team
+**Maintained By**: Qyther Team

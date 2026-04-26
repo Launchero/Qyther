@@ -77,6 +77,8 @@
   --icon-size-md: 20px;
   --icon-size-lg: 24px;
   --icon-size-xl: 32px;       /* send buttons */
+  --icon-size-2xl: 40px;      /* drag-and-drop icon */
+  --icon-size-3xl: 80px;      /* welcome logo */
   
   /* Send button unified size */
   --send-button-size: 32px;
@@ -90,9 +92,11 @@
   --container-ask-command-bar-height: 100px;     /* Mockup line 100-101 - Updated from 52px */
   --textarea-ask-max-lines: calc(var(--text-base) * 1.5 * 3); /* 3 lines at 16px × 1.5 line-height */
   --chat-bubble-max-width-user: 80%;             /* Mockup line 192 */
+  --chat-message-max-width: 88%;                 /* User message bubble max width */
   --chat-bubble-max-width-assistant: 100%;       /* Mockup line 204 */
   --chat-messages-padding: var(--spacing-5);     /* 20px - Mockup line 136 */
   --chat-messages-gap: var(--spacing-5);         /* 20px - Mockup line 138 */
   --recent-chats-max-width: 480px;               /* Mockup line 173 */
   --suggestion-grid-max-width: 520px;            /* Mockup line 162 */
+  --model-selector-max-width: 120px;             /* Model selector inline max width */
 }

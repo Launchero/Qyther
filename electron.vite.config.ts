@@ -11,10 +11,8 @@ export default defineConfig({
         formats: ['es'],
       },
       rollupOptions: {
-        // Externalize native modules and CJS-only packages so they're not bundled
         external: ['better-sqlite3', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core'],
         output: {
-          // Keep external modules as require() calls
           format: 'es',
         },
       },
@@ -25,11 +23,12 @@ export default defineConfig({
       outDir: 'out/preload',
       lib: {
         entry: resolve(__dirname, 'src/preload/preload.ts'),
-        formats: ['cjs'], // Use CommonJS for sandboxed preload
+        formats: ['cjs'],
       },
     },
   },
   renderer: {
+    publicDir: resolve(__dirname, 'public'),
     plugins: [
       react({
         // React 19 Compiler enabled by default

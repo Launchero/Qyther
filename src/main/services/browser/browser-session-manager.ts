@@ -1,3 +1,7 @@
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('BrowserSessionMgr');
+
 export interface BrowserSession {
   id: string;
   createdAt: Date;
@@ -23,7 +27,7 @@ export class BrowserSessionManager {
   async createSession(config?: BrowserSessionConfig): Promise<string> {
     // Close any existing session first
     if (this.currentSession && this.currentSession.status !== 'closed') {
-      console.log('[BrowserSessionManager] Closing existing session before creating new one');
+      log.info('Closing existing session before creating new one');
       await this.closeSession();
     }
 
@@ -38,7 +42,7 @@ export class BrowserSessionManager {
       stepCount: 0,
     };
 
-    console.log(`[BrowserSessionManager] Created session: ${sessionId}`);
+    log.info(`Created session: ${sessionId}`);
     return sessionId;
   }
 
@@ -50,7 +54,7 @@ export class BrowserSessionManager {
     // Check if session has timed out due to inactivity
     const timeSinceLastActive = Date.now() - this.currentSession.lastActive.getTime();
     if (timeSinceLastActive > this.inactivityTimeout) {
-      console.log('[BrowserSessionManager] Session timed out due to inactivity');
+      log.info('Session timed out due to inactivity');
       await this.closeSession();
       return null;
     }
@@ -79,7 +83,7 @@ export class BrowserSessionManager {
       return;
     }
 
-    console.log(`[BrowserSessionManager] Closing session: ${this.currentSession.id}`);
+    log.info(`Closing session: ${this.currentSession.id}`);
     this.currentSession.status = 'closed';
     this.currentSession = null;
   }
@@ -93,7 +97,7 @@ export class BrowserSessionManager {
     const timeSinceLastActive = Date.now() - this.currentSession.lastActive.getTime();
 
     if (timeSinceLastActive > timeout) {
-      console.log('[BrowserSessionManager] Auto-closing inactive session');
+      log.info('Auto-closing inactive session');
       await this.closeSession();
     }
   }

@@ -2,39 +2,38 @@ import React from 'react';
 import { DataTable, TableData, TableColumn } from './DataTable';
 import { FormPreview, FormField } from './FormPreview';
 import { ComparisonTable, ComparisonItem, ComparisonCriteria } from './ComparisonTable';
+import { ChartView, ChartDataPoint } from './ChartView';
 import { GenerativeUISkeleton } from './GenerativeUISkeleton';
 import { GenerativeUIProgress } from './GenerativeUIProgress';
 
-export type GenerativeUIType = 'table' | 'form' | 'comparison' | 'list';
+export type GenerativeUIType = 'table' | 'form' | 'comparison' | 'list' | 'chart';
 
 interface GenerativeUIProps {
   resultType: GenerativeUIType;
-  data: any;
+  data: Record<string, unknown> | unknown[];
   title?: string;
   onExport?: (format: 'csv' | 'json' | 'md') => void;
-  onConfirm?: (data: any) => void;
-  onEdit?: (field: string, value: any) => void;
+  onConfirm?: (data: Record<string, unknown>) => void;
+  onEdit?: (field: string, value: unknown) => void;
   onCancel?: () => void;
 }
 
 export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onEdit, onCancel }: GenerativeUIProps) {
   switch (resultType) {
     case 'table': {
-      const tableData = data as TableData;
       return (
         <DataTable
-          data={tableData}
+          data={data as unknown as TableData}
           title={title}
           onExport={onExport}
         />
       );
     }
-    
+
     case 'form': {
-      const formFields = data as FormField[];
       return (
         <FormPreview
-          formData={formFields}
+          formData={data as unknown as FormField[]}
           title={title}
           onConfirm={onConfirm}
           onEdit={onEdit}
@@ -42,24 +41,20 @@ export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onE
         />
       );
     }
-    
+
     case 'comparison': {
-      const comparisonData = {
-        items: data.items as ComparisonItem[],
-        criteria: data.criteria as ComparisonCriteria[],
-      };
+      const obj = data as Record<string, unknown>;
       return (
         <ComparisonTable
-          items={comparisonData.items}
-          criteria={comparisonData.criteria}
-          title={data.title || title}
+          items={obj.items as ComparisonItem[]}
+          criteria={obj.criteria as ComparisonCriteria[]}
+          title={(obj.title as string) || title}
           onExport={onExport}
         />
       );
     }
-    
+
     case 'list': {
-      // Simple list rendering
       return (
         <div className="generative-ui-container generative-list">
           {title && <h3 className="generative-ui-title">{title}</h3>}
@@ -77,7 +72,21 @@ export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onE
         </div>
       );
     }
-    
+
+    case 'chart': {
+      const obj = data as Record<string, unknown>;
+      return (
+        <ChartView
+          chartType={obj.chartType as 'bar' | 'line' | 'area' | 'pie'}
+          data={obj.data as ChartDataPoint[]}
+          title={(obj.title as string) || title}
+          description={obj.description as string}
+          xKey={obj.xKey as string}
+          yKey={obj.yKey as string}
+        />
+      );
+    }
+
     default:
       return (
         <div className="generative-ui-fallback">
@@ -88,5 +97,5 @@ export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onE
   }
 }
 
-export { DataTable, FormPreview, ComparisonTable, GenerativeUISkeleton, GenerativeUIProgress };
-export type { TableData, TableColumn, FormField, ComparisonItem, ComparisonCriteria };
+export { DataTable, FormPreview, ComparisonTable, ChartView, GenerativeUISkeleton, GenerativeUIProgress };
+export type { TableData, TableColumn, FormField, ComparisonItem, ComparisonCriteria, ChartDataPoint };

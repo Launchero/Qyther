@@ -7,6 +7,9 @@ import { loadMcpTools } from '@langchain/mcp-adapters';
 import type { RunnableToolLike } from '@langchain/core/runnables';
 import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('BrowserAgent');
 
 dotenv.config();
 
@@ -69,7 +72,7 @@ export class StatefulBrowserAgent extends EventEmitter {
         throw new Error('No browser tools found from Playwright MCP server');
       }
 
-      console.log(`[BrowserAgent] Loaded ${browserTools.length} browser tools`);
+      log.info(`Loaded ${browserTools.length} browser tools`);
 
       const apiKey = process.env.API_KEY;
       const baseURL = process.env.BASE_URL;
@@ -96,16 +99,16 @@ export class StatefulBrowserAgent extends EventEmitter {
       });
 
       this.isInitialized = true;
-      console.log('[BrowserAgent] Initialized successfully');
+      log.info('Initialized successfully');
     } catch (error) {
-      console.error('[BrowserAgent] Initialization failed:', error);
+      log.error('Initialization failed:', error);
       throw error;
     }
   }
 
   async createSession(): Promise<string> {
     const sessionId = `browser-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`[BrowserAgent] Created session: ${sessionId}`);
+    log.info(`Created session: ${sessionId}`);
     return sessionId;
   }
 
@@ -275,7 +278,7 @@ Current session: ${sessionId}`),
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    console.log(`[BrowserAgent] Closing session: ${sessionId}`);
+    log.info(`Closing session: ${sessionId}`);
     
     if (this.agentExecutor) {
       try {
@@ -290,20 +293,20 @@ Current session: ${sessionId}`),
           }
         );
       } catch (error) {
-        console.warn('[BrowserAgent] Error closing browser:', error);
+        log.warn('Error closing browser:', error);
       }
     }
   }
 
   async cleanup(): Promise<void> {
-    console.log('[BrowserAgent] Cleaning up resources');
+    log.info('Cleaning up resources');
     
     if (this.mcpClient) {
       try {
         await this.mcpClient.close();
         this.mcpClient = null;
       } catch (error) {
-        console.error('[BrowserAgent] Error closing MCP client:', error);
+        log.error('Error closing MCP client:', error);
       }
     }
     
@@ -342,7 +345,7 @@ Current session: ${sessionId}`),
       const evaluateTool = allTools.find((t: any) => t.name === 'browser_evaluate');
       
       if (!evaluateTool) {
-        console.warn('[BrowserAgent] browser_evaluate tool not found, using alternative method');
+        log.warn('browser_evaluate tool not found, using alternative method');
         // Fallback: return empty array
         return [];
       }
@@ -358,10 +361,10 @@ Current session: ${sessionId}`),
       });
       
       const links = JSON.parse(result as string);
-      console.log('[BrowserAgent] Extracted', links.length, 'links');
+      log.info(`Extracted ${links.length} links`);
       return links;
     } catch (error) {
-      console.error('[BrowserAgent] Error extracting links:', error);
+      log.error('Error extracting links:', error);
       return [];
     }
   }

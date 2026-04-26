@@ -1,5 +1,8 @@
 import { app } from 'electron';
 import os from 'os';
+import { createLogger } from './logger';
+
+const log = createLogger('Platform');
 
 export type Platform = 'win32' | 'darwin' | 'linux' | 'unknown';
 
@@ -111,11 +114,7 @@ export function getSystemInfo(): SystemInfo {
  * Log platform information to console
  */
 export function logSystemInfo(): void {
-  const timestamp = new Date().toLocaleTimeString();
-  const platformName = getPlatformName();
-  const platformTag = getPlatformTag();
-
-  console.log(`[${timestamp}] ${platformTag} Platform: ${platformName}`);
+  log.info('Platform:', getPlatformName());
 }
 
 /**

@@ -58,6 +58,14 @@ function ListSkeleton() {
   );
 }
 
+function ChartSkeleton() {
+  return (
+    <div className="skeleton-chart">
+      <div className="skeleton-chart-area shimmer" />
+    </div>
+  );
+}
+
 function DefaultSkeleton() {
   return (
     <div className="skeleton-default">
@@ -73,6 +81,7 @@ const SKELETON_VARIANTS: Record<string, React.FC> = {
   form: FormSkeleton,
   comparison: ComparisonSkeleton,
   list: ListSkeleton,
+  chart: ChartSkeleton,
 };
 
 export function GenerativeUISkeleton({ estimatedType, title }: GenerativeUISkeletonProps) {

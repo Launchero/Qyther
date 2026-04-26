@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { SearchMode } from '@/components/SearchBar';
+import type { SearchMode } from '@/components/ModeTabs';
 
 export interface Tip {
   id: string;
@@ -9,14 +9,15 @@ export interface Tip {
 
 const TIPS: Tip[] = [
   // General tips (all modes)
-  { id: 'tab-cycle', text: 'Press Tab to cycle between File and AI modes', modes: [] },
+  { id: 'tab-cycle', text: 'Press Shift+Tab to cycle between File and AI modes', modes: [] },
   { id: 'arrows-navigate', text: 'Use arrow keys to navigate through results', modes: [] },
   { id: 'esc-close', text: 'Press Esc to close this window', modes: [] },
-  { id: 'global-shortcut', text: 'Press Alt+Space from anywhere to open this launcher', modes: [] },
+  { id: 'global-shortcut', text: 'Press Ctrl+Alt+Space from anywhere to open this launcher', modes: [] },
   { id: 'mode-toggle', text: 'Click the mode tabs to switch between File and AI', modes: [] },
   // File mode tips
   { id: 'open-panel', text: 'Press right arrow to open a file in the side panel', modes: ['file'] },
   { id: 'terminal', text: 'Press Ctrl+Shift to open the selected file in terminal', modes: ['file'] },
+  { id: 'alt-enter-ask', text: 'Press Alt+Enter to ask AI about the selected file', modes: ['file'] },
   // AI mode tips
   { id: 'shift-enter', text: 'Press Shift+Enter for a new line in AI chat', modes: ['ai'] },
   { id: 'browser-mode', text: 'Press Ctrl+B to enable browser automation in AI mode', modes: ['ai'] },
@@ -34,6 +35,11 @@ export function useRotatingTips(searchMode: SearchMode, hasQuery: boolean) {
     () => TIPS.filter((tip) => tip.modes.length === 0 || tip.modes.includes(searchMode)),
     [searchMode]
   );
+
+  // Reset tip index when search mode changes to avoid out-of-bounds access
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [searchMode]);
 
   // Pause conditions: has query, hovering, or no tips
   const isPaused = hasQuery || isHoveringRef.current || tips.length === 0;

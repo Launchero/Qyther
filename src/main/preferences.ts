@@ -2,6 +2,9 @@ import { app } from 'electron';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { WindowMode } from './windowManager';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('Prefs');
 
 
 interface LLMPreferences {
@@ -99,7 +102,7 @@ export function loadPreferences(): Preferences {
     
     return prefs;
   } catch (error) {
-    console.error('Failed to load preferences:', error);
+    log.error('Failed to load preferences:', error);
     return {
       mcp: getDefaultMCPConfig(),
     };
@@ -117,7 +120,7 @@ export function savePreferences(prefs: Partial<Preferences>): void {
     // Write to file (creates the file if it doesn't exist)
     writeFileSync(prefsPath, JSON.stringify(updatedPrefs, null, 2), 'utf-8');
   } catch (error) {
-    console.error('Failed to save preferences:', error);
+    log.error('Failed to save preferences:', error);
     // Fallback: try to ensure directory exists and retry once
     try {
       const userDataPath = app.getPath('userData');
@@ -126,27 +129,25 @@ export function savePreferences(prefs: Partial<Preferences>): void {
       }
       writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
     } catch (retryError) {
-      console.error('Failed to save preferences on retry:', retryError);
+      log.error('Failed to save preferences on retry:', retryError);
     }
   }
 }
 
 export function initializePreferences(): void {
   try {
-    // Ensure user data directory exists
     const userDataPath = app.getPath('userData');
     if (!existsSync(userDataPath)) {
       mkdirSync(userDataPath, { recursive: true });
     }
     
-    // Ensure preferences file exists
     if (!existsSync(PREFERENCES_FILE)) {
       writeFileSync(PREFERENCES_FILE, '{}', 'utf-8');
     }
     
-    console.log('Preferences initialized');
+    log.info('Preferences initialized');
   } catch (error) {
-    console.error('Failed to initialize preferences:', error);
+    log.error('Failed to initialize preferences:', error);
   }
 }
 
@@ -157,7 +158,7 @@ export function resetPreferences(): void {
     try {
       writeFileSync(prefsPath, '{}', 'utf-8');
     } catch (error) {
-      console.error('Failed to reset preferences:', error);
+      log.error('Failed to reset preferences:', error);
     }
   }
 }

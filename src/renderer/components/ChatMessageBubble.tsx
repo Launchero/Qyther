@@ -10,9 +10,18 @@ import { CitationBracket } from './ask-mode/CitationBracket';
 import { RelatedQuestions } from './ask-mode/RelatedQuestions';
 import { ThinkingSteps } from './ask-mode/ThinkingSteps';
 import { ConfidenceBadge } from './ask-mode/ConfidenceBadge';
+import { formatTime } from '../utils/formatTime';
 import { cn } from '@/lib/utils';
 import type { TaskMetrics } from '../utils/costCalculator';
 import { CheckCircle } from '@phosphor-icons/react';
+import { logInfo } from '../utils/debugLogger';
+
+export interface UIPayload {
+  type: GenerativeUIType;
+  title: string;
+  data: Record<string, unknown>;
+  node: string;
+}
 
 export interface ThinkingStep {
   type: string;
@@ -31,6 +40,7 @@ export interface ChatMessage {
   hasStructuredData?: boolean;
   dataType?: GenerativeUIType;
   structuredData?: any;
+  uiPayloads?: UIPayload[];
   thinkingSteps?: ThinkingStep[];
   sources?: Array<{
     id: string;
@@ -46,29 +56,24 @@ export interface ChatMessage {
   selfCorrected?: boolean;
   iterationsUsed?: number;
   validationScore?: number;
+  qualityScore?: number;
   confidence?: number;
   verified?: boolean;
   uiPayloadPending?: boolean;
   uiPayloadType?: GenerativeUIType;
   uiGenerationProgress?: number;
+  uiProgressMessage?: string;
 }
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  className?: string;
   onCopy?: (content: string) => void;
   onExplain?: (content: string) => void;
   onShowCode?: (content: string) => void;
   onRegenerate?: () => void;
   onRelatedQuestion?: (question: string) => void;
   onFormSubmit?: (formTitle: string, formData: Record<string, unknown>) => void;
-}
-
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date);
 }
 
 function renderInlineMarkdownWithCitations(
@@ -220,7 +225,7 @@ function SimpleMarkdown({
   return <>{elements}</>;
 }
 
-export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onShowCode, onRegenerate, onRelatedQuestion, onFormSubmit }: ChatMessageBubbleProps) => {
+export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExplain, onShowCode, onRegenerate, onRelatedQuestion, onFormSubmit }: ChatMessageBubbleProps) => {
   const messageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -231,12 +236,20 @@ export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onSho
 
   const isUser = message.role === 'user';
 
+  // Determine which payloads to render — prefer full uiPayloads, fall back to legacy single payload
+  const payloadsToRender = message.uiPayloads && message.uiPayloads.length > 0
+    ? message.uiPayloads
+    : message.hasStructuredData && message.structuredData
+      ? [{ type: message.dataType || 'list' as GenerativeUIType, title: message.structuredData.title || '', data: message.structuredData, node: 'legacy' }]
+      : [];
+
   return (
     <div
       ref={messageRef}
       className={cn(
-        "flex gap-3 max-w-[88%]",
-        isUser ? "self-end flex-row-reverse" : "self-start"
+        "flex gap-3 max-w-[var(--chat-message-max-width)]",
+        isUser ? "self-end flex-row-reverse" : "self-start",
+        className
       )}
       tabIndex={0}
       role="article"
@@ -277,35 +290,33 @@ export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onSho
                   {message.uiGenerationProgress !== undefined && message.uiGenerationProgress > 0 && (
                     <GenerativeUIProgress
                       progress={message.uiGenerationProgress}
-                      message="Generating structured data..."
+                      message={message.uiProgressMessage || 'Generating structured data...'}
                     />
                   )}
                 </>
               )}
 
-              {!message.isStreaming && message.hasStructuredData && message.structuredData && (
+              {!message.isStreaming && payloadsToRender.length > 0 && payloadsToRender.map((payload, idx) => (
                 <GenerativeUI
-                  resultType={message.dataType || 'list'}
-                  data={message.structuredData}
-                  title={message.structuredData.title}
+                  key={`${payload.type}-${idx}`}
+                  resultType={payload.type}
+                  data={payload.data}
+                  title={payload.title}
                   onExport={(format) => {
-                    // DataTable and ComparisonTable handle their own file downloads;
-                    // this callback fires for notification/logging purposes.
-                    console.log(`[ChatMessageBubble] Exported as ${format}`);
+                    logInfo(`[ChatMessageBubble] Exported ${payload.type} as ${format}`);
                   }}
                   onConfirm={(formData) => {
-                    const formTitle = message.structuredData?.title || message.structuredData?.targetUrl || 'Configuration';
-                    onFormSubmit?.(formTitle, formData as Record<string, unknown>);
+                    const formTitle = (payload.data as Record<string, unknown>)?.title || (payload.data as Record<string, unknown>)?.targetUrl || payload.title || 'Configuration';
+                    onFormSubmit?.(formTitle as string, formData as Record<string, unknown>);
                   }}
                   onEdit={() => {
                     // FormPreview manages local state; edits are handled internally.
-                    // This callback is available for future analytics integration.
                   }}
                   onCancel={() => {
-                    console.log('[ChatMessageBubble] Form cancelled');
+                    logInfo('[ChatMessageBubble] Form cancelled');
                   }}
                 />
-              )}
+              ))}
 
               {/* Quality badge for self-corrected responses */}
               {message.selfCorrected && !message.isStreaming && (
@@ -323,6 +334,9 @@ export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onSho
                 <ConfidenceBadge
                   confidence={message.confidence}
                   verified={message.verified}
+                  selfCorrected={message.selfCorrected}
+                  qualityScore={message.qualityScore}
+                  iterationsUsed={message.iterationsUsed}
                 />
               )}
             </div>
@@ -378,7 +392,12 @@ export const ChatMessageBubble = React.memo(({ message, onCopy, onExplain, onSho
     prevProps.message.sources?.length === nextProps.message.sources?.length &&
     prevProps.message.thinkingSteps?.length === nextProps.message.thinkingSteps?.length &&
     prevProps.message.confidence === nextProps.message.confidence &&
-    prevProps.message.verified === nextProps.message.verified
+    prevProps.message.verified === nextProps.message.verified &&
+    prevProps.message.uiPayloadPending === nextProps.message.uiPayloadPending &&
+    prevProps.message.uiGenerationProgress === nextProps.message.uiGenerationProgress &&
+    prevProps.message.uiProgressMessage === nextProps.message.uiProgressMessage &&
+    prevProps.message.uiPayloads?.length === nextProps.message.uiPayloads?.length &&
+    prevProps.className === nextProps.className
   );
 });
 

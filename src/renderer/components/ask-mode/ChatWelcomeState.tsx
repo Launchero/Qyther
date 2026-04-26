@@ -1,5 +1,5 @@
 import React from 'react';
-import { SparkleIcon, FileIcon, FolderIcon, GlobeIcon, BugIcon, WrenchIcon } from '@phosphor-icons/react';
+import { FileIcon, FolderIcon, GlobeIcon, BugIcon, WrenchIcon } from '@phosphor-icons/react';
 import { RecentChatsInline, InlineChatSession } from './RecentChatsInline';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,7 @@ interface ChatWelcomeStateProps {
   browserModeEnabled?: boolean;
   onEnableBrowserMode?: () => void;
   className?: string;
+  recentSearchResults?: Array<{ title: string; type: string }>;
 }
 
 const suggestionCards: SuggestionCard[] = [
@@ -60,6 +61,7 @@ export function ChatWelcomeState({
   browserModeEnabled = false,
   onEnableBrowserMode,
   className,
+  recentSearchResults,
 }: ChatWelcomeStateProps) {
   const filteredActions = browserModeEnabled
     ? suggestionCards
@@ -67,7 +69,8 @@ export function ChatWelcomeState({
 
   return (
     <div className={cn('welcome-state', className)} role="region" aria-label="Welcome to AI Assistant">
-      <SparkleIcon className="welcome-icon" weight="fill" />
+      <img src="/logo-nothing-terminal.svg" alt="Qyther" className="welcome-logo dark:hidden" />
+      <img src="/logo-nothing-terminal-light.svg" alt="Qyther" className="welcome-logo hidden dark:block" />
       <div>
         <div className="welcome-title">What do you need help with?</div>
         <div className="welcome-subtitle">
@@ -82,6 +85,34 @@ export function ChatWelcomeState({
           onSelectSession={onSelectSession}
           onNewChat={onNewChat}
         />
+      )}
+
+      {/* Context-aware suggestions from recent search */}
+      {recentSearchResults && recentSearchResults.length > 0 && (
+        <div className="mb-6">
+          <div className="px-1 pb-3">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              From Your Search
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recentSearchResults.slice(0, 3).map((r) => (
+              <button
+                key={r.title}
+                onClick={() => onSendExample(`Tell me about ${r.title}`)}
+                className={cn(
+                  "px-3 py-1.5 text-xs rounded-md",
+                  "bg-accent hover:bg-accent/80 text-foreground",
+                  "border border-border/50",
+                  "transition-colors duration-150",
+                  "recent-search-chip"
+                )}
+              >
+                {r.title}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="suggestion-grid">

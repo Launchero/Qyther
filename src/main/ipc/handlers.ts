@@ -7,8 +7,10 @@ import { searchFiles, formatFileSize, formatDate } from '../utils/esRunner';
 import { getSystemInfo, getPlatform, getPlatformName, isWindows, isMacOS, isLinux } from '../utils/platform';
 import { registerChatHandlers } from './chat-handlers';
 import { registerMCPHandlers } from './mcp-handlers';
+import { createLogger } from '../utils/logger';
 
 const execAsync = promisify(exec);
+const log = createLogger('IPC');
 
 export function registerIPCHandlers(): void {
   registerChatHandlers();
@@ -45,19 +47,17 @@ export function registerIPCHandlers(): void {
 
   // Window control handlers
   ipcMain.handle('window:hide', () => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] 👁️  IPC: Hiding window`);
+    log.info('Hiding window');
     hideMainWindow();
   });
 
   ipcMain.handle('window:setMode', (_, mode: import('../windowManager').WindowMode) => {
     try {
-      const timestamp = new Date().toLocaleTimeString();
-      console.log(`[${timestamp}] 📡 IPC: Setting window mode to ${mode}`);
+      log.info('Setting window mode to', mode);
       setWindowMode(mode);
       return mode;
     } catch (error) {
-      console.error('[IPC] Error in setMode:', error);
+      log.error('Error in setMode:', error);
       throw error;
     }
   });
@@ -65,11 +65,10 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('window:getMode', () => {
     try {
       const mode = getWindowMode();
-      // Removed verbose logging - called frequently by renderer polling
       return mode;
     } catch (error) {
-      console.error('[IPC] Error in getMode:', error);
-      return 'compact'; // Default fallback
+      log.error('Error in getMode:', error);
+      return 'compact';
     }
   });
 
@@ -77,7 +76,7 @@ export function registerIPCHandlers(): void {
     try {
       return toggleWindowMode();
     } catch (error) {
-      console.error('[IPC] Error in toggleMode:', error);
+      log.error('Error in toggleMode:', error);
       return 'compact';
     }
   });
@@ -88,10 +87,10 @@ export function registerIPCHandlers(): void {
       if (mainWindow) {
         windowManager.setCustomDimensions(width, height, mainWindow);
       } else {
-        console.warn('[IPC] setCustomDimensions: mainWindow is null');
+        log.warn('setCustomDimensions: mainWindow is null');
       }
     } catch (error) {
-      console.error('[IPC] Error in setCustomDimensions:', error);
+      log.error('Error in setCustomDimensions:', error);
     }
   });
 
@@ -108,7 +107,7 @@ export function registerIPCHandlers(): void {
         });
       }
     } catch (error) {
-      console.error('[IPC] Error in resizeHeight:', error);
+      log.error('Error in resizeHeight:', error);
     }
   });
 
@@ -120,7 +119,7 @@ export function registerIPCHandlers(): void {
       }
       return 600;
     } catch (error) {
-      console.error('[IPC] Error in getHeight:', error);
+      log.error('Error in getHeight:', error);
       return 600;
     }
   });
@@ -149,6 +148,11 @@ export function registerIPCHandlers(): void {
   // Open file/folder handler
   ipcMain.handle('file:open', async (_, path: string): Promise<void> => {
     await shell.openPath(path);
+  });
+
+  // Reveal file in folder handler
+  ipcMain.handle('file:revealInFolder', async (_, path: string): Promise<void> => {
+    shell.showItemInFolder(path);
   });
 
   // List applications (platform-specific)
@@ -184,25 +188,23 @@ export function registerIPCHandlers(): void {
           }
         }
       } catch (error) {
-        console.error('Error listing Windows apps:', error);
+        log.error('Error listing Windows apps:', error);
       }
     } else if (isMacOS()) {
-      // macOS: Get apps from Applications folder
       try {
         const { stdout } = await execAsync('ls /Applications | grep ".app$"');
         const appNames = stdout.split('\n').filter(line => line.trim());
         
-        for (const appName of appNames.slice(0, 50)) { // Limit to 50 apps
+        for (const appName of appNames.slice(0, 50)) {
           apps.push({
             name: appName.replace('.app', ''),
             path: `/Applications/${appName}`,
           });
         }
       } catch (error) {
-        console.error('Error listing macOS apps:', error);
+        log.error('Error listing macOS apps:', error);
       }
     } else if (isLinux()) {
-      // Linux: Get .desktop files
       try {
         const { stdout } = await execAsync('ls /usr/share/applications/*.desktop 2>/dev/null | head -50');
         const desktopFiles = stdout.split('\n').filter(line => line.trim());
@@ -215,7 +217,7 @@ export function registerIPCHandlers(): void {
           });
         }
       } catch (error) {
-        console.error('Error listing Linux apps:', error);
+        log.error('Error listing Linux apps:', error);
       }
     }
 
@@ -247,12 +249,11 @@ export function registerIPCHandlers(): void {
     category?: string;
   }>> => {
     try {
-      const timestamp = new Date().toLocaleTimeString();
-      console.log(`[${timestamp}] 🔍 IPC: Searching files for query: "${query}"`);
+      log.debug('Searching files for query:', query);
       
       // Only available on Windows
       if (!isWindows()) {
-        console.warn('[IPC] File search only available on Windows');
+        log.warn('File search only available on Windows');
         return [];
       }
       
@@ -275,15 +276,14 @@ export function registerIPCHandlers(): void {
         category: result.category,
       }));
     } catch (error) {
-      console.error('[IPC] File search error:', error);
+      log.error('File search error:', error);
       throw error;
     }
   });
 
   // Debug log handler - receives logs from renderer process
   ipcMain.handle('debug:log', (event, message: string, data?: any) => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] 📊 ${message}`, data ? JSON.stringify(data, null, 2) : '');
+    log.debug(message, data ? JSON.stringify(data, null, 2) : '');
   });
 
   // Dialog handlers
@@ -305,7 +305,7 @@ export function registerIPCHandlers(): void {
       
       return { path: result.filePaths[0] };
     } catch (error) {
-      console.error('[IPC] Dialog openFile error:', error);
+      log.error('Dialog openFile error:', error);
       return { cancelled: true };
     }
   });
@@ -326,7 +326,7 @@ export function registerIPCHandlers(): void {
       
       return { path: result.filePaths[0] };
     } catch (error) {
-      console.error('[IPC] Dialog openFolder error:', error);
+      log.error('Dialog openFolder error:', error);
       return { cancelled: true };
     }
   });

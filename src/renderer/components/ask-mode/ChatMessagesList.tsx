@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { PlusIcon } from '@phosphor-icons/react';
+import autoAnimate from '@formkit/auto-animate';
 import { ChatMessageBubble, ChatMessage } from '../ChatMessageBubble';
 import { ChatErrorBanner } from './ChatErrorBanner';
 import { ChatWelcomeState } from './ChatWelcomeState';
@@ -24,6 +25,7 @@ interface ChatMessagesListProps {
   onRetry?: () => void;
   onEditQuery?: () => void;
   onFormSubmit?: (formTitle: string, formData: Record<string, unknown>) => void;
+  recentSearchResults?: Array<{ title: string; type: string }>;
 }
 
 export function ChatMessagesList({
@@ -45,12 +47,23 @@ export function ChatMessagesList({
   onRetry,
   onEditQuery,
   onFormSubmit,
+  recentSearchResults,
 }: ChatMessagesListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (messagesAreaRef.current) {
+      autoAnimate(messagesAreaRef.current, {
+        duration: 200,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      });
+    }
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -63,6 +76,7 @@ export function ChatMessagesList({
             onNewChat={onNewChat}
             browserModeEnabled={browserModeEnabled}
             onEnableBrowserMode={onEnableBrowserMode}
+            recentSearchResults={recentSearchResults}
           />
         </div>
       ) : (
@@ -82,6 +96,7 @@ export function ChatMessagesList({
             </div>
           )}
           <div
+            ref={messagesAreaRef}
             className="messages-area"
             role="log"
             aria-live="polite"
@@ -101,10 +116,10 @@ export function ChatMessagesList({
               />
             ))}
             {isLoading && (
-              <div className="flex gap-1 p-3 self-start" role="status" aria-live="polite" aria-label="AI is typing">
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
+              <div className="flex gap-[var(--spacing-1)] p-3 self-start" role="status" aria-live="polite" aria-label="AI is typing">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
               </div>
             )}
             {error && (

@@ -19,19 +19,6 @@ const NON_MAC_DISPLAY: OSDisplayNames = {
   shift: 'Shift',
 };
 
-let cachedOS: OSDisplayNames | null = null;
-
-export async function getOSDisplayNames(): Promise<OSDisplayNames> {
-  if (cachedOS) return cachedOS;
-  try {
-    const isMac = await window.electronAPI.isMacOS();
-    cachedOS = isMac ? MAC_DISPLAY : NON_MAC_DISPLAY;
-  } catch {
-    cachedOS = getOSDisplayNamesSync();
-  }
-  return cachedOS;
-}
-
 export function getOSDisplayNamesSync(): OSDisplayNames {
   if (typeof navigator === 'undefined') {
     return NON_MAC_DISPLAY;

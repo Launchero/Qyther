@@ -1,9 +1,11 @@
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, screen, nativeImage } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { windowManager } from './windowManager';
+import { createLogger } from './utils/logger';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const log = createLogger('Window');
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -27,6 +29,14 @@ export function createMainWindow(): BrowserWindow {
   const maxAvailableHeight = screenHeight - (y - currentScreen.bounds.y);
   const effectiveHeight = Math.min(windowHeight, maxAvailableHeight);
 
+  // Load window icon from build resources
+  const isDev = process.env.DEV === 'true' || process.env.NODE_ENV === 'development';
+  const iconDir = isDev 
+    ? join(__dirname, '../../build/icons') 
+    : join(process.resourcesPath, 'icons');
+  
+  const appIcon = nativeImage.createFromPath(join(iconDir, 'icon.ico'));
+
   const options: Electron.BrowserWindowConstructorOptions = {
     width: windowWidth,
     height: effectiveHeight,
@@ -46,6 +56,7 @@ export function createMainWindow(): BrowserWindow {
     backgroundMaterial: 'none',
     autoHideMenuBar: true,
     roundedCorners: true,
+    icon: appIcon.isEmpty() ? undefined : appIcon,
     webPreferences: {
       // CRITICAL: Security settings
       contextIsolation: true,
@@ -72,6 +83,23 @@ export function createMainWindow(): BrowserWindow {
     mainWindow?.setMenuBarVisibility(false);
   });
 
+  // Intercept Alt+Space on Windows.
+  // Alt+Space is reserved by Windows for the system context menu.
+  // The system-context-menu event doesn't capture Alt+Space in Electron 41.x,
+  // so we use hookWindowMessage to intercept WM_SYSCOMMAND (0x0112) with SC_KEYMENU (0xF100).
+  const WM_SYSCOMMAND = 0x0112;
+  const SC_KEYMENU = 0xF100;
+
+  mainWindow.hookWindowMessage(WM_SYSCOMMAND, (wParam) => {
+    const command = wParam.readUInt32LE(0) & 0xFFF0;
+
+    if (command === SC_KEYMENU) {
+      toggleMainWindow();
+      return true; // Prevent default
+    }
+    return false; // Allow other commands
+  });
+
   // Hide window instead of closing when user presses escape
   mainWindow.on('close', (event) => {
     if (mainWindow?.isVisible()) {
@@ -83,7 +111,6 @@ export function createMainWindow(): BrowserWindow {
   });
 
   // Load application
-  const isDev = process.env.DEV === 'true' || process.env.NODE_ENV === 'development';
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
@@ -95,9 +122,7 @@ export function createMainWindow(): BrowserWindow {
 
 export function showMainWindow(): void {
   if (mainWindow) {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] 👁️  Showing main window`);
-    // Reposition based on current mode
+    log.info('Showing main window');
     windowManager.repositionWindow(mainWindow);
     mainWindow.show();
     mainWindow.focus();
@@ -107,24 +132,20 @@ export function showMainWindow(): void {
 
 export function hideMainWindow(): void {
   if (mainWindow) {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] 👁️  Hiding main window`);
-    // Preserve current mode for next open
+    log.info('Hiding main window');
     const currentMode = windowManager.getCurrentMode();
-    console.log(`[${timestamp}] 💾 Preserving window mode: ${currentMode}`);
-    // Notify renderer to store active element before hiding
+    log.debug('Preserving window mode:', currentMode);
     mainWindow.webContents.send('window:will-hide');
     mainWindow.hide();
   }
 }
 
 export function toggleMainWindow(): void {
-  const timestamp = new Date().toLocaleTimeString();
   if (mainWindow && mainWindow.isVisible()) {
-    console.log(`[${timestamp}] 🔄 Toggling window: visible → hiding`);
+    log.info('Toggling window: visible -> hiding');
     hideMainWindow();
   } else {
-    console.log(`[${timestamp}] 🔄 Toggling window: hidden → showing`);
+    log.info('Toggling window: hidden -> showing');
     showMainWindow();
   }
 }

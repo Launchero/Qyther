@@ -1,11 +1,15 @@
-import React, { useRef, useEffect, useState, useCallback, DragEvent } from 'react';
-import { BrainIcon, PaperPlaneRightIcon, SparkleIcon, CaretDownIcon, PaperclipIcon, XIcon, GlobeIcon, FileIcon, FolderIcon, FilePdf, FileCsv, Presentation, BookOpen } from '@phosphor-icons/react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { CaretDownIcon, PaperPlaneRightIcon, PaperclipIcon, XIcon, GlobeIcon } from '@phosphor-icons/react';
 import { SearchWebToggle } from './SearchWebToggle';
-import { ModeTabs, type SearchMode } from '../ModeTabs';
 import { ShortcutKey } from '@/components/common/ShortcutKeys';
 import { getAriaKeyshortcuts } from '@/utils/shortcuts';
-import type { AttachedFile } from '../ChatInputArea';
+import type { AttachedFile } from '@/types/ask-types';
 import { cn } from '@/lib/utils';
+import { logWarn } from '../../utils/debugLogger';
+import { useDragAndDrop } from '@/hooks/useDragAndDrop';
+import { useAutoResizeTextarea } from '@/hooks/useAutoResizeTextarea';
+import { useInputIcon } from './useInputIcon';
+import { getFileIconType, FileIconForType } from './fileTypeIcons';
 
 export interface UnifiedCommandBarProps {
   value: string;
@@ -24,10 +28,6 @@ export interface UnifiedCommandBarProps {
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onAddFile?: (file: AttachedFile) => void;
-  currentMode?: SearchMode;
-  onModeChange?: (mode: SearchMode) => void;
-  tabsExpanded?: boolean;
-  onTabsExpanded?: (expanded: boolean) => void;
 }
 
 export function UnifiedCommandBar({
@@ -45,77 +45,42 @@ export function UnifiedCommandBar({
   attachedFiles = [],
   onRemoveFile,
   onAttachFile,
-  onAttachFolder,
+  onAttachFolder: _onAttachFolder,
   onAddFile,
-  currentMode = 'ai',
-  onModeChange,
-  tabsExpanded = false,
-  onTabsExpanded,
 }: UnifiedCommandBarProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
   const [hasSent, setHasSent] = useState(hasSentMessage);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const dragCounterRef = useRef(0);
 
-  // Sync with parent hasSentMessage state (both directions)
+  const { isDragOver, handleDragEnter, handleDragLeave, handleDragOver, handleDrop } =
+    useDragAndDrop({
+      onFilesDrop: (files) => {
+        files.forEach((file) => {
+          const filePath = (file as any).path || '';
+          onAddFile?.({ name: file.name, path: filePath, type: 'file' });
+        });
+      },
+    });
+
+  const { textareaRef, resetHeight } = useAutoResizeTextarea({
+    value,
+    maxHeight: 120,
+  });
+
   useEffect(() => {
     if (hasSentMessage !== hasSent) {
       setHasSent(hasSentMessage);
     }
   }, [hasSentMessage, hasSent]);
 
-  // Auto-resize textarea
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      const newHeight = Math.min(textarea.scrollHeight, 100);
-      textarea.style.height = `${newHeight}px`;
-    }
-  }, [value]);
-
-  // Handle mode change - close tabs and focus input (matching SearchBar behavior)
-  const handleModeChange = (mode: SearchMode) => {
-    onModeChange?.(mode);
-    onTabsExpanded?.(false);
-    textareaRef.current?.focus();
-  };
-
-  // Toggle tabs expanded state
-  const handleToggleTabs = () => {
-    const newState = !tabsExpanded;
-    onTabsExpanded?.(newState);
-  };
-
-  // Close tabs when clicking outside (matching SearchBar behavior)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      
-      if (tabsExpanded && tabsContainerRef.current && !tabsContainerRef.current.contains(target)) {
-        onTabsExpanded?.(false);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [tabsExpanded, onTabsExpanded]);
-
   const handleSend = useCallback(() => {
     if (value.trim() && !disabled && !isLoading) {
       onSend(value.trim());
       onChange('');
       setHasSent(true);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      resetHeight();
     } else {
-      console.warn('[UnifiedCommandBar] Not sending - conditions not met');
+      logWarn('[UnifiedCommandBar] Not sending - conditions not met');
     }
-  }, [value, disabled, isLoading, onSend, onChange]);
+  }, [value, disabled, isLoading, onSend, onChange, resetHeight]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -126,72 +91,11 @@ export function UnifiedCommandBar({
 
   const isSendActive = value.trim().length > 0;
 
-  // Determine which icon to show
-  const InputIcon = hasSent ? BrainIcon : isSendActive ? PaperPlaneRightIcon : SparkleIcon;
+  const InputIcon = useInputIcon(hasSent, isSendActive);
 
-  // Placeholder text based on state
   const placeholder = hasSent
     ? 'Reply to AI... or ask a follow-up'
     : 'Ask anything about your code, files, or project...';
-
-  // Drag-and-drop handlers
-  const handleDragEnter = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current++;
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      setIsDragOver(true);
-    }
-  }, []);
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragOver(false);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    dragCounterRef.current = 0;
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      Array.from(e.dataTransfer.files).forEach((file: File) => {
-        if (file.name) {
-          // For drag-drop, we only get the filename, not the full path
-          onAddFile?.({ name: file.name, path: '', type: 'file' });
-        }
-      });
-    }
-  }, [onAddFile]);
-
-  // Format file size from name heuristics
-  const getFileExtension = (name: string): string => {
-    const parts = name.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const getFileIcon = (name: string) => {
-    const ext = getFileExtension(name);
-    const codeExts = ['ts', 'tsx', 'js', 'jsx', 'py', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'css', 'html', 'json', 'yaml', 'yml', 'toml', 'md', 'sql'];
-    if (codeExts.includes(ext)) return 'code';
-    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext)) return 'image';
-    if (['pdf'].includes(ext)) return 'pdf';
-    if (['doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext)) return 'doc';
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'spreadsheet';
-    if (['ppt', 'pptx'].includes(ext)) return 'presentation';
-    if (['epub', 'mobi', 'azw3'].includes(ext)) return 'ebook';
-    return 'file';
-  };
 
   return (
     <div
@@ -201,7 +105,6 @@ export function UnifiedCommandBar({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Drag-and-Drop Overlay */}
       {isDragOver && (
         <div className="drag-drop-overlay">
           <div className="drag-drop-zone">
@@ -212,24 +115,12 @@ export function UnifiedCommandBar({
         </div>
       )}
 
-      {/* Command Bar — mode pill + input + shortcuts (flex row) */}
       <div className="command-bar">
-        {/* Mode Tabs */}
-        <div ref={tabsContainerRef} className="flex-shrink-0 self-center">
-          <ModeTabs
-            currentMode={currentMode}
-            onModeChange={handleModeChange}
-            expanded={tabsExpanded}
-            onToggle={handleToggleTabs}
-          />
-        </div>
-
-        {/* Context Indicator Badges - Compact Mode Only */}
         {windowMode === 'compact' && !hasSent && (attachedFiles.length > 0 || mcpCount > 0 || webSearchEnabled) && (
           <div className="context-indicator-compact">
             {attachedFiles.length > 0 && (
               <span className="context-badge" title={`${attachedFiles.length} files attached`}>
-                <PaperclipIcon className="w-2.5 h-2.5" weight="fill" />
+                <PaperclipIcon className="context-badge-icon" weight="fill" />
                 {attachedFiles.length}
               </span>
             )}
@@ -241,13 +132,12 @@ export function UnifiedCommandBar({
             )}
             {webSearchEnabled && (
               <span className="context-badge" title="Web search enabled">
-                <GlobeIcon className="w-2.5 h-2.5" weight="fill" />
+                <GlobeIcon className="context-badge-icon" weight="fill" />
               </span>
             )}
           </div>
         )}
 
-        {/* Unified Input Container */}
         <div
           className={cn(
             'unified-input-container',
@@ -255,7 +145,6 @@ export function UnifiedCommandBar({
             isDragOver && 'drag-over'
           )}
         >
-          {/* Dynamic Icon */}
           <InputIcon
             className={cn(
               'input-icon',
@@ -264,7 +153,6 @@ export function UnifiedCommandBar({
             weight={hasSent ? 'fill' : 'regular'}
           />
 
-          {/* Textarea */}
           <textarea
             ref={textareaRef}
             className="unified-input"
@@ -276,7 +164,6 @@ export function UnifiedCommandBar({
             disabled={disabled || isLoading}
           />
 
-          {/* Attach Button — inside input container */}
           {onAttachFile && (
             <button
               className={cn('attach-trigger-inline', isDragOver && 'drag-over-active')}
@@ -288,7 +175,6 @@ export function UnifiedCommandBar({
             </button>
           )}
 
-          {/* Model Selector (visible only after sending) */}
           {hasSent && (
             <button className="model-select-inline visible" type="button">
               <span>Qwen</span>
@@ -296,7 +182,6 @@ export function UnifiedCommandBar({
             </button>
           )}
 
-          {/* Send Button */}
           <button
             className={cn('send-button', isSendActive && 'active')}
             onClick={handleSend}
@@ -308,8 +193,7 @@ export function UnifiedCommandBar({
           </button>
         </div>
 
-        {/* Keyboard Shortcuts (visible only in compact mode before sending) */}
-        {!hasSent && windowMode === 'compact' && (
+        {!hasSent && (
           <div className="shortcut-keys">
             <ShortcutKey alt />
             <ShortcutKey label="Space" />
@@ -317,22 +201,14 @@ export function UnifiedCommandBar({
         )}
       </div>
 
-      {/* Context Chips — visible whenever files are attached (before AND after sending) */}
-      {(attachedFiles.length > 0 || mcpCount > 0 || onToggleWebSearch) && (
+      {(attachedFiles.length > 0 || mcpCount > 0 || onToggleWebSearch) && windowMode !== 'compact' && (
         <div className={cn('context-chips-above-input', hasSent && 'visible', attachedFiles.length > 0 && 'visible')}>
           {attachedFiles.map((file, index) => {
-            const iconType = getFileIcon(file.name);
+            const iconType = getFileIconType(file.name);
             return (
-              <div key={index} className="context-chip-above">
-                {iconType === 'code' && <span className="chip-icon code-dot" />}
-                {iconType === 'image' && <span className="chip-icon image-dot" />}
-                {iconType === 'pdf' && <FilePdf className="chip-icon pdf-icon" weight="regular" />}
-                {iconType === 'spreadsheet' && <FileCsv className="chip-icon spreadsheet-icon" weight="regular" />}
-                {iconType === 'presentation' && <Presentation className="chip-icon presentation-icon" weight="regular" />}
-                {iconType === 'ebook' && <BookOpen className="chip-icon ebook-icon" weight="regular" />}
-                {iconType === 'doc' && <FileIcon className="chip-icon" weight="regular" />}
-                {iconType === 'file' && <FileIcon className="chip-icon" weight="regular" />}
-                {file.name}
+              <div key={index} className="context-chip-above" data-file-type={iconType}>
+                <FileIconForType iconType={iconType} />
+                <span className="context-chip-label" title={file.name}>{file.name}</span>
                 <XIcon
                   className="context-chip-remove"
                   weight="bold"

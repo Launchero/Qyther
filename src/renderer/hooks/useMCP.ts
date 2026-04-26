@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logError } from '../utils/debugLogger';
 
 interface MCPStatus {
   enabled: boolean;
@@ -26,7 +27,7 @@ export function useMCP() {
       const result = await window.electronAPI.mcp.getStatus();
       setStatus(result);
     } catch (error) {
-      console.error('Failed to load MCP status:', error);
+      logError('[useMCP] Failed to load MCP status:', error);
     }
   }, []);
 
@@ -36,7 +37,7 @@ export function useMCP() {
       const result = await window.electronAPI.mcp.getTools();
       setTools(result);
     } catch (error) {
-      console.error('Failed to load MCP tools:', error);
+      logError('[useMCP] Failed to load MCP tools:', error);
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +48,7 @@ export function useMCP() {
       await window.electronAPI.mcp.toggle(!status.enabled);
       await loadStatus();
     } catch (error) {
-      console.error('Failed to toggle MCP:', error);
+      logError('[useMCP] Failed to toggle MCP:', error);
     }
   }, [status.enabled, loadStatus]);
 
@@ -56,7 +57,7 @@ export function useMCP() {
       await window.electronAPI.mcp.toggleTool(toolName);
       await loadTools();
     } catch (error) {
-      console.error('Failed to toggle tool:', error);
+      logError('[useMCP] Failed to toggle tool:', error);
     }
   }, [loadTools]);
 

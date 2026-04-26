@@ -2,6 +2,9 @@ import { ipcMain } from 'electron';
 import { statefulBrowserAgent, BrowserTaskProgress } from '../services/browser/stateful-browser-agent';
 import { browserSessionManager } from '../services/browser/browser-session-manager';
 import { langChainAgent } from '../services/langchain/agent';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('BrowserHandlers');
 
 export function registerBrowserHandlers(): void {
   ipcMain.handle('browser:initialize', async (_, config?: { headed?: boolean }) => {
@@ -12,7 +15,7 @@ export function registerBrowserHandlers(): void {
         message: 'Browser agent initialized successfully',
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Initialization failed:', error);
+      log.error('Initialization failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -28,7 +31,7 @@ export function registerBrowserHandlers(): void {
         sessionId,
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Create session failed:', error);
+      log.error('Create session failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -79,7 +82,7 @@ export function registerBrowserHandlers(): void {
         response: accumulatedResponse,
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Execute task failed:', error);
+      log.error('Execute task failed:', error);
       
       // Send error to renderer
       event.sender.send('browser:error', {
@@ -103,7 +106,7 @@ export function registerBrowserHandlers(): void {
         message: 'Session closed successfully',
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Close session failed:', error);
+      log.error('Close session failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -120,7 +123,7 @@ export function registerBrowserHandlers(): void {
         enabled,
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Set mode failed:', error);
+      log.error('Set mode failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -156,7 +159,7 @@ export function registerBrowserHandlers(): void {
         message: 'Cleanup completed',
       };
     } catch (error) {
-      console.error('[BrowserHandlers] Cleanup failed:', error);
+      log.error('Cleanup failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',

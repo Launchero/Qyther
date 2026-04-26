@@ -2,6 +2,9 @@ import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import type { RunnableToolLike } from "@langchain/core/runnables";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import { loadPreferences } from "../../preferences";
+import { createLogger } from "../../utils/logger";
+
+const log = createLogger('MCP');
 
 export class MCPService {
   private client: MultiServerMCPClient | null = null;
@@ -16,7 +19,7 @@ export class MCPService {
     const mcpConfig = prefs.mcp;
 
     if (!mcpConfig?.enabled) {
-      console.log('[MCP] MCP disabled in preferences');
+      log.info('MCP disabled in preferences');
       return;
     }
 
@@ -71,9 +74,9 @@ export class MCPService {
         }
       }
       
-      console.log(`[MCP] Initialized with ${this.tools.length} tools across ${enabledServers.length} servers`);
+      log.info(`Initialized with ${this.tools.length} tools across ${enabledServers.length} servers`);
     } catch (error) {
-      console.error('[MCP] Initialization failed:', error);
+      log.error('Initialization failed:', error);
       throw error;
     }
   }
@@ -84,7 +87,7 @@ export class MCPService {
         await this.initialize();
         return;
       } catch (error) {
-        console.warn(`[MCP] Retry ${i + 1}/${maxRetries} failed:`, error);
+        log.warn(`Retry ${i + 1}/${maxRetries} failed:`, error);
         if (i === maxRetries - 1) {
           throw error;
         }
@@ -112,7 +115,7 @@ export class MCPService {
       this.tools = [];
       this.isInitializedFlag = false;
       this.serverToolCounts.clear();
-      console.log('[MCP] Cleanup complete');
+      log.info('Cleanup complete');
     }
   }
 }

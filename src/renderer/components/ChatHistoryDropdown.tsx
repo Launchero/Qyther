@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ClockIcon, ChatsCircleIcon, PlusIcon } from '@phosphor-icons/react';
+import { logInfo } from '../utils/debugLogger';
 
 export interface ChatHistoryDropdownProps {
   history?: string[];
@@ -32,7 +33,7 @@ export function ChatHistoryDropdown({
   visible = true,
 }: ChatHistoryDropdownProps) {
   const handleChatSelect = (chatTitle: string) => {
-    console.log('[ChatHistoryDropdown] Chat selected:', chatTitle);
+    logInfo('[ChatHistoryDropdown] Chat selected:', chatTitle);
     onSelect(chatTitle);
     onToggle();
   };

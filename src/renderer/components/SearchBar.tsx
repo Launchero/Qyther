@@ -1,13 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ModeTabs } from './ModeTabs';
+import type { SearchMode } from './ModeTabs';
 import { ChatHistoryDropdown } from './ChatHistoryDropdown';
 import { ShortcutKey } from '@/components/common/ShortcutKeys';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MagnifyingGlass, X, CaretDown } from '@phosphor-icons/react';
+import { MagnifyingGlass, X } from '@phosphor-icons/react';
+import { logInfo } from '../utils/debugLogger';
 
-export type SearchMode = 'file' | 'ai';
+export type { SearchMode } from './ModeTabs';
 
 export interface SearchBarProps {
   value: string;
@@ -18,7 +20,6 @@ export interface SearchBarProps {
   onTabsExpanded?: (expanded: boolean) => void;
   windowMode?: 'expanded' | 'compact' | 'custom';
   onSendMessage?: () => void;
-  onExpandWindow?: () => void;
 }
 
 export function SearchBar({ 
@@ -30,7 +31,6 @@ export function SearchBar({
   onTabsExpanded,
   windowMode = 'expanded',
   onSendMessage,
-  onExpandWindow,
 }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
@@ -141,12 +141,12 @@ export function SearchBar({
   }, [tabsExpanded, chatHistoryOpen, onTabsExpanded]);
 
   const handleChatSelect = (chatTitle: string) => {
-    console.log('[SearchBar] Chat selected:', chatTitle);
+    logInfo('[SearchBar] Chat selected:', chatTitle);
     setChatHistoryOpen(false);
   };
 
   const handleNewChat = () => {
-    console.log('[SearchBar] New chat requested');
+    logInfo('[SearchBar] New chat requested');
     setChatHistoryOpen(false);
   };
 
@@ -175,7 +175,7 @@ export function SearchBar({
       </div>
 
       {/* Search Input - Mockup lines 237-258 */}
-      {/* Hidden in expanded Ask mode - ChatInputArea becomes the primary input */}
+      {/* Hidden in expanded Ask mode - UnifiedCommandBar becomes the primary input */}
       {!isExpandedAskMode && (
         <div className={cn(
           "flex-1 flex items-center h-[var(--container-input-height)] self-center relative",
@@ -230,7 +230,7 @@ export function SearchBar({
         (tabsExpanded || isExpandedAskMode) && "opacity-0 w-0 mx-0"
       )} />
 
-      {/* Keyboard Shortcut - Alt+Space (actual global shortcut) */}
+      {/* Keyboard Shortcut - Alt+Space (global shortcut) */}
       {/* Always visible in compact window mode per mockup design */}
       <div className={cn(
         "flex items-center gap-1.5 flex-shrink-0 self-center",
@@ -250,18 +250,6 @@ export function SearchBar({
           onNewChat={handleNewChat}
           visible={showModelAndHistory}
         />
-      )}
-
-      {/* Expand affordance - subtle chevron in compact mode to signal expand capability */}
-      {isCompactWindow && onExpandWindow && (
-        <button
-          className="flex items-center justify-center w-6 h-6 flex-shrink-0 self-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
-          onClick={onExpandWindow}
-          title="Expand (Alt+Shift+M)"
-          type="button"
-        >
-          <CaretDown weight="bold" className="w-3.5 h-3.5" />
-        </button>
       )}
     </div>
   );

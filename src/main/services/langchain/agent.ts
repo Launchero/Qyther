@@ -7,6 +7,9 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import type { RunnableToolLike } from "@langchain/core/runnables";
 import { statefulBrowserAgent } from '../browser/stateful-browser-agent';
 import { browserSessionManager } from '../browser/browser-session-manager';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('LangChain');
 
 dotenv.config();
 
@@ -18,6 +21,7 @@ export interface ChatMessage {
   hasStructuredData?: boolean;
   dataType?: 'table' | 'form' | 'comparison' | 'list';
   structuredData?: any;
+  uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>;
   sources?: Array<{
     id: string;
     url: string;
@@ -26,6 +30,8 @@ export interface ChatMessage {
     confidence?: number;
     accessedAt?: Date;
   }>;
+  confidence?: number;
+  qualityScore?: number;
   reasoning?: {
     steps: Array<{
       stepNumber: number;
@@ -86,7 +92,7 @@ class LangChainAgent extends EventEmitter {
       const model = process.env.MODEL || 'qwen3.5-plus';
 
       if (!apiKey) {
-        console.warn('[LangChain] API_KEY not found in environment. Chat functionality will be limited.');
+        log.warn('API_KEY not found in environment. Chat functionality will be limited.');
         this.isInitialized = true;
         return;
       }
@@ -101,13 +107,13 @@ class LangChainAgent extends EventEmitter {
         temperature: 0.7,
       });
       
-      console.log('[LangChain] ChatOpenAI configured with baseURL:', baseURL);
-      console.log('[LangChain] Model:', model);
+      log.info('ChatOpenAI configured with baseURL:', baseURL);
+      log.info('Model:', model);
 
       this.isInitialized = true;
-      console.log('[LangChain] Agent initialized with model:', model);
+      log.info('Agent initialized with model:', model);
     } catch (error) {
-      console.error('[LangChain] Failed to initialize:', error);
+      log.error('Failed to initialize:', error);
       throw error;
     }
   }
@@ -186,20 +192,20 @@ class LangChainAgent extends EventEmitter {
 
     const isBrowserQuery = this.browserModeEnabled || this.requiresBrowserAutomation(content);
     
-    console.log('[LangChain] Browser mode enabled:', this.browserModeEnabled);
-    console.log('[LangChain] Is browser query (auto-detect):', this.requiresBrowserAutomation(content));
-    console.log('[LangChain] Has active browser session:', this.currentBrowserSessionId);
-    console.log('[LangChain] Final isBrowserQuery:', isBrowserQuery);
+    log.debug('Browser mode enabled:', this.browserModeEnabled);
+    log.debug('Is browser query (auto-detect):', this.requiresBrowserAutomation(content));
+    log.debug('Has active browser session:', this.currentBrowserSessionId);
+    log.debug('Final isBrowserQuery:', isBrowserQuery);
     
     if (isBrowserQuery) {
-      console.log('[LangChain] Routing to browser agent:', content);
+      log.info('Routing to browser agent:', content);
       
       if (!this.browserAgentInitialized) {
-        console.log('[LangChain] Initializing browser agent...');
+        log.debug('Initializing browser agent...');
         await this.initializeBrowserAgent();
       }
       
-      console.log('[LangChain] Browser agent ready:', statefulBrowserAgent.isReady());
+      log.debug('Browser agent ready:', statefulBrowserAgent.isReady());
       
       if (statefulBrowserAgent.isReady()) {
         // Reuse existing session or create new one
@@ -207,27 +213,27 @@ class LangChainAgent extends EventEmitter {
         if (!sessionId) {
           sessionId = await browserSessionManager.createSession();
           this.currentBrowserSessionId = sessionId;
-          console.log('[LangChain] Created NEW browser session:', sessionId);
+          log.info('Created NEW browser session:', sessionId);
         } else {
-          console.log('[LangChain] Reusing EXISTING browser session:', sessionId);
+          log.info('Reusing EXISTING browser session:', sessionId);
         }
         
         let fullResponse = '';
         
         try {
-          console.log('[LangChain] Executing browser task...');
+          log.info('Executing browser task...');
           const stream = await statefulBrowserAgent.executeTask(content, sessionId);
           
-          console.log('[LangChain] Starting to read stream...');
+          log.debug('Starting to read stream...');
           for await (const chunk of stream) {
-            console.log('[LangChain] Received chunk:', chunk.slice(0, 50));
+            log.debug('Received chunk:', chunk.slice(0, 50));
             fullResponse += chunk;
             if (onChunk) {
               onChunk(chunk);
             }
           }
           
-          console.log('[LangChain] Stream complete, response length:', fullResponse.length);
+          log.info('Stream complete, response length:', fullResponse.length);
           
           // Add P2 metadata for browser queries
           const durationMs = Date.now() - startTime;
@@ -276,7 +282,7 @@ class LangChainAgent extends EventEmitter {
           
           return fullResponse;
         } catch (error) {
-          console.error('[LangChain] Browser agent error:', error);
+          log.error('Browser agent error:', error);
           // Only close session on error
           await statefulBrowserAgent.closeSession(sessionId);
           await browserSessionManager.closeSession();
@@ -284,10 +290,10 @@ class LangChainAgent extends EventEmitter {
           throw error;
         }
       } else {
-        console.warn('[LangChain] Browser agent not ready, falling back to standard chat');
+        log.warn('Browser agent not ready, falling back to standard chat');
       }
     } else {
-      console.log('[LangChain] Not a browser query, using standard chat');
+      log.debug('Not a browser query, using standard chat');
     }
 
     // Add user message to history
@@ -379,7 +385,7 @@ class LangChainAgent extends EventEmitter {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred while processing your request';
-      console.error('[LangChain] Error sending message:', error);
+      log.error('Error sending message:', error);
       this.addMessage('assistant', errorMessage);
       return errorMessage;
     }
@@ -404,16 +410,16 @@ class LangChainAgent extends EventEmitter {
     try {
       await statefulBrowserAgent.initialize(config);
       this.browserAgentInitialized = true;
-      console.log('[LangChain] Browser agent initialized successfully');
+      log.info('Browser agent initialized successfully');
     } catch (error) {
-      console.error('[LangChain] Browser agent initialization failed:', error);
+      log.error('Browser agent initialization failed:', error);
       throw error;
     }
   }
 
   setBrowserModeEnabled(enabled: boolean): void {
     this.browserModeEnabled = enabled;
-    console.log('[LangChain] Browser mode:', enabled ? 'enabled' : 'disabled');
+    log.info('Browser mode:', enabled ? 'enabled' : 'disabled');
   }
 
   isBrowserModeEnabled(): boolean {
@@ -480,10 +486,10 @@ class LangChainAgent extends EventEmitter {
           tools,
         });
         this.useMCP = true;
-        console.log('[LangChain] MCP tools integrated successfully');
+        log.info('MCP tools integrated successfully');
       }
     } catch (error) {
-      console.warn('[LangChain] MCP initialization failed, continuing without MCP:', error);
+      log.warn('MCP initialization failed, continuing without MCP:', error);
       this.useMCP = false;
     }
   }
@@ -521,7 +527,7 @@ class LangChainAgent extends EventEmitter {
     }
     
     if (this.currentBrowserSessionId) {
-      console.log('[LangChain] Closing browser session:', this.currentBrowserSessionId);
+      log.info('Closing browser session:', this.currentBrowserSessionId);
       await statefulBrowserAgent.closeSession(this.currentBrowserSessionId);
       await browserSessionManager.closeSession();
       this.currentBrowserSessionId = null;
@@ -536,7 +542,7 @@ class LangChainAgent extends EventEmitter {
       }
       this.browserSessionTimeout = setTimeout(
         () => {
-          console.log('[LangChain] Auto-closing browser session after inactivity');
+          log.info('Auto-closing browser session after inactivity');
           this.closeBrowserSession();
         },
         this.BROWSER_INACTIVITY_TIMEOUT
@@ -550,9 +556,9 @@ class LangChainAgent extends EventEmitter {
       await browserSessionManager.closeSession();
       this.browserAgentInitialized = false;
       this.currentBrowserSessionId = null;
-      console.log('[LangChain] Browser agent cleaned up');
+      log.info('Browser agent cleaned up');
     } catch (error) {
-      console.error('[LangChain] Browser agent cleanup error:', error);
+      log.error('Browser agent cleanup error:', error);
     }
   }
 }

@@ -2,11 +2,11 @@ import React from 'react';
 import { ResultsList, SearchResult } from './ResultsList';
 import { AskModeExpanded } from './AskModeExpanded';
 import { SearchEmptyState } from './SearchEmptyState';
-import type { AttachedFile } from './ChatInputArea';
+import type { AttachedFile } from '@/types/ask-types';
 import type { RecentFile } from '@/hooks/useRecentFiles';
-import type { SearchMode } from './SearchBar';
+import type { SearchMode } from './ModeTabs';
 
-export interface CommandPaletteBodyProps {
+interface CommandPaletteBodyProps {
   showResults: boolean;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -24,14 +24,16 @@ export interface CommandPaletteBodyProps {
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onClearAttachments?: () => void;
+  onAddFile?: (file: AttachedFile) => void;
   isFileSearchLoading?: boolean;
   fileSearchError?: string | null;
   recentFiles?: RecentFile[];
   onAskAboutFile?: (result: SearchResult) => void;
   onQuickAction?: (action: string) => void;
+  mcpCount?: number;
 }
 
-export function CommandPaletteBody({
+function CommandPaletteBodyImpl({
   showResults,
   searchQuery,
   onSearchChange,
@@ -49,11 +51,13 @@ export function CommandPaletteBody({
   onAttachFile,
   onAttachFolder,
   onClearAttachments,
+  onAddFile,
   isFileSearchLoading,
   fileSearchError,
   recentFiles = [],
   onQuickAction,
   onAskAboutFile,
+  mcpCount = 0,
 }: CommandPaletteBodyProps) {
   // Show chat interface in expanded Ask mode
   if (searchMode === 'ai' && windowMode === 'expanded') {
@@ -61,13 +65,16 @@ export function CommandPaletteBody({
       <div ref={bodyRef} className="flex-1 min-h-0 flex flex-col overflow-hidden bg-card">
         <AskModeExpanded
           searchQuery={searchQuery}
-          onSearchChange={(_q) => {}}
+          onSearchChange={onSearchChange}
           onRegisterSendMessage={onRegisterSendMessage}
           attachedFiles={attachedFiles}
           onRemoveFile={onRemoveFile}
           onAttachFile={onAttachFile}
           onAttachFolder={onAttachFolder}
           onClearAttachments={onClearAttachments}
+          onAddFile={onAddFile}
+          mcpCount={mcpCount}
+          recentSearchResults={results.filter(r => r.type === 'file').slice(0, 3).map(r => ({ title: r.title, type: r.type }))}
         />
       </div>
     );
@@ -120,3 +127,28 @@ export function CommandPaletteBody({
   );
 }
 
+const MemoizedCommandPaletteBody = React.memo(CommandPaletteBodyImpl, (prev, next) => {
+  return (
+    prev.results === next.results &&
+    prev.selectedIndex === next.selectedIndex &&
+    prev.searchQuery === next.searchQuery &&
+    prev.showResults === next.showResults &&
+    prev.executingId === next.executingId &&
+    prev.searchMode === next.searchMode &&
+    prev.windowMode === next.windowMode &&
+    prev.isFileSearchLoading === next.isFileSearchLoading &&
+    prev.fileSearchError === next.fileSearchError &&
+    prev.attachedFiles === next.attachedFiles &&
+    prev.recentFiles === next.recentFiles &&
+    prev.bodyRef === next.bodyRef &&
+    prev.onSearchChange === next.onSearchChange &&
+    prev.onSelect === next.onSelect &&
+    prev.onExecute === next.onExecute &&
+    prev.onAskAboutFile === next.onAskAboutFile &&
+    prev.onClearAttachments === next.onClearAttachments &&
+    prev.onAddFile === next.onAddFile
+  );
+});
+
+export { MemoizedCommandPaletteBody as CommandPaletteBody };
+export type { CommandPaletteBodyProps };

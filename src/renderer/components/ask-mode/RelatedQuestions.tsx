@@ -15,10 +15,10 @@ export function RelatedQuestions({ questions, onSelect, className }: RelatedQues
     <div className={cn('related-questions', className)}>
       <div className="related-title">Related</div>
       <div className="related-list" role="list">
-        {questions.map((question, index) => (
+        {questions.map((question) => (
           <button
-            key={index}
-            className="related-item"
+            key={question}
+            className="related-question-item related-item"
             onClick={() => onSelect(question)}
             role="listitem"
             aria-label={`Ask: ${question}`}

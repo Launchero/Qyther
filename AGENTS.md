@@ -1,11 +1,13 @@
 # Agent Instructions
 
 ## Stack
+
 - Electron 41, React 19, TypeScript 5.7, Vite 6
 - Global shortcut: Alt+Space
 - Performance target: <500ms cold start
 
 ## Essential Commands
+
 ```bash
 npm run dev        # Start dev server
 npm run build      # Build for production
@@ -14,11 +16,12 @@ npm run lint       # ESLint check
 ```
 
 ## Critical Constraints
-- Context Isolation + Sandbox enabled (security-first)
+
 - All IPC calls validated in `src/main/ipc/handlers.ts`
 - Follow patterns in existing components
 
 ## Canonical Examples
+
 - Main process: `src/main/main.ts`
 - Window management: `src/main/windows.ts`
 - Component pattern: `src/renderer/components/CommandPalette.tsx`
@@ -26,6 +29,7 @@ npm run lint       # ESLint check
 - Custom hook: `src/renderer/hooks/useKeyboard.ts`
 
 ## Web & MCP Tools
+
 - Use WebSearch for current info (2025-2026)
 - Use WebFetch for documentation URLs
 - Use Context7 MCP for library APIs
@@ -50,28 +54,38 @@ npm run lint       # ESLint check
 
 ### Skill Navigation
 
-| Situation | Use This Skill |
-|-----------|---------------|
-| Starting any task (master entry point) | `karpathy-universal` |
-| Agent produced wrong output | `skill-issue-diagnosis` |
-| Delegating multi-part work | `parallel-orchestration` |
-| Structuring intent before coding | `instruction-first` |
-| Plan mode research | `plan-mode-enhancement` (rule) |
-| Electron main process / architecture | `electron-core` |
-| Electron + React integration | `electron-react-core` |
-| IPC patterns (main <-> renderer) | `electron-react-ipc` |
-| Security best practices | `electron-react-security` |
-| Performance optimization | `electron-react-performance` |
-| Component design patterns | `electron-react-components` |
-| React fundamentals | `react-core` |
-| TypeScript type patterns | `typescript-core` |
-| Library API research | `context7-integration` |
-| Browser UI testing | `browser-use-testing` |
-| Electron-vite build config | `electron-react-build` |
-| React 19 state patterns | `electron-react-state` |
-| Parallel Context7 research | `context7-parallel-research` |
-| Web tool selection logic | `web-tools-decision-tree` |
-| Search/install skills from skills.sh | `skill-installer` |
+
+| Situation                                 | Use This Skill                                   |
+| ----------------------------------------- | ------------------------------------------------ |
+| Starting any task (master entry point)    | `karpathy-universal`                             |
+| Agent produced wrong output               | `skill-issue-diagnosis`                          |
+| Delegating multi-part work                | `parallel-orchestration`                         |
+| Structuring intent before coding          | `instruction-first`                              |
+| Plan mode research                        | `plan-mode-enhancement` (rule)                   |
+| Electron main process / architecture      | `electron-core`                                  |
+| Electron + React integration              | `electron-react-core`                            |
+| IPC patterns (main <-> renderer)          | `electron-react-ipc`                             |
+| Security best practices                   | `electron-react-security`                        |
+| Performance optimization                  | `electron-react-performance`                     |
+| Component design patterns                 | `electron-react-components`                      |
+| React fundamentals                        | `react-core`                                     |
+| TypeScript type patterns                  | `typescript-core`                                |
+| Library API research                      | `context7-integration`                           |
+| Browser UI testing                        | `browser-use-testing`                            |
+| Electron-vite build config                | `electron-react-build`                           |
+| React 19 state patterns                   | `electron-react-state`                           |
+| Parallel Context7 research                | `context7-parallel-research`                     |
+| Web tool selection logic                  | `web-tools-decision-tree`                        |
+| Search/install skills from skills.sh      | `agent-skill-finder`                             |
+| LangGraph StateGraph / research agent     | `langgraph-agent-patterns`                       |
+| MCP server integration (tool calling)     | `mcp-server-integration`                         |
+| Structured LLM output to React components | `generative-ui-components`                       |
+| Window modes, shortcuts, launcher UX      | `command-launcher-ux`                            |
+| Cost tracking, source citations, trust    | `source-transparency`                            |
+| Systematic debugging methodology          | `systematic-debugging` (obra/superpowers)        |
+| Subagent-driven development patterns      | `subagent-driven-development` (obra/superpowers) |
+| Frontend polish and design taste          | `polish` (pbakaus/impeccable)                    |
+
 
 ### Simplicity Rules (Enforced)
 
@@ -83,22 +97,26 @@ npm run lint       # ESLint check
 
 ### Bounded Autonomy Defaults
 
-| Constraint | Default |
-|------------|---------|
-| Scope | 1-3 files max per agent |
-| Time budget | 300s per experiment |
-| Metric | One unambiguous metric |
-| Rollback | Git reset on failure |
-| Max experiments | 100 (standard) |
+
+| Constraint      | Default                 |
+| --------------- | ----------------------- |
+| Scope           | 1-3 files max per agent |
+| Time budget     | 300s per experiment     |
+| Metric          | One unambiguous metric  |
+| Rollback        | Git reset on failure    |
+| Max experiments | 100 (standard)          |
+
 
 ## UI & Design System
 
 ### Token-Driven Architecture (MANDATORY)
+
 All UI features MUST use the design token system. See `@design-tokens-enforcement` rule for full token documentation, usage rules, and Tailwind v4 guidance.
 
 Key rules: NEVER hardcode pixel values or OKLCH colors. ALWAYS use `var(--token-name)` or Tailwind utilities from `@theme inline`.
 
 ### shadcn/ui Patterns
+
 - **Components are source code**: Treat `components/ui/` as owned code, not dependencies
 - **File organization**:
   - `components/ui/` - shadcn primitives (keep pristine for updates)
@@ -117,6 +135,7 @@ Key rules: NEVER hardcode pixel values or OKLCH colors. ALWAYS use `var(--token-
 - **Updates**: Run `npx shadcn@latest diff` monthly, apply selectively
 
 ### Best Practices
+
 - ✅ ALWAYS use design tokens (see Token Usage Rules above)
 - ✅ Use semantic color tokens (`bg-primary`, not `bg-blue-500`)
 - ✅ Create wrapper components for domain-specific logic in `components/common/`
@@ -129,7 +148,9 @@ Key rules: NEVER hardcode pixel values or OKLCH colors. ALWAYS use `var(--token-
 - ❌ Don't remove accessibility attributes
 
 ### Documentation
+
 - See `design-systems/SHADCN-DESIGN-SYSTEM.md` for design system guide (audited for accuracy)
 
 ## Auto-Update Rule
+
 This file is automatically maintained by Cursor subagents. Before updating, subagents MUST reference `@AGENT-INSTRUCTION-BEST-PRACTICES.md` to ensure minimal, relevant context only.

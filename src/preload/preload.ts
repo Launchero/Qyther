@@ -1,21 +1,27 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 // #region agent log
+const PRELOAD_LOGGING_ENABLED = process.env.LOG_PRELOAD === 'true';
+const PRELOAD_LOG_ENDPOINT = process.env.LOG_PRELOAD_ENDPOINT || 'http://127.0.0.1:7593/ingest/711a8501-3d31-485b-8bdd-ee2778fa3e69';
+const PRELOAD_SESSION_ID = process.env.LOG_PRELOAD_SESSION_ID || 'e0162f';
+
 const logToServer = (message: string, data: any = {}, hypothesisId: string = 'A') => {
-  fetch('http://127.0.0.1:7593/ingest/711a8501-3d31-485b-8bdd-ee2778fa3e69',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e0162f'},
-    body:JSON.stringify({
-      sessionId:'e0162f',
-      id:`preload_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-      timestamp:Date.now(),
-      location:'preload.ts:1',
+  if (!PRELOAD_LOGGING_ENABLED) return;
+
+  fetch(PRELOAD_LOG_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': PRELOAD_SESSION_ID },
+    body: JSON.stringify({
+      sessionId: PRELOAD_SESSION_ID,
+      id: `preload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      location: 'preload.ts:1',
       message,
       data,
-      runId:'initial',
-      hypothesisId
-    })
-  }).catch(()=>{});
+      runId: 'initial',
+      hypothesisId,
+    }),
+  }).catch(() => {});
 };
 // #endregion
 
@@ -82,15 +88,13 @@ export const electronAPI = {
     resizeHeight: (height: number) => ipcRenderer.invoke('window:resizeHeight', height),
     getHeight: () => ipcRenderer.invoke('window:getHeight'),
   },
-  
+
   // Command execution
   command: {
     execute: (command: string) => {
-      // Validate command before sending
       if (!command || typeof command !== 'string') {
         throw new Error('Valid command is required');
       }
-      // Basic security: prevent dangerous commands
       const dangerousPatterns = ['rm -rf', 'del /s', 'format', 'shutdown'];
       for (const pattern of dangerousPatterns) {
         if (command.toLowerCase().includes(pattern)) {
@@ -100,7 +104,7 @@ export const electronAPI = {
       return ipcRenderer.invoke('command:execute', command);
     },
   },
-  
+
   // URL handling
   url: {
     open: (url: string) => {
@@ -110,8 +114,8 @@ export const electronAPI = {
       return ipcRenderer.invoke('url:open', url);
     },
   },
-  
-  // File handling (ENHANCED with options parameter - backward compatible)
+
+  // File handling
   file: {
     open: (path: string) => {
       if (!path || typeof path !== 'string') {
@@ -119,55 +123,58 @@ export const electronAPI = {
       }
       return ipcRenderer.invoke('file:open', path);
     },
+    revealInFolder: (path: string) => {
+      if (!path || typeof path !== 'string') {
+        throw new Error('Valid path is required');
+      }
+      return ipcRenderer.invoke('file:revealInFolder', path);
+    },
     search: (query: string, options?: {
       maxResults?: number;
       excludeHidden?: boolean;
       excludeSystem?: boolean;
       includeMetadata?: boolean;
     }) => {
-      // EXISTING validation - DO NOT MODIFY (backward compatibility)
       if (!query || typeof query !== 'string') {
         throw new Error('Valid search query is required');
       }
-      // Basic security: prevent command injection
       const dangerousPatterns = ['&&', '||', ';', '|', '&', '>', '<', '^'];
       for (const pattern of dangerousPatterns) {
         if (query.includes(pattern)) {
           throw new Error('Invalid characters in search query');
         }
       }
-      
-      // NEW enhanced validation - ADDITIONAL only (backward compatible)
+
       if (query.length > 500) {
         throw new Error('Search query too long (max 500 characters)');
       }
       if (options && typeof options !== 'object') {
         throw new Error('Options must be an object');
       }
-      
+
       return ipcRenderer.invoke('file:search', query, options);
     },
   },
-  
+
   // Applications
   apps: {
     list: () => ipcRenderer.invoke('apps:list'),
   },
-  
+
   // App lifecycle
   quit: () => ipcRenderer.invoke('app:quit'),
-  
+
   // Debug logging
   debug: {
     log: (message: string, data?: any) => ipcRenderer.invoke('debug:log', message, data),
   },
-  
+
   // Chat API
   chat: {
     initialize: () => ipcRenderer.invoke('chat:initialize'),
-    sendMessage: (content: string, sessionId?: string) => 
+    sendMessage: (content: string, sessionId?: string) =>
       ipcRenderer.invoke('chat:sendMessage', { content, sessionId }),
-    sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => 
+    sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) =>
       ipcRenderer.invoke('chat:sendStreamMessage', { content, sessionId, attachmentPaths }),
     createSession: (title?: string) => ipcRenderer.invoke('chat:createSession', title),
     getCurrentSession: () => ipcRenderer.invoke('chat:getCurrentSession'),
@@ -179,8 +186,8 @@ export const electronAPI = {
     isReady: () => ipcRenderer.invoke('chat:isReady'),
     resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) =>
       ipcRenderer.invoke('chat:resumeGraph', { threadId, resumeValue }),
-    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { chunk: string; isComplete: boolean }) => callback(data);
+    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => callback(data);
       ipcRenderer.on('chat:stream-chunk', handler);
       return () => {
         ipcRenderer.removeListener('chat:stream-chunk', handler);
@@ -214,8 +221,32 @@ export const electronAPI = {
         ipcRenderer.removeListener('chat:ui-payload-progress', handler);
       };
     },
+    onUIPayloadReset: (callback: () => void) => {
+      const handler = (_event: Electron.IpcRendererEvent) => callback();
+      ipcRenderer.on('chat:ui-payload-reset', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:ui-payload-reset', handler);
+      };
+    },
+    onDesktopConfirmationRequest: (callback: (data: {
+      threadId: string;
+      interruptPayload: { type: string; action: string; description: string };
+      pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
+      planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
+    }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: {
+        threadId: string;
+        interruptPayload: { type: string; action: string; description: string };
+        pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
+        planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
+      }) => callback(data);
+      ipcRenderer.on('desktop:confirmation-request', handler);
+      return () => {
+        ipcRenderer.removeListener('desktop:confirmation-request', handler);
+      };
+    },
   },
-  
+
   // Browser Automation API
   browser: {
     initializeAgent: (config?: { headed?: boolean }) => ipcRenderer.invoke('browser:initializeAgent', config),
@@ -248,13 +279,14 @@ export const electronAPI = {
       };
     },
   },
-  
+
   // MCP API
   mcp: {
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
+    getServerCount: () => ipcRenderer.invoke('mcp:getServerCount'),
     toggle: (enabled: boolean) => ipcRenderer.invoke('mcp:toggle', enabled),
     getServers: () => ipcRenderer.invoke('mcp:getServers'),
-    toggleServer: (serverName: string, enabled: boolean) => 
+    toggleServer: (serverName: string, enabled: boolean) =>
       ipcRenderer.invoke('mcp:toggleServer', serverName, enabled),
     getTools: () => ipcRenderer.invoke('mcp:getTools'),
     toggleTool: (toolName: string) => ipcRenderer.invoke('mcp:toggleTool', toolName),
@@ -262,20 +294,32 @@ export const electronAPI = {
 
   // Dialog API
   dialog: {
-    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => 
+    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) =>
       ipcRenderer.invoke('dialog:openFile', options),
-    openFolder: (options?: { defaultPath?: string }) => 
+    openFolder: (options?: { defaultPath?: string }) =>
       ipcRenderer.invoke('dialog:openFolder', options),
   },
 
+  // License (Gumroad-based verification)
+  license: {
+    verify: (licenseKey: string) => ipcRenderer.invoke('license:verify', licenseKey),
+  },
+
+  // API Config (buyer-provided API keys)
+  apiConfig: {
+    save: (config: { apiKey: string; baseUrl: string; model: string }) => ipcRenderer.invoke('api-config:save', config),
+    load: () => ipcRenderer.invoke('api-config:load'),
+    delete: () => ipcRenderer.invoke('api-config:delete'),
+    test: (config: { apiKey: string; baseUrl: string; model: string }) => ipcRenderer.invoke('api-config:test', config),
+  },
 };
 
 // Expose with type safety
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-logToServer('contextBridge.exposeInMainWorld called', { 
+logToServer('contextBridge.exposeInMainWorld called', {
   electronAPI_keys: Object.keys(electronAPI),
   has_window: !!electronAPI.window,
-  has_apps: !!electronAPI.apps 
+  has_apps: !!electronAPI.apps
 }, 'A');
 
 // Type declaration for renderer

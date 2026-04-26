@@ -20,20 +20,31 @@ export interface Attachment {
 }
 
 export interface UIPayload {
-  type: 'table' | 'comparison' | 'form' | 'list';
+  type: 'table' | 'comparison' | 'form' | 'list' | 'chart';
   title: string;
   data: Record<string, unknown>;
   node: string;
 }
 
+export interface DesktopAction {
+  type: string;
+  description: string;
+  success: boolean;
+  result?: string;
+}
+
+// Replace reducer: each node output fully replaces the previous value.
+// Prevents stale accumulation across graph runs when a thread is reused.
+const replaceArray = <T>() => (_a: T[] | undefined, b: T[]) => b;
+
 export const AskState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<BaseMessage>(),
     default: () => [],
   }),
   userQuery: Annotation<string>,
   attachments: Annotation<Attachment[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<Attachment>(),
     default: () => [],
   }),
   intent: Annotation<string>({
@@ -41,11 +52,11 @@ export const AskState = Annotation.Root({
     default: () => "general",
   }),
   researchResults: Annotation<string[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<string>(),
     default: () => [],
   }),
   sources: Annotation<Source[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<Source>(),
     default: () => [],
   }),
   finalResponse: Annotation<string>({
@@ -76,12 +87,16 @@ export const AskState = Annotation.Root({
     reducer: (_a, b) => b,
     default: () => 0,
   }),
+  qualityScore: Annotation<number>({
+    reducer: (_a, b) => b,
+    default: () => 0,
+  }),
   complexityScore: Annotation<string>({
     reducer: (_a, b) => b,
     default: () => "simple",
   }),
   searchQueries: Annotation<string[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<string>(),
     default: () => [],
   }),
   verified: Annotation<boolean>({
@@ -89,7 +104,15 @@ export const AskState = Annotation.Root({
     default: () => false,
   }),
   uiPayloads: Annotation<UIPayload[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: replaceArray<UIPayload>(),
+    default: () => [],
+  }),
+  previousIntent: Annotation<string>({
+    reducer: (_a, b) => b,
+    default: () => "general",
+  }),
+  desktopActions: Annotation<DesktopAction[]>({
+    reducer: replaceArray<DesktopAction>(),
     default: () => [],
   }),
 });

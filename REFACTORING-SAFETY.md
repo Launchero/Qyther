@@ -42,7 +42,7 @@
 - [ ] Alt+Shift+M toggles window mode
 - [ ] Alt+Shift+T toggles theme
 - [ ] State persists across hides/shows
-- [ ] Ctrl+1/2/3 switches search mode
+- [ ] Shift+Tab switches search mode
 
 ## Baseline Metrics (Before Refactoring)
 

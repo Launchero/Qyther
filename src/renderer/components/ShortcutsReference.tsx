@@ -27,16 +27,15 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['Page Up'], label: 'Jump 5 results up' },
       { keys: ['Page Down'], label: 'Jump 5 results down' },
       { keys: ['Enter'], label: 'Open selected item' },
+      { keys: ['Ctrl', 'Shift', 'Enter'], label: 'Ask AI about selected file' },
       { keys: ['Esc'], label: 'Close window' },
     ],
   },
   {
     title: 'Modes',
     shortcuts: [
-      { keys: ['Tab'], label: 'Cycle modes (when input focused)' },
-      { keys: ['Shift', 'Tab'], label: 'Cycle modes (reverse)' },
-      { keys: ['Ctrl', 'Tab'], label: 'Cycle modes (anywhere)' },
-      { keys: ['Ctrl', 'Shift', 'Tab'], label: 'Cycle modes reverse (anywhere)' },
+      { keys: ['Shift', 'Tab'], label: 'Cycle modes forward' },
+      { keys: ['Ctrl', 'Shift', 'Tab'], label: 'Cycle modes reverse' },
     ],
   },
   {

@@ -1,28 +1,68 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import { createLogger } from "../../utils/logger";
+
+const log = createLogger("Search");
+
+async function searchTavily(query: string, maxResults: number): Promise<string> {
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (!tavilyKey) {
+    return JSON.stringify({ error: "Tavily API key not configured", query });
+  }
+
+  try {
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: tavilyKey,
+        query,
+        max_results: maxResults,
+        search_depth: "basic",
+      }),
+    });
+
+    if (!response.ok) {
+      return JSON.stringify({ error: "Tavily search failed", status: response.status });
+    }
+
+    const data = await response.json();
+    const results: Array<{ title: string; url: string; snippet: string }> = (data.results || []).map((r: any) => ({
+      title: r.title || "",
+      url: r.url || "",
+      snippet: r.content || r.snippet || "",
+    }));
+
+    return JSON.stringify({ query, resultsCount: results.length, results, provider: "tavily" });
+  } catch (error) {
+    log.error("Tavily fallback also failed:", error);
+    return JSON.stringify({ error: "Tavily search failed", query, details: String(error) });
+  }
+}
 
 export const webSearchTool = tool(
   async ({ query, maxResults }) => {
     try {
       const url = new URL("https://html.duckduckgo.com/html/");
       url.searchParams.set("q", query);
-      
+
       const response = await fetch(url.toString(), {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
       });
-      
+
       if (!response.ok) {
-        return JSON.stringify({ error: "Search failed", status: response.status });
+        log.warn("DuckDuckGo HTTP error:", response.status, "- falling back to Tavily");
+        return searchTavily(query, maxResults);
       }
-      
+
       const html = await response.text();
       const results: Array<{ title: string; url: string; snippet: string }> = [];
-      
+
       const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>.*?<a[^>]*class="result__snippet"[^>]*>(.*?)<\/a>/gis;
       let match;
-      
+
       while ((match = resultRegex.exec(html)) !== null && results.length < maxResults) {
         results.push({
           title: match[2].replace(/<[^>]*>/g, "").trim(),
@@ -30,13 +70,13 @@ export const webSearchTool = tool(
           snippet: match[3].replace(/<[^>]*>/g, "").trim(),
         });
       }
-      
+
       if (results.length === 0) {
         const altRegex = /<a[^>]*href="\/l\/\?uddg=([^"&]*)/gi;
         while ((match = altRegex.exec(html)) !== null && results.length < maxResults) {
           const titleEl = html.substring(match.index).match(/class="result__a"[^>]*>(.*?)<\/a>/i);
           const snippetEl = html.substring(match.index).match(/class="result__snippet"[^>]*>(.*?)<\/a>/is);
-          
+
           results.push({
             title: titleEl ? titleEl[1].replace(/<[^>]*>/g, "").trim() : "Unknown",
             url: decodeURIComponent(match[1]),
@@ -44,17 +84,20 @@ export const webSearchTool = tool(
           });
         }
       }
-      
+
+      if (results.length === 0) {
+        log.debug("DuckDuckGo returned no results, falling back to Tavily");
+        return searchTavily(query, maxResults);
+      }
+
       return JSON.stringify({
         query,
         resultsCount: results.length,
         results,
       });
     } catch (error) {
-      return JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown search error",
-        query,
-      });
+      log.warn("DuckDuckGo search failed, falling back to Tavily:", error);
+      return searchTavily(query, maxResults);
     }
   },
   {

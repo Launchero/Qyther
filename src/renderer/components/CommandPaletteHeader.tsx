@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { SearchBar, type SearchMode } from './SearchBar';
-import { UnifiedCommandBar } from './ask-mode/UnifiedCommandBar';
-import type { AttachedFile } from './ChatInputArea';
+import { SearchBar } from './SearchBar';
+import { type SearchMode } from './ModeTabs';
+import { ModeTabs } from './ModeTabs';
 import { cn } from '@/lib/utils';
 
 export interface CommandPaletteHeaderProps {
@@ -12,18 +12,7 @@ export interface CommandPaletteHeaderProps {
   onTabsExpanded: (expanded: boolean) => void;
   windowMode: 'expanded' | 'compact' | 'custom';
   headerRef: React.RefObject<HTMLDivElement | null>;
-  onSendMessage?: (message: string) => void;
-  hasSentMessage?: boolean;
-  mcpCount?: number;
-  onOpenMCPModal?: () => void;
-  webSearchEnabled?: boolean;
-  onToggleWebSearch?: () => void;
-  attachedFiles?: AttachedFile[];
-  onRemoveFile?: (index: number) => void;
-  onAttachFile?: () => void;
-  onAttachFolder?: () => void;
-  onAddFile?: (file: AttachedFile) => void;
-  onExpandWindow?: () => void;
+  isCollapsing?: boolean;
 }
 
 export function CommandPaletteHeader({
@@ -34,29 +23,10 @@ export function CommandPaletteHeader({
   onTabsExpanded,
   windowMode,
   headerRef,
-  onSendMessage,
-  hasSentMessage = false,
-  mcpCount = 0,
-  onOpenMCPModal,
-  webSearchEnabled = false,
-  onToggleWebSearch,
-  attachedFiles = [],
-  onRemoveFile,
-  onAttachFile,
-  onAttachFolder,
-  onAddFile,
-  onExpandWindow,
+  isCollapsing = false,
 }: CommandPaletteHeaderProps) {
   const isAskMode = searchMode === 'ai';
   const [askTabsExpanded, setAskTabsExpanded] = useState(false);
-
-  const handleSend = (message: string) => {
-    if (onSendMessage) {
-      onSendMessage(message);
-    } else {
-      console.warn('[CommandPaletteHeader] onSendMessage is undefined!');
-    }
-  };
 
   const handleAskTabsExpanded = (expanded: boolean) => {
     setAskTabsExpanded(expanded);
@@ -72,36 +42,24 @@ export function CommandPaletteHeader({
         "bg-card text-card-foreground",
         // In file mode, use fixed 100px header.
         "h-[var(--container-header-height)]",
-        // Ask mode wrapper: column layout so chips appear below the command bar
-        isAskMode && "flex flex-col",
         // Border: compact file mode has no border, everything else has bottom border
         windowMode === 'compact' && !isAskMode
           ? "border-0"
           : "border-b border-border",
+        // Visual transition cue: brief highlight when auto-collapsing
+        isCollapsing && "collapse-flash",
         "transition-colors duration-200"
       )}
     >
       {isAskMode ? (
-        <UnifiedCommandBar
-          value={searchQuery}
-          onChange={onSearchChange}
-          onSend={handleSend}
-          windowMode={windowMode}
-          hasSentMessage={hasSentMessage}
-          mcpCount={mcpCount}
-          onOpenMCPModal={onOpenMCPModal}
-          webSearchEnabled={webSearchEnabled}
-          onToggleWebSearch={onToggleWebSearch}
-          attachedFiles={attachedFiles}
-          onRemoveFile={onRemoveFile}
-          onAttachFile={onAttachFile}
-          onAttachFolder={onAttachFolder}
-          onAddFile={onAddFile}
-          currentMode={searchMode}
-          onModeChange={onSearchModeChange}
-          tabsExpanded={askTabsExpanded}
-          onTabsExpanded={handleAskTabsExpanded}
-        />
+        <div className="ask-mode-header-minimal">
+          <ModeTabs
+            currentMode={searchMode}
+            onModeChange={onSearchModeChange}
+            expanded={askTabsExpanded}
+            onToggle={() => handleAskTabsExpanded(!askTabsExpanded)}
+          />
+        </div>
       ) : (
         <SearchBar
           value={searchQuery}
@@ -111,8 +69,6 @@ export function CommandPaletteHeader({
           onModeChange={onSearchModeChange}
           onTabsExpanded={onTabsExpanded}
           windowMode={windowMode}
-          onSendMessage={onSendMessage ? () => onSendMessage('') : undefined}
-          onExpandWindow={onExpandWindow}
         />
       )}
     </div>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CommandPalette } from './components/CommandPalette';
+import { LicenseActivation } from './components/LicenseActivation';
+import { ApiKeySetup } from './components/ApiKeySetup';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useSearch } from './hooks/useSearch';
 import { useFileSearch } from './hooks/useFileSearch';
@@ -8,9 +10,10 @@ import { useWindowMode } from './hooks/useWindowMode';
 import { useContextAttachments } from './hooks/useContextAttachments';
 import { useRecentFiles } from './hooks/useRecentFiles';
 import type { SearchResult } from './components/ResultsList';
-import type { SearchMode } from './components/SearchBar';
-import type { AttachedFile } from './components/ChatInputArea';
+import type { SearchMode } from './components/ModeTabs';
+import type { AttachedFile } from './types/ask-types';
 import { useTheme } from './context/ThemeProvider';
+import { logInfo, logError, logDebug } from './utils/debugLogger';
 
 // Default commands for the palette
 const DEFAULT_COMMANDS: SearchResult[] = [
@@ -34,6 +37,53 @@ const DEFAULT_COMMANDS: SearchResult[] = [
 
 export function App() {
   const { toggleTheme } = useTheme();
+  const [isLicensed, setIsLicensed] = useState(false);
+  const [licenseChecked, setLicenseChecked] = useState(false);
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [apiConfigChecked, setApiConfigChecked] = useState(false);
+  
+  // Check license on mount
+  useEffect(() => {
+    async function checkLicense() {
+      try {
+        const storedKey = localStorage.getItem('qyther_license_key');
+        if (storedKey) {
+          const response = await window.electronAPI.license.verify(storedKey);
+          if (response.success) {
+            setIsLicensed(true);
+          } else {
+            // Stored key is invalid, clear it
+            localStorage.removeItem('qyther_license_key');
+          }
+        }
+      } catch {
+        // License check failed or not available
+        setIsLicensed(false);
+      } finally {
+        setLicenseChecked(true);
+      }
+    }
+    
+    checkLicense();
+  }, []);
+
+  // Check API config after license is confirmed
+  useEffect(() => {
+    if (!isLicensed) return;
+    
+    async function checkApiConfig() {
+      try {
+        const config = await window.electronAPI.apiConfig.load();
+        setApiKeyConfigured(config.configured);
+      } catch {
+        setApiKeyConfigured(false);
+      } finally {
+        setApiConfigChecked(true);
+      }
+    }
+    
+    checkApiConfig();
+  }, [isLicensed]);
   
   // Fetch installed applications on mount
   const [apps, setApps] = React.useState<SearchResult[]>([]);
@@ -42,7 +92,7 @@ export function App() {
   React.useEffect(() => {
     async function loadApps() {
       try {
-        console.log('[App] About to call window.electronAPI.apps.list()');
+        logInfo('[App] About to call window.electronAPI.apps.list()');
         const appList = await window.electronAPI.apps.list();
         const appResults: SearchResult[] = appList.map((app: { name: string; path: string }, index: number) => ({
           id: `app-${index}`,
@@ -54,7 +104,7 @@ export function App() {
         }));
         setApps(appResults);
       } catch (error) {
-        console.error('Failed to load apps:', error);
+        logError('[App] Failed to load apps:', error);
       } finally {
         setIsLoading(false);
       }
@@ -78,7 +128,7 @@ export function App() {
   } = useSearch(allItems);
   
   const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
-  const { windowMode, isManuallyExpanded, setIsManuallyExpanded } = useWindowMode({ searchQuery, searchMode });
+  const { windowMode, isManuallyExpanded, isCollapsing, setIsManuallyExpanded } = useWindowMode({ searchQuery, searchMode });
   const { recentFiles, addRecentFile } = useRecentFiles(4);
   const { executingId, execute } = useCommandExecution({
     onExecuted: (result) => {
@@ -88,10 +138,12 @@ export function App() {
     },
   });
   
-  // Unified input state management
-  const [hasSentMessage, setHasSentMessage] = useState(false);
-  const [mcpCount] = useState(2);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  // MCP count from installed servers (dynamic)
+  const [mcpCount, setMcpCount] = useState(0);
+
+  useEffect(() => {
+    window.electronAPI.mcp.getServerCount().then(setMcpCount).catch(() => setMcpCount(0));
+  }, []);
 
   const {
     attachedFiles,
@@ -124,7 +176,7 @@ export function App() {
   }, [baseResults, fileResults, searchQuery]);
 
   if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
-    console.debug('[App] Final results merged:', {
+    logDebug('[App] Final results merged:', {
       count: results.length,
       fileResults: fileResults.length,
       baseResults: baseResults.length,
@@ -133,6 +185,19 @@ export function App() {
   }
 
   // Keyboard navigation hook
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  const handleAskAbout = useCallback((result: SearchResult) => {
+    const file: AttachedFile = {
+      name: result.title,
+      path: result.metadata?.path || result.subtitle || '',
+      type: result.metadata?.fileType || 'file',
+    };
+    addAttachedFile(file);
+    setSearchQuery(`What does ${result.title} do?`);
+    setSearchMode('ai');
+  }, [addAttachedFile, setSearchQuery, setSearchMode]);
+
   useKeyboard({
     selectedIndex,
     setSelectedIndex,
@@ -143,6 +208,8 @@ export function App() {
     },
     searchMode,
     setSearchMode,
+    onAskAbout: handleAskAbout,
+    onToggleHelp: () => setShowShortcuts(prev => !prev),
   });
 
   // Theme toggle shortcut (Alt+Shift+T)
@@ -151,7 +218,7 @@ export function App() {
       if (event.altKey && event.shiftKey && event.key === 'T') {
         event.preventDefault();
         toggleTheme();
-        console.log('[App] Theme toggled via keyboard shortcut');
+        logInfo('[App] Theme toggled via keyboard shortcut');
       }
     };
     
@@ -187,7 +254,7 @@ export function App() {
       if (!isResizingRef.current) return;
       const delta = e.clientY - resizeStartY.current;
       const newHeight = Math.max(300, resizeStartHeight.current + delta);
-      window.electronAPI.window.resizeHeight(newHeight).catch(console.error);
+      window.electronAPI.window.resizeHeight(newHeight).catch((e) => logError('[App] resizeHeight failed:', e));
     };
 
     const handleMouseUp = () => {
@@ -207,6 +274,21 @@ export function App() {
 
   return (
     <div className="w-full h-full max-w-full flex flex-col relative overflow-hidden m-0 p-0">
+      {/* License Activation Overlay - blocks entire app until licensed */}
+      {licenseChecked && !isLicensed && (
+        <LicenseActivation onActivated={() => setIsLicensed(true)} />
+      )}
+
+      {/* API Key Setup - appears after license activation */}
+      {licenseChecked && isLicensed && !apiConfigChecked && (
+        <div className="absolute inset-0 bg-background/50 z-40 flex items-center justify-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      )}
+      {licenseChecked && isLicensed && apiConfigChecked && !apiKeyConfigured && (
+        <ApiKeySetup onConfigured={() => setApiKeyConfigured(true)} />
+      )}
+
       {/* Background overlay - MUST be behind CommandPalette (z-0) */}
       <div className="fixed inset-0 bg-transparent z-0" />
       
@@ -223,10 +305,7 @@ export function App() {
           executingId={executingId}
           searchMode={searchMode}
           onSearchModeChange={setSearchMode}
-          hasSentMessage={hasSentMessage}
           mcpCount={mcpCount}
-          webSearchEnabled={webSearchEnabled}
-          onToggleWebSearch={() => setWebSearchEnabled(prev => !prev)}
           attachedFiles={attachedFiles}
           onRemoveFile={removeAttachedFile}
           onAttachFile={openFilePicker}
@@ -243,33 +322,23 @@ export function App() {
                   if (result.path) {
                     setSearchQuery(result.path);
                   }
-                }).catch(console.error);
+                }).catch((e) => logError('[App] openFolder failed:', e));
                 break;
               case 'recent-files':
                 // Recent files already shown in SearchEmptyState
                 break;
               case 'open-terminal':
-                console.log('[App] Quick action "open-terminal" - requires new IPC handler');
+                logInfo('[App] Quick action "open-terminal" - requires new IPC handler');
                 break;
               case 'git-status':
-                console.log('[App] Quick action "git-status" - requires new IPC handler');
+                logInfo('[App] Quick action "git-status" - requires new IPC handler');
                 break;
             }
           }}
-          onExpandWindow={() => {
-            window.electronAPI.window.setMode('expanded').catch(console.error);
-          }}
-          onAskAboutFile={(result) => {
-            // Add file to attachments
-            const file: AttachedFile = {
-              name: result.title,
-              path: result.metadata?.path || result.subtitle || '',
-              type: result.metadata?.fileType || 'file'
-            };
-            addAttachedFile(file);
-            // Switch to AI mode
-            setSearchMode('ai');
-          }}
+          onAskAboutFile={handleAskAbout}
+          showShortcuts={showShortcuts}
+          onToggleShortcuts={() => setShowShortcuts(prev => !prev)}
+          isCollapsing={isCollapsing}
         />
       </div>
       

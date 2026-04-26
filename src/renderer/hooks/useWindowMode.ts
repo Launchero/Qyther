@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchMode } from '../types/commandPalette';
+import { logInfo, logError } from '../utils/debugLogger';
 
 export type WindowMode = 'compact' | 'expanded' | 'custom';
 
@@ -17,20 +18,22 @@ const AUTO_EXPAND_DEBOUNCE_MS = 150;
  */
 export function useWindowMode(options: UseWindowModeOptions = {}) {
   const { searchQuery = '', searchMode } = options;
-  
-  const [windowMode, setWindowMode] = useState<WindowMode>('expanded');
+
+  const [windowMode, setWindowMode] = useState<WindowMode>('compact');
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
+  const [isCollapsing, setIsCollapsing] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousModeRef = useRef<WindowMode>('compact');
 
   // Load current window mode on mount
   useEffect(() => {
     async function loadWindowMode() {
       try {
         const mode = await window.electronAPI.window.getMode();
-        console.log('[useWindowMode] Initial window mode:', mode);
+        logInfo('[useWindowMode] Initial window mode:', mode);
         setWindowMode(mode);
       } catch (error) {
-        console.error('Failed to load window mode:', error);
+        logError('[useWindowMode] Failed to load window mode:', error);
       }
     }
     
@@ -42,9 +45,20 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
     const handleModeChanged = (event: Event) => {
       const mode = (event as CustomEvent<WindowMode>).detail;
       if (mode !== windowMode) {
-        console.log(`[useWindowMode] IPC mode change: ${windowMode} -> ${mode}`);
+        // Trigger collapse flash when transitioning to compact from expanded
+        if (mode === 'compact' && previousModeRef.current === 'expanded') {
+          setIsCollapsing(true);
+          setTimeout(() => setIsCollapsing(false), 600);
+        }
+        previousModeRef.current = mode;
+        logInfo(`[useWindowMode] IPC mode change: ${windowMode} -> ${mode}`);
+        // When mode is changed from main process (manual toggle), treat it as manual
+        if (mode === 'expanded') {
+          setIsManuallyExpanded(true);
+        } else if (mode === 'compact') {
+          setIsManuallyExpanded(false);
+        }
         setWindowMode(mode);
-        setIsManuallyExpanded(mode === 'expanded');
       }
     };
     
@@ -66,9 +80,9 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
             setIsManuallyExpanded(true);
           }
           setWindowMode(mode);
-          console.log(`[useWindowMode] Window shown - restored mode: ${mode}`);
+          logInfo(`[useWindowMode] Window shown - restored mode: ${mode}`);
         } catch (error) {
-          console.error('Failed to load window mode on visibility change:', error);
+          logError('[useWindowMode] Failed to load window mode on visibility change:', error);
         }
       }
     };
@@ -78,6 +92,11 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Clear manual expansion flag when search mode changes to allow fresh auto-expand/collapse logic
+  useEffect(() => {
+    setIsManuallyExpanded(false);
+  }, [searchMode]);
   
   // Auto-expand/collapse logic with debounce and character threshold
   useEffect(() => {
@@ -86,9 +105,9 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
     // If user manually expanded, keep expanded regardless of query
     if (isManuallyExpanded) {
       if (windowMode !== 'expanded') {
-        console.log(`[useWindowMode] Manually expanded: forcing expanded`);
+        logInfo(`[useWindowMode] Manually expanded: forcing expanded`);
         setWindowMode('expanded');
-        window.electronAPI.window.setMode('expanded').catch(console.error);
+        window.electronAPI.window.setMode('expanded').catch((e) => logError('[useWindowMode] Failed to set expanded mode:', e));
       }
       return;
     }
@@ -105,10 +124,17 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
     }
 
     if (windowMode !== targetMode) {
+      const willCollapse = targetMode === 'compact';
       debounceTimerRef.current = setTimeout(() => {
-        console.log(`[useWindowMode] Search query: "${searchQuery}", searchMode: ${searchMode}, targetMode: ${targetMode}`);
+        logInfo(`[useWindowMode] Search query: "${searchQuery}", searchMode: ${searchMode}, targetMode: ${targetMode}`);
+        // Flash collapse indicator so users understand what happened
+        if (willCollapse && previousModeRef.current === 'expanded') {
+          setIsCollapsing(true);
+          setTimeout(() => setIsCollapsing(false), 600);
+        }
+        previousModeRef.current = targetMode;
         setWindowMode(targetMode);
-        window.electronAPI.window.setMode(targetMode).catch(console.error);
+        window.electronAPI.window.setMode(targetMode).catch((e) => logError('[useWindowMode] Failed to set mode:', e));
       }, AUTO_EXPAND_DEBOUNCE_MS);
     }
 
@@ -136,6 +162,7 @@ export function useWindowMode(options: UseWindowModeOptions = {}) {
   return {
     windowMode,
     isManuallyExpanded,
+    isCollapsing,
     setIsManuallyExpanded: setExpandedManually,
     setWindowMode: setMode,
     toggleMode,

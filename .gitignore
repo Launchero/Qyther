@@ -6,7 +6,13 @@ node_modules/
 # Build outputs
 dist/
 out/
+release/
+
+# Build artifacts (except icons)
 build/
+!build/icons/
+!build/icon.ico
+!build/icon.png
 
 # Logs
 logs
@@ -68,3 +74,31 @@ test-extract/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Ad-hoc test scripts (one-off local testing files)
+test-*.js
+test-*.mjs
+test-*.ts
+
+# Private keys (NEVER commit)
+private.key
+public.key
+
+# Tesseract / OCR trained data
+*.traineddata
+
+# Local data dumps / scratch files
+posts-digest.md
+*-relevant-posts.json
+launcher-relevant-posts.json
+
+# Local data files
+*.data
+
+# Temporary mockup/scratch files
+mockup-*.html
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

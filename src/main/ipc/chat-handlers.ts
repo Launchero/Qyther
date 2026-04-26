@@ -6,6 +6,27 @@ import { Command } from '@langchain/langgraph';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractDocument, getFormatConfig, DOCUMENT_EXTENSIONS } from '../services/utils/document-loader';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Chat');
+
+// Serialize SQLite state access to prevent SQLITE_BUSY errors from concurrent reads/writes
+let stateAccessLock = Promise.resolve();
+
+async function withStateLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = stateAccessLock;
+  let resolve!: () => void;
+  const next = new Promise<void>((r) => { resolve = r; });
+  stateAccessLock = prev.then(() => next);
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    resolve();
+  }
+}
+
+const MAX_MESSAGES = 20;
 
 interface AttachmentPath {
   name: string;
@@ -136,14 +157,14 @@ async function readAttachmentContents(attachmentPaths: AttachmentPath[]): Promis
 }
 
 export function registerChatHandlers(): void {
-  console.log('[Chat IPC] Registering chat handlers...');
+  log.info('Registering chat handlers...');
   
   ipcMain.handle('chat:initialize', async () => {
     try {
       await langChainAgent.initialize();
       return { success: true, ready: langChainAgent.isReady() };
     } catch (error) {
-      console.error('[Chat IPC] Initialization error:', error);
+      log.error('Initialization error:', error);
       return { 
         success: false, 
         ready: false, 
@@ -183,7 +204,7 @@ export function registerChatHandlers(): void {
 
       return { success: true, response };
     } catch (error) {
-      console.error('[Chat IPC] Error sending message:', error);
+      log.error('Error sending message:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -199,7 +220,7 @@ export function registerChatHandlers(): void {
       const sessionId = await langChainAgent.createSession(title);
       return { success: true, sessionId };
     } catch (error) {
-      console.error('[Chat IPC] Error creating session:', error);
+      log.error('Error creating session:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -234,7 +255,7 @@ export function registerChatHandlers(): void {
       await langChainAgent.switchSession(sessionId);
       return { success: true };
     } catch (error) {
-      console.error('[Chat IPC] Error switching session:', error);
+      log.error('Error switching session:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -250,7 +271,7 @@ export function registerChatHandlers(): void {
       await langChainAgent.deleteSession(sessionId);
       return { success: true };
     } catch (error) {
-      console.error('[Chat IPC] Error deleting session:', error);
+      log.error('Error deleting session:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -264,7 +285,7 @@ export function registerChatHandlers(): void {
       await langChainAgent.clearHistory();
       return { success: true };
     } catch (error) {
-      console.error('[Chat IPC] Error clearing history:', error);
+      log.error('Error clearing history:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -280,7 +301,7 @@ export function registerChatHandlers(): void {
     event: IpcMainInvokeEvent,
     { content, sessionId, attachmentPaths }: { content: string; sessionId?: string; attachmentPaths?: AttachmentPath[] }
   ): Promise<{ success: boolean; response?: string; error?: string }> => {
-    console.log('[Chat IPC] Received sendStreamMessage:', {
+    log.debug('Received sendStreamMessage:', {
       content: content.substring(0, 100),
       sessionId,
       attachmentCount: attachmentPaths?.length || 0,
@@ -288,14 +309,23 @@ export function registerChatHandlers(): void {
     });
     try {
       const graph = await getAskGraph();
-      const threadId = sessionId || `thread-${Date.now()}`;
+
+      // Align backend session with the caller's session before reading history
+      if (sessionId) {
+        await langChainAgent.switchSession(sessionId);
+      }
+
+      // Per-turn thread ID isolates LangGraph checkpoint state from other turns
+      const turnThreadId = sessionId
+        ? `${sessionId}:turn-${Date.now()}`
+        : `thread-${Date.now()}`;
 
       // Read file contents from attachment paths
       let attachmentContents: AttachmentContent[] = [];
       if (attachmentPaths && attachmentPaths.length > 0) {
-        console.log('[Chat IPC] Starting to read attachment files:', attachmentPaths.map(a => a.path));
+        log.debug('Starting to read attachment files:', attachmentPaths.map(a => a.path));
         attachmentContents = await readAttachmentContents(attachmentPaths);
-        console.log('[Chat IPC] File read results:', attachmentContents.map(a => ({ name: a.name, contentLen: a.content.length })));
+        log.debug('File read results:', attachmentContents.map(a => ({ name: a.name, contentLen: a.content.length })));
       }
 
       const history = await langChainAgent.getCurrentSession();
@@ -313,12 +343,20 @@ export function registerChatHandlers(): void {
       if (history) {
         const recentMessages = history.messages
           .filter(m => m.role !== 'system')
-          .slice(-6)
+          .slice(-10)
           .map(m => m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content));
         messages.push(...recentMessages);
       }
 
       messages.push(new HumanMessage(content));
+
+      // Cap messages to prevent context window overflow
+      if (messages.length > MAX_MESSAGES) {
+        const systemMsgs = messages.filter(m => m instanceof SystemMessage);
+        const nonSystem = messages.filter(m => !(m instanceof SystemMessage));
+        messages.length = 0;
+        messages.push(...systemMsgs, ...nonSystem.slice(-(MAX_MESSAGES - systemMsgs.length)));
+      }
 
       let fullResponse = '';
       let thinkingSteps: Array<{ type: string; step: string; status: string; detail: string; data?: any }> = [];
@@ -335,121 +373,172 @@ export function registerChatHandlers(): void {
       let streamedContent = '';
       const nodeRunCounts = new Map<string, number>();
 
-      const stream = graph.streamEvents(
-        { messages, userQuery: content, attachments: attachmentContents },
-        { version: "v2", configurable: { thread_id: threadId }, recursion_limit: 50 }
-      );
+      const GRAPH_TIMEOUT_MS = 60_000; // 60 seconds max for graph execution
+      const abortController = new AbortController();
 
-      for await (const streamEvent of stream) {
-        const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
-        const eventName = streamEvent.event;
-        const streamName = streamEvent.name;
-        
-        if (eventName === "on_chat_model_stream") {
-          if (!nodeName || !responseNodes.has(nodeName)) {
-            continue;
+      try {
+        const stream = graph.streamEvents(
+          { messages, userQuery: content, attachments: attachmentContents },
+          {
+            version: "v2",
+            configurable: { thread_id: turnThreadId },
+            recursionLimit: 50,
+            signal: abortController.signal,
+            timeout: GRAPH_TIMEOUT_MS,
+          }
+        );
+
+        for await (const streamEvent of stream) {
+          if (abortController.signal.aborted) {
+            log.warn('Aborting stream iteration due to timeout or cancellation');
+            break;
           }
 
-          // Track how many times each node has run
-          const runCount = (nodeRunCounts.get(nodeName) || 0) + 1;
-          nodeRunCounts.set(nodeName, runCount);
+          const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
+          const eventName = streamEvent.event;
+          const streamName = streamEvent.name;
 
-          // Detect loop: if synthesize/validate/replan runs more than once, it's a retry
-          const isLoopNode = ['synthesize', 'validate', 'replan'].includes(nodeName);
-          if (isLoopNode && runCount > 1) {
-            // New iteration: reset streamed content and update the UI
-            if (runCount === 2) {
-              currentLoopIteration++;
-              // Replace the entire response with the new attempt's content
-              streamedContent = '';
+          if (eventName === "on_chat_model_stream") {
+            if (!nodeName || !responseNodes.has(nodeName)) {
+              continue;
             }
-          }
 
-          const contentChunk = streamEvent.data.chunk?.content;
-          
-          if (contentChunk) {
-            const textContent = typeof contentChunk === 'string'
-              ? contentChunk
-              : Array.isArray(contentChunk)
-                ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
-                : '';
+            // Track how many times each node has run
+            const runCount = (nodeRunCounts.get(nodeName) || 0) + 1;
+            nodeRunCounts.set(nodeName, runCount);
 
-            if (textContent) {
-              if (isLoopNode && runCount > 1) {
-                // On retries, accumulate fresh content for this attempt only
-                streamedContent += textContent;
-                // Replace the entire assistant message in the UI
-                event.sender.send('chat:stream-replace', { content: streamedContent, isComplete: false });
-              } else {
-                streamedContent += textContent;
-                fullResponse += textContent;
-                event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
+            // Detect loop: if synthesize/quickVerify/replan runs more than once, it's a retry
+            const isLoopNode = ['synthesizeWithSelfCheck', 'quickVerify', 'replan'].includes(nodeName);
+            if (isLoopNode && runCount > 1) {
+              // New iteration: reset streamed content and update the UI
+              if (runCount === 2) {
+                currentLoopIteration++;
+                // Replace the entire response with the new attempt's content
+                streamedContent = '';
+                // Reset UI payload state for the retry
+                event.sender.send('chat:ui-payload-reset', {});
               }
             }
-          }
 
-          if (nodeName === 'synthesizeWithSelfCheck' && runCount > 0) {
-            event.sender.send('chat:ui-payload-progress', { progress: 0.6, message: 'Synthesizing results...' });
-          }
-        } else if (eventName === "on_chain_start" && streamName) {
-          const step: typeof thinkingSteps[number] = {
-            type: "node_start",
-            step: streamName,
-            status: "in_progress",
-            detail: `Starting ${streamName}`,
-          };
-          thinkingSteps.push(step);
-          event.sender.send('chat:thinking-step', step);
+            const contentChunk = streamEvent.data.chunk?.content;
 
-          if (streamName === 'comparisonNode') {
-            event.sender.send('chat:ui-payload-started', { type: 'comparison' });
-            event.sender.send('chat:ui-payload-progress', { progress: 0.3, message: 'Generating comparison...' });
-          }
-          if (streamName === 'formNode') {
-            event.sender.send('chat:ui-payload-started', { type: 'form' });
-            event.sender.send('chat:ui-payload-progress', { progress: 0.3, message: 'Generating form schema...' });
-          }
-        } else if (eventName === "on_chain_end" && streamName) {
-          const existingStep = thinkingSteps.find(s => s.step === streamName && s.status === 'in_progress');
-          if (existingStep) {
-            existingStep.status = 'completed';
-            existingStep.detail = `Completed ${streamName}`;
-            event.sender.send('chat:thinking-step', { ...existingStep, update: true });
-          } else {
+            if (contentChunk) {
+              const textContent = typeof contentChunk === 'string'
+                ? contentChunk
+                : Array.isArray(contentChunk)
+                  ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+                  : '';
+
+              if (textContent) {
+                if (isLoopNode && runCount > 1) {
+                  // On retries, accumulate fresh content for this attempt only
+                  streamedContent += textContent;
+                  // Replace the entire assistant message in the UI
+                  event.sender.send('chat:stream-replace', { content: streamedContent, isComplete: false });
+                } else {
+                  streamedContent += textContent;
+                  fullResponse += textContent;
+                  event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
+                }
+              }
+            }
+
+            if (nodeName === 'synthesizeWithSelfCheck' && runCount > 0) {
+              event.sender.send('chat:ui-payload-progress', { progress: 0.6, message: 'Synthesizing results...' });
+            }
+
+            if (nodeName === 'chartNode' && runCount > 0) {
+              event.sender.send('chat:ui-payload-progress', { progress: 0.7, message: 'Rendering visualization...' });
+            }
+          } else if (eventName === "on_chain_start" && streamName) {
             const step: typeof thinkingSteps[number] = {
-              type: "node_end",
+              type: "node_start",
               step: streamName,
-              status: "completed",
-              detail: `Completed ${streamName}`,
+              status: "in_progress",
+              detail: `Starting ${streamName}`,
             };
             thinkingSteps.push(step);
             event.sender.send('chat:thinking-step', step);
-          }
-        } else if (eventName === "on_tool_start") {
-          const step: typeof thinkingSteps[number] = {
-            type: "tool_start",
-            step: "tool_execution",
-            status: "in_progress",
-            detail: `Executing: ${streamName}`,
-            data: streamEvent.data.input,
-          };
-          thinkingSteps.push(step);
-          event.sender.send('chat:thinking-step', step);
-        } else if (eventName === "on_tool_end") {
-          const existingStep = thinkingSteps.find(s => s.status === 'in_progress' && s.type === 'tool_start');
-          if (existingStep) {
-            existingStep.status = 'completed';
-            existingStep.detail = `Completed: ${existingStep.data?.name || 'tool'}`;
-            event.sender.send('chat:thinking-step', { ...existingStep, update: true });
+
+            if (streamName === 'comparisonNode') {
+              event.sender.send('chat:ui-payload-started', { type: 'comparison' });
+              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing comparison request...' });
+            }
+            if (streamName === 'formNode') {
+              event.sender.send('chat:ui-payload-started', { type: 'form' });
+              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing configuration requirements...' });
+            }
+            if (streamName === 'chartNode') {
+              event.sender.send('chat:ui-payload-started', { type: 'chart' });
+              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing data...' });
+            }
+          } else if (eventName === "on_chain_end" && streamName) {
+            const existingStep = thinkingSteps.find(s => s.step === streamName && s.status === 'in_progress');
+            if (existingStep) {
+              existingStep.status = 'completed';
+              existingStep.detail = `Completed ${streamName}`;
+              event.sender.send('chat:thinking-step', { ...existingStep, update: true });
+            } else {
+              const step: typeof thinkingSteps[number] = {
+                type: "node_end",
+                step: streamName,
+                status: "completed",
+                detail: `Completed ${streamName}`,
+              };
+              thinkingSteps.push(step);
+              event.sender.send('chat:thinking-step', step);
+            }
+
+            // Send final progress for structured UI nodes
+            if (streamName === 'comparisonNode') {
+              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Building comparison table...' });
+            }
+            if (streamName === 'formNode') {
+              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Validating form fields...' });
+            }
+            if (streamName === 'chartNode') {
+              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Rendering visualization...' });
+            }
+          } else if (eventName === "on_tool_start") {
+            const step: typeof thinkingSteps[number] = {
+              type: "tool_start",
+              step: "tool_execution",
+              status: "in_progress",
+              detail: `Executing: ${streamName}`,
+              data: streamEvent.data.input,
+            };
+            thinkingSteps.push(step);
+            event.sender.send('chat:thinking-step', step);
+          } else if (eventName === "on_tool_end") {
+            const existingStep = thinkingSteps.find(s => s.status === 'in_progress' && s.type === 'tool_start');
+            if (existingStep) {
+              existingStep.status = 'completed';
+              existingStep.detail = `Completed: ${existingStep.data?.name || 'tool'}`;
+              event.sender.send('chat:thinking-step', { ...existingStep, update: true });
+            }
           }
         }
+      } finally {
+        // Timeout is handled by LangGraph's native timeout option; no manual cleanup needed
+      }
+
+      // Handle timeout: check if the signal was aborted due to timeout
+      if (abortController.signal.aborted) {
+        event.sender.send('chat:stream-chunk', {
+          chunk: '',
+          isComplete: true,
+          error: 'Request timed out. Please try again.',
+        });
+        return { success: false, error: 'Graph execution timed out' };
       }
 
       // Get final state from checkpointer to ensure we have the last finalResponse
       let uiPayloads: any[] = [];
       let graphState: any;
       try {
-        graphState = await graph.getState({ configurable: { thread_id: threadId } });
+        graphState = await withStateLock(() =>
+          graph.getState({ configurable: { thread_id: turnThreadId } })
+        );
         const stateFinalResponse = graphState?.values?.finalResponse as string | undefined;
         if (stateFinalResponse && stateFinalResponse !== streamedContent) {
           // The state has the authoritative final response
@@ -458,7 +547,7 @@ export function registerChatHandlers(): void {
         }
         uiPayloads = (graphState?.values?.uiPayloads as any[]) || [];
       } catch (e) {
-        console.warn('[Chat IPC] Could not get final graph state, using streamed content:', e);
+        log.warn('Could not get final graph state, using streamed content:', e);
       }
 
       // Emit desktop confirmation request when graph hit an interrupt() for destructive action.
@@ -469,7 +558,7 @@ export function registerChatHandlers(): void {
       if (needsConfirmation) {
         const interruptPayload = interruptState[0].value;
         event.sender.send('desktop:confirmation-request', {
-          threadId,
+          threadId: turnThreadId,
           interruptPayload: {
             type: interruptPayload.type,
             action: interruptPayload.action,
@@ -529,15 +618,17 @@ export function registerChatHandlers(): void {
       // Get retry metadata from graph state
       let selfCorrected = false;
       let iterationsUsed = 1;
-      let validationScore = 0;
+      let finalQualityScore = 0;
       let finalConfidence = 0;
       try {
-        const graphState = await graph.getState({ configurable: { thread_id: threadId } });
+        const graphState = await withStateLock(() =>
+          graph.getState({ configurable: { thread_id: turnThreadId } })
+        ) as { values: Record<string, unknown> };
         const stateValues = graphState?.values || {};
         const retryCount = (stateValues.retryCount as number) || 0;
         selfCorrected = retryCount > 0;
         iterationsUsed = retryCount + 1;
-        validationScore = (stateValues.validationScore as number) || 0;
+        finalQualityScore = (stateValues.qualityScore as number) || 0;
         finalConfidence = (stateValues.confidence as number) || 0;
       } catch (e) {
         // Fallback: check thinking steps for retry indicators
@@ -546,33 +637,67 @@ export function registerChatHandlers(): void {
           selfCorrected = true;
           iterationsUsed = validateSteps.length;
         }
-        console.warn("[Chat IPC] Could not get graph state for confidence:", e);
+        log.warn("Could not get graph state for confidence:", e);
       }
+
+      // Include sources and reasoning steps from graph state
+      const graphSources = (graphState?.values?.sources as Array<{ url: string; title: string; excerpt: string }> ) || [];
+      const graphReasoningSteps = (graphState?.values?.reasoningSteps as Array<{ step: string; status: string; detail: string }> ) || [];
+
+      // Convert graph reasoning steps to the renderer's ThinkingStep shape for a more truthful timeline
+      const graphThinkingSteps: Array<{ type: string; step: string; status: string; detail: string }> = graphReasoningSteps.map(rs => ({
+        type: 'graph_reasoning',
+        step: rs.step,
+        status: rs.status,
+        detail: rs.detail,
+      }));
+
+      // Prefer graph-native steps when available; fall back to stream events so the UI stays live during streaming
+      const effectiveThinkingSteps = graphThinkingSteps.length > 0 ? graphThinkingSteps : thinkingSteps;
+
+      // Canonicalize: validationScore is derived from qualityScore so the UI never sees a permanently-zero field
+      const validationScore = finalQualityScore;
 
       event.sender.send('chat:stream-chunk', {
         chunk: '',
         isComplete: true,
         metrics,
         reasoning,
-        thinkingSteps,
+        thinkingSteps: effectiveThinkingSteps,
         selfCorrected,
         iterationsUsed,
         validationScore,
         confidence: finalConfidence,
+        qualityScore: finalQualityScore,
         verificationSkipped: finalConfidence >= 0.8,
         fullContent: streamedContent || null,
         uiPayloads,
+        sources: graphSources,
       });
 
       if (fullResponse) {
-        langChainAgent.addMessagePublic('assistant', fullResponse);
         langChainAgent.addMessagePublic('user', content);
+        langChainAgent.addMessagePublic('assistant', fullResponse, {
+          sources: graphSources.map((s, i) => ({
+            id: `source-${i}`,
+            url: s.url,
+            title: s.title,
+            excerpt: s.excerpt,
+          })),
+          uiPayloads: uiPayloads.length > 0 ? uiPayloads : undefined,
+          confidence: finalConfidence,
+          qualityScore: finalQualityScore,
+        });
       }
 
       return { success: true, response: fullResponse };
     } catch (error) {
-      console.error('[Chat IPC] Stream error:', error);
-      event.sender.send('chat:stream-chunk', { chunk: '', isComplete: true });
+      log.error('Stream error:', error);
+      event.sender.send('chat:stream-chunk', {
+        chunk: '',
+        isComplete: true,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -595,80 +720,125 @@ export function registerChatHandlers(): void {
         'browserAgent',
       ]);
 
-      const stream = graph.streamEvents(
-        command,
-        { version: "v2", configurable: { thread_id: threadId }, recursion_limit: 50 }
-      );
+      const RESUME_TIMEOUT_MS = 30_000; // 30 seconds max for resume (shorter than initial)
+      const abortController = new AbortController();
 
-      for await (const streamEvent of stream) {
-        const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
-        const eventName = streamEvent.event;
+      try {
+        const stream = graph.streamEvents(
+          command,
+          {
+            version: "v2",
+            configurable: { thread_id: threadId },
+            recursionLimit: 50,
+            signal: abortController.signal,
+            timeout: RESUME_TIMEOUT_MS,
+          }
+        );
 
-        if (eventName === "on_chat_model_stream") {
-          if (!nodeName || !responseNodes.has(nodeName)) continue;
+        for await (const streamEvent of stream) {
+          if (abortController.signal.aborted) {
+            log.warn('Aborting resume stream due to timeout or cancellation');
+            break;
+          }
 
-          const contentChunk = streamEvent.data.chunk?.content;
-          if (contentChunk) {
-            const textContent = typeof contentChunk === 'string'
-              ? contentChunk
-              : Array.isArray(contentChunk)
-                ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
-                : '';
+          const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
+          const eventName = streamEvent.event;
 
-            if (textContent) {
-              fullResponse += textContent;
-              event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
+          if (eventName === "on_chat_model_stream") {
+            if (!nodeName || !responseNodes.has(nodeName)) continue;
+
+            const contentChunk = streamEvent.data.chunk?.content;
+            if (contentChunk) {
+              const textContent = typeof contentChunk === 'string'
+                ? contentChunk
+                : Array.isArray(contentChunk)
+                  ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+                  : '';
+
+              if (textContent) {
+                fullResponse += textContent;
+                event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
+              }
             }
           }
         }
+      } finally {
+        // Timeout is handled by LangGraph's native timeout option; no manual cleanup needed
+      }
+
+      // Handle timeout: check if the signal was aborted due to timeout
+      if (abortController.signal.aborted) {
+        event.sender.send('chat:stream-chunk', {
+          chunk: '',
+          isComplete: true,
+          error: 'Resume request timed out. Please try again.',
+        });
+        return { success: false, error: 'Resume graph execution timed out' };
       }
 
       // Get final state
       let uiPayloads: any[] = [];
       let graphState: any;
       try {
-        graphState = await graph.getState({ configurable: { thread_id: threadId } });
+        graphState = await withStateLock(() =>
+          graph.getState({ configurable: { thread_id: threadId } })
+        );
         const stateFinalResponse = graphState?.values?.finalResponse as string | undefined;
         if (stateFinalResponse) {
           fullResponse = stateFinalResponse;
         }
         uiPayloads = (graphState?.values?.uiPayloads as any[]) || [];
       } catch (e) {
-        console.warn('[Chat IPC] Could not get final graph state after resume:', e);
+        log.warn('Could not get final graph state after resume:', e);
       }
 
-      // Forward desktop actions from resumed execution
+      // Merge desktop actions into uiPayloads (single completion event)
       const desktopActions = (graphState?.values?.desktopActions as any[]) || [];
       if (desktopActions.length > 0) {
-        event.sender.send('chat:stream-chunk', {
-          chunk: '',
-          isComplete: true,
-          uiPayloads: desktopActions.map(a => ({
+        uiPayloads = [
+          ...uiPayloads,
+          ...desktopActions.map(a => ({
             type: 'desktop_action',
             title: a.description || a.type,
-            success: a.success,
-            result: a.result,
+            data: { success: a.success, result: a.result },
+            node: 'desktopConfirmation',
+          })),
+        ];
+      }
+
+      const finalConfidence = (graphState?.values?.confidence as number) || 0;
+      const graphSources = (graphState?.values?.sources as Array<{ url: string; title: string; excerpt: string }>) || [];
+
+      // Send single consolidated completion event
+      event.sender.send('chat:stream-chunk', {
+        chunk: '',
+        isComplete: true,
+        uiPayloads: uiPayloads.length > 0 ? uiPayloads : undefined,
+        confidence: finalConfidence,
+        sources: graphSources,
+      });
+
+      if (fullResponse) {
+        const userQuery = (graphState?.values?.userQuery as string) || 'Resumed action';
+        langChainAgent.addMessagePublic('user', userQuery);
+        langChainAgent.addMessagePublic('assistant', fullResponse, {
+          sources: graphSources.map((s, i) => ({
+            id: `source-${i}`,
+            url: s.url,
+            title: s.title,
+            excerpt: s.excerpt,
           })),
         });
       }
 
-      const finalConfidence = (graphState?.values?.confidence as number) || 0;
-
+      return { success: true, response: fullResponse };
+    } catch (error) {
+      log.error('Resume graph error:', error);
       event.sender.send('chat:stream-chunk', {
         chunk: '',
         isComplete: true,
-        uiPayloads,
-        confidence: finalConfidence,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       });
-
-      if (fullResponse) {
-        langChainAgent.addMessagePublic('assistant', fullResponse);
-      }
-
-      return { success: true, response: fullResponse };
-    } catch (error) {
-      console.error('[Chat IPC] Resume graph error:', error);
-      event.sender.send('chat:stream-chunk', { chunk: '', isComplete: true });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

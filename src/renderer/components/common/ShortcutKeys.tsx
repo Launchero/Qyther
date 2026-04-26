@@ -44,8 +44,10 @@ export function ShortcutCombo({ keys, className }: ShortcutComboProps) {
           display = os.modifier;
         } else if (key === 'alt') {
           display = os.alt;
-        } else if (key === 'shift') {
+        } else if (key === 'shift' || key === 'Shift') {
           display = os.shift;
+        } else if (key === 'Enter' || key === 'enter') {
+          display = 'Enter';
         }
         return (
           <React.Fragment key={`${key}-${index}`}>

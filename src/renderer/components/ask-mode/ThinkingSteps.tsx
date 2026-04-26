@@ -22,6 +22,9 @@ const LOADING_MESSAGES: Record<string, string> = {
   replan: 'Looking deeper...',
   generalChat: 'Generating response...',
   tool_execution: 'Running tool...',
+  chartNode: 'Creating visualization...',
+  comparisonNode: 'Building comparison...',
+  formNode: 'Generating form schema...',
 };
 
 const PHASE_ORDER = [
@@ -31,19 +34,22 @@ const PHASE_ORDER = [
 ];
 
 const PHASE_LABELS: Record<string, string> = {
-  classify: 'Understanding',
-  classifyIntent: 'Understanding',
-  webSearch: 'Searching',
-  externalSearchFanOut: 'Searching',
-  generalChat: 'Thinking',
-  internalKnowledge: 'Recalling',
-  synthesizeWithSelfCheck: 'Synthesizing',
-  synthesize: 'Synthesizing',
-  quickVerify: 'Verifying',
-  validate: 'Reviewing',
-  replan: 'Refining',
-  fallbackSearch: 'Re-searching',
-  fastPath: 'Responding',
+  classify: 'Classified intent',
+  classifyIntent: 'Classified intent',
+  webSearch: 'Searched web',
+  externalSearchFanOut: 'Multi-source search',
+  generalChat: 'Generated response',
+  internalKnowledge: 'Checked knowledge',
+  synthesizeWithSelfCheck: 'Synthesized answer',
+  synthesize: 'Synthesized answer',
+  quickVerify: 'Verified quality',
+  validate: 'Reviewed',
+  replan: 'Refined search',
+  fallbackSearch: 'Re-searched',
+  fastPath: 'Fast response',
+  chartNode: 'Created visualization',
+  comparisonNode: 'Built comparison',
+  formNode: 'Generated form',
 };
 
 function getLoadingMessage(activeStep: string): string {
@@ -62,6 +68,15 @@ function getStepBadge(step: ThinkingStep): { label: string; className: string } 
   }
   if (step.step.includes('file') || step.step.includes('read')) {
     return { label: 'file', className: 'step-badge file' };
+  }
+  if (step.step === 'chartNode') {
+    return { label: 'chart', className: 'step-badge chart' };
+  }
+  if (step.step === 'comparisonNode') {
+    return { label: 'compare', className: 'step-badge compare' };
+  }
+  if (step.step === 'formNode') {
+    return { label: 'form', className: 'step-badge form' };
   }
   return null;
 }

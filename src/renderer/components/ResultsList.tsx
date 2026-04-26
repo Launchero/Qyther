@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ResultItem } from './ResultItem';
 import { cn } from '@/lib/utils';
+import { logDebug } from '../utils/debugLogger';
 
 export interface SearchResult {
   id: string;
@@ -58,29 +58,69 @@ function groupResultsBySection(results: SearchResult[]): SectionGroup[] {
   }));
 }
 
-export function ResultsList({ results, selectedIndex, onSelect, onExecute, searchQuery, executingId, isFileSearchLoading, fileSearchError, onAskAbout }: ResultsListProps) {
-  const [animationRef] = useAutoAnimate({
-    duration: 200,
-    easing: 'cubic-bezier(0.4, 0, 0.2, 1)', // Matches --easing-smooth token
-  });
+export const ResultsList = React.memo(function ResultsList({ results, selectedIndex, onSelect, onExecute, searchQuery, executingId, isFileSearchLoading, fileSearchError, onAskAbout }: ResultsListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
 
-  // Attach AutoAnimate to our container ref
-  useEffect(() => {
-    if (containerRef.current) {
-      animationRef(containerRef.current);
-    }
-  }, [animationRef]);
+  // Memoize grouped results to avoid recreation on every render
+  const groupedResults = useMemo(() => groupResultsBySection(results), [results]);
 
-  // Scroll selected item into view
+  // Stable refs for callbacks
+  const onSelectRef = useRef(onSelect);
+  const onExecuteRef = useRef(onExecute);
+  const onAskAboutRef = useRef(onAskAbout);
+  const resultsRef = useRef(results);
+  onSelectRef.current = onSelect;
+  onExecuteRef.current = onExecute;
+  onAskAboutRef.current = onAskAbout;
+  resultsRef.current = results;
+
+  // Stable callbacks using refs - never change between renders
+  const handleItemClick = useCallback((index: number) => {
+    onSelectRef.current(index);
+    onExecuteRef.current(resultsRef.current[index]);
+  }, []);
+
+  const handleItemAskAbout = useCallback((index: number) => {
+    onAskAboutRef.current?.(resultsRef.current[index]);
+  }, []);
+
+  // Memoize callback map to avoid creating new functions per item on every render
+  const clickCallbacks = useMemo(() => {
+    const map = new Map<number, () => void>();
+    results.forEach((_, index) => {
+      map.set(index, () => handleItemClick(index));
+    });
+    return map;
+  }, [results.length, handleItemClick]);
+
+  const askCallbacks = useMemo(() => {
+    if (!onAskAbout) return null;
+    const map = new Map<number, () => void>();
+    results.forEach((_, index) => {
+      map.set(index, () => handleItemAskAbout(index));
+    });
+    return map;
+  }, [results.length, onAskAbout, handleItemAskAbout]);
+
+  // Scroll selected item into view with RAF batching to avoid layout thrashing
   useEffect(() => {
+    let rafId: number | null = null;
+    
     if (selectedRef.current) {
-      selectedRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
+      rafId = requestAnimationFrame(() => {
+        selectedRef.current?.scrollIntoView({
+          behavior: 'instant',
+          block: 'nearest',
+        });
       });
     }
+
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [selectedIndex]);
 
   if (results.length === 0) {
@@ -110,10 +150,8 @@ export function ResultsList({ results, selectedIndex, onSelect, onExecute, searc
     );
   }
 
-  const groupedResults = groupResultsBySection(results);
-
   if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
-    console.debug('[ResultsList] Grouped sections:', {
+    logDebug('[ResultsList] Grouped sections:', {
       sectionCount: groupedResults.length,
       sections: groupedResults.map(s => ({
         title: s.title,
@@ -169,15 +207,12 @@ export function ResultsList({ results, selectedIndex, onSelect, onExecute, searc
                       subtitle={result.subtitle}
                       icon={result.icon}
                       isSelected={is_selected}
-                      onClick={() => {
-                        onSelect(currentIndex);
-                        onExecute(result);
-                      }}
+                      onClick={clickCallbacks.get(currentIndex)!}
                       resultType={result.type}
                       searchQuery={searchQuery}
                       isExecuting={executingId === result.id}
                       metadata={result.metadata}
-                      onAskAbout={() => onAskAbout?.(result)}
+                      onAskAbout={askCallbacks?.get(currentIndex)}
                     />
                   </div>
                 );
@@ -211,4 +246,4 @@ export function ResultsList({ results, selectedIndex, onSelect, onExecute, searc
       </div>
     </ScrollArea>
   );
-}
+});

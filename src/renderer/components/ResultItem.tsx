@@ -1,32 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, memo } from 'react';
 import { cn } from '@/lib/utils';
-import { CircleDashed, FileTs, FileJs, FileText, Folder, File } from '@phosphor-icons/react';
+import { CircleDashed, FileTs, FileJs, FileText, Folder, File, Sparkle } from '@phosphor-icons/react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFuzzyMatchIndices } from '@/utils/fuzzySearch';
 import { getFileTypeFromName } from '@/utils/fileUtils';
-
-// Hook to detect if an element's text is truncated
-function useTruncated(ref: React.RefObject<HTMLElement | null>) {
-  const [isTruncated, setIsTruncated] = useState(false);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
-    const check = () => {
-      setIsTruncated(element.scrollWidth > element.clientWidth);
-    };
-
-    check();
-
-    const observer = new ResizeObserver(check);
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, [ref]);
-
-  return isTruncated;
-}
+import { logDebug } from '../utils/debugLogger';
 
 export interface ResultItemProps {
   id: string;
@@ -48,63 +25,6 @@ export interface ResultItemProps {
   onAskAbout?: () => void;
 }
 
-function buildHighlightPart(
-  text: string,
-  isHighlighted: boolean,
-  isSelected: boolean | undefined,
-  partIndex: number,
-): React.JSX.Element {
-  return (
-    <span
-      key={`highlight-${partIndex}`}
-      className={cn(
-        isHighlighted && "font-semibold",
-        isHighlighted
-          ? isSelected
-            ? "text-primary-foreground"
-            : "text-primary"
-          : isSelected
-            ? "text-primary-foreground"
-            : "text-foreground",
-      )}
-    >
-      {text}
-    </span>
-  );
-}
-
-function highlightFuzzyMatches(text: string, query: string, isSelected?: boolean) {
-  if (!query || query.trim().length === 0) return text;
-
-  const indices = getFuzzyMatchIndices(query, text);
-  if (indices.length === 0) return text;
-
-  const indexSet = new Set(indices);
-  const parts: (string | React.JSX.Element)[] = [];
-  let currentRun: string[] = [];
-  let inHighlight = indexSet.has(0);
-  let partIndex = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const shouldHighlight = indexSet.has(i);
-
-    if (shouldHighlight === inHighlight) {
-      currentRun.push(char);
-    } else {
-      parts.push(buildHighlightPart(currentRun.join(''), inHighlight, isSelected, partIndex++));
-      currentRun = [char];
-      inHighlight = shouldHighlight;
-    }
-  }
-
-  if (currentRun.length > 0) {
-    parts.push(buildHighlightPart(currentRun.join(''), inHighlight, isSelected, partIndex++));
-  }
-
-  return <>{parts}</>;
-}
-
 function highlightMatches(text: string, query: string, isSelected?: boolean) {
   if (!query || query.trim().length === 0) return text;
 
@@ -112,7 +32,6 @@ function highlightMatches(text: string, query: string, isSelected?: boolean) {
   const lowerText = text.toLowerCase();
   const lowerQuery = escapedQuery.toLowerCase();
 
-  // Find all match positions
   const matches: Array<{ start: number; end: number }> = [];
   let searchStart = 0;
 
@@ -129,17 +48,14 @@ function highlightMatches(text: string, query: string, isSelected?: boolean) {
 
   if (matches.length === 0) return text;
 
-  // Build parts array with highlights
   const parts: (string | React.JSX.Element)[] = [];
   let lastIndex = 0;
 
   matches.forEach((match, index) => {
-    // Add text before match
     if (match.start > lastIndex) {
       parts.push(text.slice(lastIndex, match.start));
     }
 
-    // Add highlighted match with different styling for selected state
     parts.push(
       <mark
         key={index}
@@ -157,14 +73,12 @@ function highlightMatches(text: string, query: string, isSelected?: boolean) {
     lastIndex = match.end;
   });
 
-  // Add remaining text
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));
   }
 
   return <>{parts}</>;
 }
-
 function getFileTypeIcon(fileType: string, isFolder?: boolean) {
   if (isFolder) {
     return <Folder weight="fill" className="h-5 w-5" />;
@@ -356,7 +270,7 @@ function getKindFromFileType(fileType: string, resultType?: string): string {
   return fileType ? `${fileType.toUpperCase().slice(0, 8)} File` : 'File';
 }
 
-export function ResultItem({ 
+export const ResultItem = memo(function ResultItem({ 
   title, 
   subtitle, 
   icon, 
@@ -371,10 +285,6 @@ export function ResultItem({
 }: ResultItemProps) {
   const titleRef = useRef<HTMLSpanElement>(null);
   const pathRef = useRef<HTMLSpanElement>(null);
-  const kindRef = useRef<HTMLSpanElement>(null);
-  const titleTruncated = useTruncated(titleRef);
-  const pathTruncated = useTruncated(pathRef);
-  const kindTruncated = useTruncated(kindRef);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -393,7 +303,7 @@ export function ResultItem({
   const shortcut = metadata?.shortcut || (resolvedIsFolder ? '→' : '↵');
 
   if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
-    console.debug('[ResultItem]', { id, title, fileType, isFolder: resolvedIsFolder, path, kind, shortcut });
+    logDebug('[ResultItem]', { id, title, fileType, isFolder: resolvedIsFolder, path, kind, shortcut });
   }
 
   return (
@@ -407,7 +317,6 @@ export function ResultItem({
       tabIndex={isSelected ? 0 : -1}
       className={cn(
         "grid grid-cols-[28px_1fr_auto] gap-3 px-4 py-2 cursor-pointer group",
-        "transition-colors duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
         "relative",
         isSelected 
           ? "bg-primary text-primary-foreground" 
@@ -437,92 +346,74 @@ export function ResultItem({
 
       {/* Content - Title and Path stacked */}
       <div className="min-w-0 flex flex-col">
-        {/* Title with tooltip when truncated */}
-        {titleTruncated ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                ref={titleRef}
-                className={cn(
-                  "text-sm font-medium truncate tracking-tight",
-                  isSelected ? "text-primary-foreground" : "text-foreground"
-                )}
-              >
-                {searchQuery ? highlightFuzzyMatches(title, searchQuery, isSelected) : title}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="start" sideOffset={4}>
-              {title}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <span
-            ref={titleRef}
-            className={cn(
-              "text-sm font-medium truncate tracking-tight",
-              isSelected ? "text-primary-foreground" : "text-foreground"
-            )}
-          >
-            {searchQuery ? highlightMatches(title, searchQuery, isSelected) : title}
-          </span>
-        )}
+        {/* Title */}
+        <span
+          ref={titleRef}
+          className={cn(
+            "text-sm font-medium truncate tracking-tight",
+            isSelected ? "text-primary-foreground" : "text-foreground"
+          )}
+          title={title}
+        >
+          {searchQuery ? highlightMatches(title, searchQuery, isSelected) : title}
+        </span>
 
-        {/* Path with tooltip when truncated */}
+        {/* Path */}
         {path && (
-          <>
-            {pathTruncated ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                <span
-                  ref={pathRef}
-                  className={cn(
-                    "font-mono truncate text-xs",
-                    isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
-                  )}
-                >
-                    {path}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" sideOffset={4}>
-                  {path}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-                <span
-                  ref={pathRef}
-                  className={cn(
-                    "font-mono truncate text-xs",
-                    isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
-                  )}
-                >
-                {path}
-              </span>
+          <span
+            ref={pathRef}
+            className={cn(
+              "font-mono truncate text-xs",
+              isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
             )}
-          </>
+            title={path}
+          >
+            {path}
+          </span>
         )}
       </div>
 
       {/* Meta section - Kind + Shortcut */}
       <div className="flex items-center gap-1.5 self-center min-w-0">
-        {/* Kind label with truncation */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              ref={kindRef}
-              className={cn(
-                "text-xs whitespace-nowrap truncate max-w-[140px]",
-                isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
-              )}
-            >
-              {kind}
-            </span>
-          </TooltipTrigger>
-          {kindTruncated && (
-            <TooltipContent side="bottom" align="end" sideOffset={4}>
-              {kind}
-            </TooltipContent>
+        {/* Kind label */}
+        <span
+          className={cn(
+            "text-xs whitespace-nowrap truncate max-w-[140px]",
+            isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
           )}
-        </Tooltip>
+          title={kind}
+        >
+          {kind}
+        </span>
+
+        {/* AI Ask hint - shown on hover for file results */}
+        {resultType === 'file' && onAskAbout && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAskAbout();
+                }}
+                className={cn(
+                  "opacity-0 group-hover:opacity-100 transition-opacity",
+                  "text-xs flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)]",
+                  "cursor-pointer",
+                  isSelected
+                    ? "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30"
+                    : "bg-primary/10 text-primary hover:bg-primary/20"
+                )}
+                type="button"
+              >
+                <Sparkle weight="fill" className="h-3 w-3" />
+                <span className="font-medium">Ask</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end" sideOffset={4}>
+              Ask about this file (Alt+Enter)
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Shortcut badge */}
         <span className={cn(
@@ -546,4 +437,4 @@ export function ResultItem({
       )}
     </div>
   );
-}
+});

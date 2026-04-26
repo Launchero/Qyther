@@ -1274,6 +1274,128 @@ const [isHovered, setIsHovered] = useState(false)
 
 ---
 
+## Animation & Motion
+
+### Design Philosophy
+
+Animations are CSS-first with `@formkit/auto-animate` for list-level transitions.
+
+**Principles:**
+1. **CSS-first**: Use CSS keyframes and transitions for element-level animations
+2. **auto-animate for lists**: Use `@formkit/auto-animate` for message list add/remove/reorder
+3. **Token-driven**: All durations and easing use motion tokens
+4. **Accessible**: Respect `prefers-reduced-motion` (globally in globals.css)
+5. **Performant**: Animate only `opacity` and `transform`
+6. **No conflicts**: Never combine auto-animate and CSS animations on the same element
+
+### Architecture
+
+```
+Message List: @formkit/auto-animate (JS DOM transitions)
+  - New messages: slide-in from bottom
+  - Removed messages: slide-out
+  - Loading dots: appear/disappear
+
+Element-level: CSS keyframes
+  - Welcome cards: scaleIn with stagger
+  - Error banner: slideDownFade + shake icon
+  - Related questions: slideUpFade with stagger
+  - Typing dots: typingDots loop
+```
+
+### Duration Hierarchy
+
+| Category | Token | Use Case |
+|----------|-------|----------|
+| Micro | `--duration-75` to `--duration-100` | Hovers, toggles, icon swaps |
+| Standard | `--duration-150` to `--duration-200` | Message entry, dropdowns, chips |
+| Macro | `--duration-250` to `--duration-500` | Welcome transitions, layout changes |
+| Loop | `1.4s` infinite | Typing indicator dots |
+
+### Available Keyframe Animations
+
+| Keyframe | Purpose | Duration | File |
+|----------|---------|----------|------|
+| `slideUpFade` | Message/question entry | 200ms | `motion.css` |
+| `slideDownFade` | Error banner entry | 200ms | `motion.css` |
+| `scaleIn` | Welcome card entry | 150ms | `motion.css` |
+| `errorShake` | Error icon feedback | 300ms | `motion.css` |
+| `typingDots` | Typing indicator | 1.4s loop | `motion.css` |
+| `fadeOutUp` | Exit transitions | 250ms | `motion.css` |
+| `fadeIn` | General fade-in | -- | `globals.css` |
+| `slideDown` | Context chip dropdown | -- | `globals.css` |
+
+### Stagger Pattern
+
+Use CSS `nth-child` selectors for sequential elements. No JavaScript tracking needed:
+
+```css
+.item { animation: slideUpFade 200ms var(--easing-smooth) both; }
+.item:nth-child(1) { animation-delay: var(--stagger-50); }
+.item:nth-child(2) { animation-delay: var(--stagger-100); }
+.item:nth-child(3) { animation-delay: var(--stagger-150); }
+```
+
+### `@formkit/auto-animate` Usage
+
+For list containers where items are added/removed/reordered:
+
+```tsx
+import autoAnimate from '@formkit/auto-animate';
+
+const containerRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  if (containerRef.current) {
+    const ctrl = autoAnimate(containerRef.current, {
+      duration: 200,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    });
+    return () => ctrl.stop();
+  }
+}, []);
+
+return <div ref={containerRef}>{items.map(item => <Item key={item.id} />)}</div>;
+```
+
+**Rules:**
+- Items MUST have stable `key` props (use unique IDs, not array indices)
+- Do NOT combine with CSS animation classes on child elements
+- Call `ctrl.stop()` on cleanup to prevent memory leaks
+- Works with `React.memo` children
+
+### Reduced Motion
+
+All animations respect `prefers-reduced-motion: reduce`:
+
+**Global token override** (globals.css):
+```css
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-spin: 0ms;
+    --animate-pulse: 0ms;
+    --animate-bounce: 0ms;
+    --animate-slide-up-fade: 0ms;
+    /* ... all animation tokens set to 0ms */
+  }
+}
+```
+
+**Component-level override** (ask-mode-perplexity.css):
+```css
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot, .suggestion-card, .related-question-item, ... {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+```
+
+Users with reduced motion preferences see instant state changes with no transitions.
+
+---
+
 ## Update Strategy
 
 ### Monthly Update Workflow

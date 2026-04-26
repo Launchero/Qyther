@@ -2,43 +2,16 @@ import { StateGraph, END, interrupt } from "@langchain/langgraph";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
-import { AskState, AskStateType, Source, ReasoningStep, UIPayload } from "./state";
+import { AskState, AskStateType, Source, ReasoningStep, UIPayload, DesktopAction } from "./state";
 import { webSearchTool } from "./tools";
 import { z } from "zod";
 import { statefulBrowserAgent } from "../browser/stateful-browser-agent";
 import { browserSessionManager } from "../browser/browser-session-manager";
 import path from "path";
 import { app } from "electron";
+import { createLogger, withTiming } from "../../utils/logger";
 
-// === DEBUG CONFIGURATION ===
-const DEBUG_GRAPH = process.env.DEBUG_GRAPH === "true" || false;
-
-function graphLog(scope: string, ...args: unknown[]): void {
-  if (DEBUG_GRAPH) {
-    const timestamp = new Date().toISOString().split("T")[1].split(".")[0];
-    console.log(`[Graph ${timestamp}] [${scope}]`, ...args);
-  }
-}
-
-function graphError(scope: string, error: unknown): void {
-  const timestamp = new Date().toISOString().split("T")[1].split(".")[0];
-  console.error(`[Graph ${timestamp}] [${scope}] ERROR:`, error);
-}
-
-function timed<T>(scope: string, fn: () => Promise<T>): Promise<T> {
-  if (!DEBUG_GRAPH) return fn();
-  const start = Date.now();
-  return fn().then(
-    (result) => {
-      graphLog(scope, `Completed in ${Date.now() - start}ms`);
-      return result;
-    },
-    (err) => {
-      graphLog(scope, `Failed after ${Date.now() - start}ms:`, err);
-      throw err;
-    }
-  );
-}
+const log = createLogger("Graph");
 
 const chatModel = new ChatOpenAI({
   model: process.env.MODEL || "qwen3.5-plus",
@@ -57,6 +30,15 @@ const routerModel = new ChatOpenAI({
   configuration: { baseURL: process.env.BASE_URL },
   temperature: 0,
   maxTokens: 10,
+  streaming: false,
+});
+
+// Separate model for verification — lower temperature for analytical, critical evaluation
+const verifierModel = new ChatOpenAI({
+  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.5-plus",
+  apiKey: process.env.API_KEY,
+  configuration: { baseURL: process.env.BASE_URL },
+  temperature: 0.1,
   streaming: false,
 });
 
@@ -100,9 +82,14 @@ function assessComplexity(query: string): "simple" | "medium" | "complex" {
 }
 
 const MAX_RETRIES = 2;
-const MAX_REPLANS = 1;
 const CONFIDENCE_HIGH = 0.8;
 const CONFIDENCE_MEDIUM = 0.5;
+const MAX_STATE_MESSAGES = 20;
+
+// Defensive slice for state.messages to prevent context window overflow
+function safeMessages(state: AskStateType): AskStateType['messages'] {
+  return state.messages.slice(-MAX_STATE_MESSAGES);
+}
 
 // === STRUCTURED OUTPUT SCHEMAS FOR GENERATIVE UI ===
 
@@ -142,6 +129,21 @@ const formOutputSchema = z.object({
   fields: z.array(formFieldSchema).describe("Form fields to render"),
 });
 
+const chartDataPointSchema = z.object({
+  name: z.string().describe("Label for x-axis or pie slice"),
+  value: z.number().describe("Numeric value"),
+  category: z.string().optional().describe("Optional category for grouped/stacked charts"),
+});
+
+const chartOutputSchema = z.object({
+  title: z.string().optional().describe("Short title for the chart"),
+  chartType: z.enum(["bar", "line", "area", "pie"]).describe("Chart visualization type"),
+  description: z.string().optional().describe("Short explanation of what the chart shows"),
+  data: z.array(chartDataPointSchema).describe("Data points to visualize"),
+  xKey: z.string().optional().default("name"),
+  yKey: z.string().optional().default("value"),
+});
+
 let cachedGraph: any = null;
 
 export async function getAskGraph(): Promise<any> {
@@ -165,7 +167,9 @@ export async function getAskGraph(): Promise<any> {
     .addNode("generalChat", generalChatNode)
     .addNode("comparisonNode", comparisonNode)
     .addNode("formNode", formNode)
+    .addNode("chartNode", chartNode)
     .addNode("browserAgent", browserAgentNode)
+    .addNode("desktopConfirmation", desktopConfirmationNode)
     .addEdge("__start__", "classify")
     .addConditionalEdges("classify", routeAfterClassify, {
       fast: "fastPath",
@@ -175,6 +179,7 @@ export async function getAskGraph(): Promise<any> {
       browser: "browserAgent",
       comparison: "comparisonNode",
       form: "formNode",
+      chart: "chartNode",
     })
     .addEdge("fastPath", END)
     .addConditionalEdges("internalKnowledge", routeAfterInternalKnowledge, {
@@ -200,37 +205,54 @@ export async function getAskGraph(): Promise<any> {
     .addEdge("generalChat", END)
     .addEdge("comparisonNode", END)
     .addEdge("formNode", END)
-    .addEdge("browserAgent", END);
+    .addEdge("chartNode", END)
+    .addEdge("browserAgent", "desktopConfirmation")
+    .addEdge("desktopConfirmation", END);
 
   cachedGraph = workflow.compile({ checkpointer });
 
   const compileMs = Date.now() - compileStart;
-  console.log(`[Graph] Compilation complete in ${compileMs}ms`);
+  log.info(`Compilation complete in ${compileMs}ms`);
   if (compileMs > 5000) {
-    console.warn(`[Graph] Slow compilation detected: ${compileMs}ms`);
+    log.warn(`Slow compilation detected: ${compileMs}ms`);
   }
 
-  if (DEBUG_GRAPH) {
-    const nodes = workflow.nodes;
-    console.log("[Graph] Compiled workflow with nodes:", Object.keys(nodes).join(", "));
-    console.log("[Graph] Edge structure:", JSON.stringify(Array.from(workflow.edges).map((e: any) => ({
-      source: e[0],
-      target: e[1],
-      conditional: e[2],
-    })), null, 2));
-  }
+  log.debug("Compiled workflow with nodes:", Object.keys(workflow.nodes).join(", "));
+  log.debug("Edge structure:", JSON.stringify(Array.from(workflow.edges).map((e: any) => ({
+    source: e[0],
+    target: e[1],
+    conditional: e[2],
+  })), null, 2));
 
   return cachedGraph;
 }
 
 // === CLASSIFICATION NODE (replaces quickRoute + classifyIntent) ===
 
+function isContextualFollowup(query: string): boolean {
+  const contextualPatterns = [
+    /\b(add|append|include|show|give|display|put|insert|add more|add some)\b.*\b(this|these|that|those|it|them)\b/i,
+    /\b(this|these|that|those|it)\b.*\b(add|append|include|show|give|display|put|insert|more|niche|also)\b/i,
+    /\b(also|too|as well|more|additional|extra|niche|moreover|furthermore)\b/i,
+    /\b(change|update|modify|fix|adjust|improve|make)\b.*\b(this|that|it)\b/i,
+    /^\s*(yes|yeah|yep|sure|ok|okay|do it|go ahead)\s*$/i,
+    /\b(what about|how about|and\s+\w+)\s*/i,
+    /\b(exclude|remove|filter\s*out)\b.*\b(this|that|those)\b/i,
+    // Format/presentation followups: "show in graphs", "show as table", "make it a chart"
+    /\b(show|display|render|format|convert)\b.*\b(in|as|into|to)\b/i,
+    /\b(make|turn)\b.*\b(into|a)\b.*\b(graph|chart|table|list|pie|bar)\b/i,
+  ];
+  return contextualPatterns.some(p => p.test(query));
+}
+
 async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  graphLog("classify", "Query:", state.userQuery);
+  log.debug("Query:", state.userQuery);
+  log.debug("Previous intent:", state.previousIntent);
+  log.debug("Message count:", state.messages.length);
 
   const fastPath = detectFastPath(state.userQuery);
   if (fastPath) {
-    graphLog("classify", "Fast-path detected:", fastPath);
+    log.debug("Fast-path detected:", fastPath);
     const reasoningStep: ReasoningStep = {
       step: "classify",
       status: "completed",
@@ -240,10 +262,47 @@ async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>>
   }
 
   const complexity = assessComplexity(state.userQuery);
-  graphLog("classify", "Heuristic complexity:", complexity);
+  log.debug("Heuristic complexity:", complexity);
 
-  return timed("classify", async () => {
-    const classificationPrompt = new SystemMessage(`You are an intent and complexity classifier. Classify the user's query:
+  const followup = isContextualFollowup(state.userQuery);
+  log.debug("Contextual followup detected:", followup);
+
+  return withTiming(log, "classify", async () => {
+    const messages = safeMessages(state);
+    const recentHistory = messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-4)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 300)}`)
+      .join("\n");
+
+    let classificationPrompt: SystemMessage;
+
+    if (followup && messages.length > 1) {
+      classificationPrompt = new SystemMessage(`You are an intent and complexity classifier. Classify the user's query.
+
+This is a CONTEXTUAL FOLLOWUP — the user is referring to previous conversation content. Use the conversation history to understand what "this/that/it/them" refers to, then classify the intent based on the original topic.
+
+CRITICAL: If this is a followup to a chart/visualization request, classify as "research" (the chart node will be reached via keyword detection in routing).
+If this is a followup to a comparison, form, or browser request, preserve the previous intent.
+
+Intents:
+- research: Requires current facts, news, or information not reliably in training data
+- general: Conversational, creative writing, or training-data knowledge
+- browser: Requires interactive web page navigation
+
+Complexity:
+- simple: Short, single-concept queries (<30 chars, no question marks)
+- medium: Standard questions with clear scope
+- complex: Multi-part questions, code blocks, analysis requests, or 300+ chars
+
+Previous intent: ${state.previousIntent}
+
+Conversation History:
+${recentHistory}
+
+Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
+    } else {
+      classificationPrompt = new SystemMessage(`You are an intent and complexity classifier. Classify the user's query:
 
 Intents:
 - research: Requires current facts, news, or information not reliably in training data
@@ -256,14 +315,21 @@ Complexity:
 - complex: Multi-part questions, code blocks, analysis requests, or 300+ chars
 
 Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
+    }
 
-    const response = await routerModel.invoke([
-      classificationPrompt,
-      new HumanMessage(state.userQuery),
-    ]);
+    const messagesToClassify: (SystemMessage | HumanMessage)[] = [classificationPrompt];
+    if (followup && messages.length > 1) {
+      messagesToClassify.push(
+        new HumanMessage(`Conversation context:\n${recentHistory}\n\nCurrent query: ${state.userQuery}`)
+      );
+    } else {
+      messagesToClassify.push(new HumanMessage(state.userQuery));
+    }
+
+    const response = await routerModel.invoke(messagesToClassify);
 
     const content = (response.content as string).toLowerCase().trim();
-    graphLog("classify", "Raw model output:", content);
+    log.debug("Raw model output:", content);
 
     const [rawIntent, rawComplexity] = content.split("/");
 
@@ -273,23 +339,24 @@ Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
     const complexityScore = validComplexity.includes(rawComplexity) ? rawComplexity : assessComplexity(state.userQuery);
 
     if (!validIntents.includes(rawIntent)) {
-      graphLog("classify", "Invalid intent fallback:", rawIntent, "→ general");
+      log.debug("Invalid intent fallback:", rawIntent, "→ general");
     }
     if (!validComplexity.includes(rawComplexity)) {
-      graphLog("classify", "Invalid complexity fallback:", rawComplexity, "→", complexityScore);
+      log.debug("Invalid complexity fallback:", rawComplexity, "→", complexityScore);
     }
 
     const reasoningStep: ReasoningStep = {
       step: "classify",
       status: "completed",
-      detail: `Intent: ${intent}, Complexity: ${complexityScore}`,
+      detail: `Intent: ${intent}, Complexity: ${complexityScore}${followup ? " (contextual followup)" : ""}`,
     };
 
-    graphLog("classify", "Final classification:", { intent, complexityScore });
+    log.debug("Final classification:", { intent, complexityScore, followup });
 
     return {
       intent,
       complexityScore,
+      previousIntent: intent,
       reasoningSteps: [reasoningStep],
     };
   });
@@ -312,6 +379,10 @@ function routeAfterClassify(state: AskStateType): string {
     if (/\b(generate\s+(a|the)?\s*(form|config|configuration|settings)|create\s+(a|the)?\s*(form|config|configuration|settings))\b/i.test(userQuery)) {
       return "form";
     }
+    // Detect chart/visualization queries
+    if (/\b(chart|graph|visuali[sz]e|plot|show.*data|show.*graph|bar chart|line chart|pie chart)\b/i.test(userQuery)) {
+      return "chart";
+    }
     // Only fast-path when the query actually matches a known fast pattern.
     // This prevents incomplete queries like "what can you" from getting a canned greeting.
     if (complexityScore === "simple" && intent === "general" && detectFastPath(userQuery)) {
@@ -332,7 +403,7 @@ function routeAfterClassify(state: AskStateType): string {
     return "internal";
   })();
 
-  graphLog("route", "classify →", route, `(intent=${intent}, complexity=${complexityScore})`);
+  log.debug("classify →", route, `(intent=${intent}, complexity=${complexityScore})`);
   return route;
 }
 
@@ -380,13 +451,24 @@ async function internalKnowledgeNode(state: AskStateType): Promise<Partial<AskSt
     detail: "Answering from training knowledge",
   };
 
-  return timed("internalKnowledge", async () => {
+  return withTiming(log, "internalKnowledge", async () => {
+    const messages = safeMessages(state);
     const attachmentContext = state.attachments.length > 0
       ? `\n\nThe user has attached the following files as reference:\n${state.attachments.map(a => `\n--- ${a.name} ---\n${a.content}\n--- End: ${a.name} ---`).join('')}\n\nReference the attached file contents above when answering. The files are provided as context, not something you need to read from your training data.`
       : '';
 
+    const recentHistory = messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-6)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+      .join("\n");
+
+    const contextInstruction = messages.length > 1
+      ? `\n\nCONVERSATION CONTEXT: The current query may reference earlier messages. Use the conversation history below to resolve pronouns and references.\n\nConversation History:\n${recentHistory}`
+      : "";
+
     const response = await chatModel.invoke([
-      new SystemMessage(`Answer the user's question from your training knowledge.${attachmentContext}
+      new SystemMessage(`Answer the user's question from your training knowledge.${contextInstruction}${attachmentContext}
 
 At the END of your response, on a new line, add: Confidence: <0.0-1.0>
 
@@ -399,9 +481,9 @@ Use 0.9+ for well-established facts, 0.7-0.8 for nuanced topics, below 0.5 if yo
     const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.7;
     const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
 
-    graphLog("internalKnowledge", "Confidence extracted:", confidence);
+    log.debug("Confidence extracted:", confidence);
     if (!confidenceMatch) {
-      graphLog("internalKnowledge", "WARN: No confidence found in response, using default 0.7");
+      log.warn("No confidence found in response, using default 0.7");
     }
 
     const completedStep: ReasoningStep = {
@@ -420,14 +502,52 @@ Use 0.9+ for well-established facts, 0.7-0.8 for nuanced topics, below 0.5 if yo
 
 // === EXTERNAL SEARCH FAN-OUT NODE ===
 
+// Resolve anaphora in followup queries by rewriting against conversation history
+async function rewriteQueryWithContext(state: AskStateType): Promise<string> {
+  const messages = safeMessages(state);
+  if (messages.length <= 1) return state.userQuery;
+
+  const recentHistory = messages
+    .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+    .slice(-6)
+    .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+    .join("\n");
+
+  const rewrittenPrompt = new SystemMessage(`You are a query rewriter for a search system. The user's query contains pronouns or references ("this", "that", "it", "them", "those") that refer to earlier conversation content. Rewrite the query into a standalone, self-contained search query that resolves all references.
+
+CRITICAL:
+- Return ONLY the rewritten query, nothing else
+- Preserve the user's core intent
+- Make the query specific and search-friendly
+- If the query is already standalone, return it unchanged
+
+Conversation History:
+${recentHistory}
+
+Current query: ${state.userQuery}
+
+Rewritten query:`);
+
+  try {
+    const response = await routerModel.invoke([rewrittenPrompt]);
+    const rewritten = (response.content as string).trim();
+    log.debug("Query rewritten:", state.userQuery, "→", rewritten);
+    return rewritten || state.userQuery;
+  } catch (error) {
+    log.warn("Query rewrite failed, using original:", error);
+    return state.userQuery;
+  }
+}
+
 async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const queries = [state.userQuery];
+  const effectiveQuery = await rewriteQueryWithContext(state);
+  const queries = [effectiveQuery];
 
   if (state.intent === "research") {
-    queries.push(`${state.userQuery} 2025 2026`);
+    queries.push(`${effectiveQuery} 2025 2026`);
   }
 
-  graphLog("search", "Fan-out queries:", queries);
+  log.debug("Fan-out queries:", queries);
 
   const reasoningStep: ReasoningStep = {
     step: "externalSearchFanOut",
@@ -440,7 +560,7 @@ async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<As
 
   for (const query of queries) {
     try {
-      graphLog("search", "Executing:", query);
+      log.debug("Executing:", query);
       const searchResult = await webSearchTool.invoke({
         query,
         maxResults: 5,
@@ -453,12 +573,12 @@ async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<As
         excerpt: r.snippet,
       })) || [];
 
-      graphLog("search", "Results for", query, ":", sources.length, "sources");
+      log.debug("Results for", query, ":", sources.length, "sources");
 
       allResults.push(searchResult);
       allSources.push(...sources);
     } catch (error) {
-      graphError("search", { query, error });
+      log.error("Search failed for query:", query, error);
       allResults.push(JSON.stringify({ error: "Search failed for query", query, details: String(error) }));
     }
   }
@@ -467,7 +587,7 @@ async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<As
     (s, i, arr) => arr.findIndex((other) => other.url === s.url) === i
   );
 
-  graphLog("search", "Deduplicated:", allSources.length, "→", deduplicatedSources.length, "unique sources");
+  log.debug("Deduplicated:", allSources.length, "→", deduplicatedSources.length, "unique sources");
 
   const completedStep: ReasoningStep = {
     step: "externalSearchFanOut",
@@ -487,7 +607,7 @@ async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<As
 
 function routeAfterFanOut(state: AskStateType): "has_results" | "no_results" {
   const result = state.sources.length > 0 ? "has_results" : "no_results";
-  graphLog("route", "fanOut →", result, `(sources=${state.sources.length})`);
+  log.debug("fanOut →", result, `(sources=${state.sources.length})`);
   return result;
 }
 
@@ -495,10 +615,10 @@ function routeAfterFanOut(state: AskStateType): "has_results" | "no_results" {
 
 async function synthesizeWithSelfCheckNode(state: AskStateType): Promise<Partial<AskStateType>> {
   const isRetry = state.retryCount > 0;
-  graphLog("synthesize", isRetry ? `Retry attempt ${state.retryCount + 1}` : "Initial synthesis",
+  log.debug(isRetry ? `Retry attempt ${state.retryCount + 1}` : "Initial synthesis",
     "sources:", state.sources.length, "results:", state.researchResults.length);
 
-  return timed("synthesize", async () => {
+  return withTiming(log, "synthesize", async () => {
     const reasoningStep: ReasoningStep = {
       step: "synthesizeWithSelfCheck",
       status: "in_progress",
@@ -565,7 +685,7 @@ User Query: ${state.userQuery}${attachmentContext}`);
 
     const response = await chatModel.invoke([
       synthesizePrompt,
-      ...state.messages.filter(m => m instanceof HumanMessage || m instanceof AIMessage).slice(-4),
+      ...safeMessages(state).filter(m => m instanceof HumanMessage || m instanceof AIMessage).slice(-4),
     ]);
 
     const content = response.content as string;
@@ -574,9 +694,9 @@ User Query: ${state.userQuery}${attachmentContext}`);
     const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
 
     if (!confidenceMatch) {
-      graphLog("synthesize", "WARN: No confidence found in response, using default 0.7");
+      log.warn("No confidence found in response, using default 0.7");
     }
-    graphLog("synthesize", "Confidence:", confidence, "content length:", cleanContent.length);
+    log.debug("Confidence:", confidence, "content length:", cleanContent.length);
 
     const completedStep: ReasoningStep = {
       step: "synthesizeWithSelfCheck",
@@ -611,6 +731,9 @@ User Query: ${state.userQuery}${attachmentContext}`);
       confidence,
       sources: state.sources,
       uiPayloads,
+      qualityScore: 0,
+      validationScore: 0,
+      validationCritique: "",
       reasoningSteps: [reasoningStep, completedStep],
     };
   });
@@ -619,21 +742,25 @@ User Query: ${state.userQuery}${attachmentContext}`);
 // === ROUTER: after synthesis ===
 
 function routeAfterSynthesis(state: AskStateType): "high" | "medium" | "low" {
-  const { confidence, retryCount } = state;
+  const { confidence, qualityScore, retryCount } = state;
+  const effectiveScore = qualityScore > 0
+    ? (confidence * 0.3 + qualityScore * 0.7)
+    : confidence;
+
   const route = (() => {
-    if (confidence >= CONFIDENCE_HIGH) {
+    if (effectiveScore >= CONFIDENCE_HIGH) {
       return "high";
     }
     if (retryCount >= MAX_RETRIES) {
       return "medium";
     }
-    if (confidence >= CONFIDENCE_MEDIUM) {
+    if (effectiveScore >= CONFIDENCE_MEDIUM) {
       return "medium";
     }
     return "low";
   })();
 
-  graphLog("route", "synthesize →", route, `(confidence=${confidence}, retries=${retryCount})`);
+  log.debug("synthesize →", route, `(confidence=${confidence}, qualityScore=${qualityScore}, effective=${effectiveScore.toFixed(2)}, retries=${retryCount})`);
   return route;
 }
 
@@ -641,41 +768,60 @@ function routeAfterSynthesis(state: AskStateType): "high" | "medium" | "low" {
 
 async function quickVerifyNode(state: AskStateType): Promise<Partial<AskStateType>> {
   if (!state.finalResponse) {
-    graphLog("quickVerify", "WARN: No finalResponse to verify");
-    return { verified: false, confidence: 0 };
+    log.warn("No finalResponse to verify");
+    return { verified: false, confidence: 0, qualityScore: 0 };
   }
 
-  graphLog("quickVerify", "Verifying response length:", state.finalResponse.length, "sources:", state.sources.length);
+  log.debug("Verifying response length:", state.finalResponse.length, "sources:", state.sources.length);
 
-  return timed("quickVerify", async () => {
+  return withTiming(log, "quickVerify", async () => {
     const reasoningStep: ReasoningStep = {
       step: "quickVerify",
       status: "in_progress",
-      detail: "Quick verification check",
+      detail: "Quality verification check",
     };
 
-    const verificationPrompt = new SystemMessage(`You are a quick quality verifier. Check if this response adequately answers the user's query.
+    const messages = safeMessages(state);
+    const recentHistory = messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-4)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 300)}`)
+      .join("\n");
 
-Respond with ONLY "pass" or "fail" followed by a brief reason.
+    const contextHint = messages.length > 1
+      ? `\n\nConversation History (for reference resolution):\n${recentHistory}`
+      : "";
+
+    const verificationPrompt = new SystemMessage(`You are a quality verifier. Score this response 0.0-1.0.
+
+Respond with ONLY a number followed by a brief reason.
+Examples: "0.9 - Directly answers the query with clear, factual information"
+          "0.3 - Vague and does not address the core question"
 
 User Query: ${state.userQuery}
 Response: ${state.finalResponse}
-${state.sources.length > 0 ? `Sources: ${state.sources.length} sources available` : "No sources available"}`);
+${state.sources.length > 0 ? `Sources: ${state.sources.length} sources available` : "No sources available"}${contextHint}`);
 
-    const response = await chatModel.invoke([verificationPrompt]);
-    const content = (response.content as string).toLowerCase().trim();
+    const response = await verifierModel.invoke([verificationPrompt]);
+    const content = (response.content as string).trim();
+    const scoreMatch = content.match(/^([0-9]*\.?[0-9]+)/);
+    const qualityScore = scoreMatch ? Math.min(1, Math.max(0, parseFloat(scoreMatch[1]))) : 0.5;
+    const passed = qualityScore >= 0.6;
 
-    const passed = content.startsWith("pass");
-    graphLog("quickVerify", "Result:", passed ? "PASS" : "FAIL", "model output:", content.slice(0, 100));
+    log.debug("Quality score:", qualityScore, "passed:", passed, "model output:", content.slice(0, 100));
 
     const completedStep: ReasoningStep = {
       step: "quickVerify",
       status: "completed",
-      detail: passed ? "Quick verification passed" : `Quick verification failed: ${content.slice(0, 200)}`,
+      detail: passed ? `Quality score: ${(qualityScore * 100).toFixed(0)}% — passed` : `Quality score: ${(qualityScore * 100).toFixed(0)}% — failed: ${content.slice(0, 200)}`,
     };
 
     return {
       verified: passed,
+      qualityScore,
+      validationScore: qualityScore,
+      // Pass the full verifier output as critique when quality is low, so retry can improve
+      validationCritique: passed ? "" : content.slice(0, 500),
       reasoningSteps: [reasoningStep, completedStep],
     };
   });
@@ -684,18 +830,24 @@ ${state.sources.length > 0 ? `Sources: ${state.sources.length} sources available
 // === ROUTER: after quick verify ===
 
 function routeAfterQuickVerify(state: AskStateType): "pass" | "fail" {
+  if (state.qualityScore > 0) {
+    return state.qualityScore >= 0.6 ? "pass" : "fail";
+  }
   return state.verified ? "pass" : "fail";
 }
 
 // === ROUTER: after internal knowledge ===
 
 function routeAfterInternalKnowledge(state: AskStateType): "high" | "medium" | "low" {
-  const { confidence } = state;
+  const { confidence, qualityScore } = state;
+  const effectiveScore = qualityScore > 0
+    ? (confidence * 0.3 + qualityScore * 0.7)
+    : confidence;
 
-  if (confidence >= CONFIDENCE_HIGH) {
+  if (effectiveScore >= CONFIDENCE_HIGH) {
     return "high";
   }
-  if (confidence >= CONFIDENCE_MEDIUM) {
+  if (effectiveScore >= CONFIDENCE_MEDIUM) {
     return "medium";
   }
   return "low";
@@ -712,9 +864,13 @@ async function fallbackSearchNode(state: AskStateType): Promise<Partial<AskState
 
   const refinedQuery = state.userQuery.replace(/\b(latest|recent|current|new)\b/gi, "").trim() || state.userQuery;
 
+  const contextAwareQuery = state.messages.length > 1
+    ? await rewriteQueryWithContext(state)
+    : refinedQuery;
+
   try {
     const searchResult = await webSearchTool.invoke({
-      query: refinedQuery,
+      query: contextAwareQuery,
       maxResults: 5,
     });
 
@@ -757,7 +913,7 @@ async function generalChatNode(state: AskStateType): Promise<Partial<AskStateTyp
   };
 
   let fullContent = "";
-  const stream = await chatModel.stream(state.messages);
+  const stream = await chatModel.stream(safeMessages(state));
   for await (const chunk of stream) {
     fullContent += chunk.content as string;
   }
@@ -775,7 +931,7 @@ async function generalChatNode(state: AskStateType): Promise<Partial<AskStateTyp
 }
 
 async function comparisonNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  graphLog("comparisonNode", "Generating structured comparison for:", state.userQuery);
+  log.debug("Generating structured comparison for:", state.userQuery);
 
   const reasoningStep: ReasoningStep = {
     step: "comparisonNode",
@@ -787,11 +943,44 @@ async function comparisonNode(state: AskStateType): Promise<Partial<AskStateType
     ? state.sources.map((s, i) => `[${i + 1}] ${s.title} - ${s.url}\n${s.excerpt}`).join("\n\n")
     : "";
 
-  return timed("comparisonNode", async () => {
+  const lastAssistantMessage = state.messages
+    .filter(m => m instanceof AIMessage)
+    .slice(-1)[0];
+  const previousResponse = lastAssistantMessage
+    ? (lastAssistantMessage.content as string).substring(0, 500)
+    : "";
+
+  const lastComparisonPayload = state.uiPayloads.filter(p => p.type === "comparison").slice(-1)[0];
+  const previousComparisonData = lastComparisonPayload
+    ? JSON.stringify(lastComparisonPayload.data)
+    : "";
+
+  return withTiming(log, "comparisonNode", async () => {
     const structuredModel = chatModel.withStructuredOutput(comparisonOutputSchema, {
       name: "comparisonOutput",
       method: "jsonMode",
     });
+
+    const followupHint = state.messages.length > 1
+      ? "\n\nIMPORTANT: This may be a followup request. Check the 'Previous Response' and 'Previous Comparison Data' sections. If the user is asking to add/remove/modify items, merge their request with the existing data. Preserve all existing items and criteria unless told otherwise."
+      : "";
+
+    const contextSection = (() => {
+      const parts: string[] = [];
+      if (previousResponse) {
+        parts.push(`Previous Response:\n${previousResponse}`);
+      }
+      if (previousComparisonData) {
+        parts.push(`Previous Comparison Data JSON:\n${previousComparisonData}`);
+      }
+      if (sourcesText) {
+        parts.push(`Sources:\n${sourcesText}`);
+      }
+      if (parts.length === 0) {
+        return "Use your knowledge.";
+      }
+      return parts.join("\n\n");
+    })();
 
     const parsed = await structuredModel.invoke([
       new SystemMessage(`You are a JSON comparison engine. Return a structured comparison object.
@@ -804,7 +993,7 @@ CRITICAL:
 - Values: 1-3 words
 - 3-5 criteria
 
-${sourcesText ? `Use these sources:\n${sourcesText}` : "Use your knowledge."}`),
+${contextSection}${followupHint}`),
       new HumanMessage(state.userQuery),
     ]);
 
@@ -850,7 +1039,7 @@ ${sourcesText ? `Use these sources:\n${sourcesText}` : "Use your knowledge."}`),
       })
       .join("\n\n");
 
-    graphLog("comparisonNode", "Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
+    log.debug("Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
 
     return {
       finalResponse: `Here's a comparison of ${itemsAsRecord.map((i) => i.name).join(", ")}:\n\n${textSummary}`,
@@ -862,7 +1051,7 @@ ${sourcesText ? `Use these sources:\n${sourcesText}` : "Use your knowledge."}`),
 }
 
 async function formNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  graphLog("formNode", "Generating structured form for:", state.userQuery);
+  log.debug("Generating structured form for:", state.userQuery);
 
   const reasoningStep: ReasoningStep = {
     step: "formNode",
@@ -874,11 +1063,44 @@ async function formNode(state: AskStateType): Promise<Partial<AskStateType>> {
     ? `\n\nAttached files:\n${state.attachments.map(a => `--- ${a.name} ---\n${a.content}`).join("\n")}`
     : "";
 
-  return timed("formNode", async () => {
+  const lastAssistantMessage = state.messages
+    .filter(m => m instanceof AIMessage)
+    .slice(-1)[0];
+  const previousResponse = lastAssistantMessage
+    ? (lastAssistantMessage.content as string).substring(0, 500)
+    : "";
+
+  const lastFormPayload = state.uiPayloads.filter(p => p.type === "form").slice(-1)[0];
+  const previousFormData = lastFormPayload
+    ? JSON.stringify(lastFormPayload.data)
+    : "";
+
+  return withTiming(log, "formNode", async () => {
     const structuredModel = chatModel.withStructuredOutput(formOutputSchema, {
       name: "formOutput",
       method: "jsonMode",
     });
+
+    const followupHint = state.messages.length > 1
+      ? "\n\nIMPORTANT: This may be a followup request. Check the 'Previous Response' and 'Previous Form Data' sections. If the user is asking to add/remove/modify fields, merge their request with the existing form. Preserve all existing fields unless told otherwise."
+      : "";
+
+    const contextSection = (() => {
+      const parts: string[] = [];
+      if (previousResponse) {
+        parts.push(`Previous Response:\n${previousResponse}`);
+      }
+      if (previousFormData) {
+        parts.push(`Previous Form Data JSON:\n${previousFormData}`);
+      }
+      if (attachmentContext) {
+        parts.push(`Use attached files for context:${attachmentContext}`);
+      }
+      if (parts.length === 0) {
+        return "Use your knowledge to infer sensible defaults.";
+      }
+      return parts.join("\n\n");
+    })();
 
     const parsed = await structuredModel.invoke([
       new SystemMessage(`You are a JSON form schema generator. Analyze the user's request and generate a structured configuration form. Return valid JSON only.
@@ -893,7 +1115,7 @@ CRITICAL:
 - 3-8 fields total
 - Use reasonable defaults based on common conventions
 
-${attachmentContext ? `Use attached files for context:${attachmentContext}` : "Use your knowledge to infer sensible defaults."}`),
+${contextSection}${followupHint}`),
       new HumanMessage(state.userQuery),
     ]);
 
@@ -928,7 +1150,7 @@ ${attachmentContext ? `Use attached files for context:${attachmentContext}` : "U
 
     const fieldSummary = normalizedFields.map((f) => `${f.label}: ${JSON.stringify(f.value)}`).join(", ");
 
-    graphLog("formNode", "Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
+    log.debug("Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
 
     return {
       finalResponse: `Here's a configuration form with ${normalizedFields.length} fields:\n\n${fieldSummary}`,
@@ -939,8 +1161,117 @@ ${attachmentContext ? `Use attached files for context:${attachmentContext}` : "U
   });
 }
 
+async function chartNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  log.debug("Generating chart visualization for:", state.userQuery);
+
+  const reasoningStep: ReasoningStep = {
+    step: "chartNode",
+    status: "in_progress",
+    detail: "Generating chart visualization",
+  };
+
+  const sourcesText = state.sources.length > 0
+    ? state.sources.map((s, i) => `[${i + 1}] ${s.title} - ${s.url}\n${s.excerpt}`).join("\n\n")
+    : "";
+
+  const lastAssistantMessage = state.messages
+    .filter(m => m instanceof AIMessage)
+    .slice(-1)[0];
+  const previousResponse = lastAssistantMessage
+    ? (lastAssistantMessage.content as string).substring(0, 2000)
+    : "";
+
+  const lastChartPayload = state.uiPayloads.length > 0
+    ? JSON.stringify(state.uiPayloads[state.uiPayloads.length - 1].data)
+    : "";
+
+  return withTiming(log, "chartNode", async () => {
+    const structuredModel = chatModel.withStructuredOutput(chartOutputSchema, {
+      name: "chartOutput",
+      method: "jsonMode",
+    });
+
+    const contextSection = (() => {
+      const parts: string[] = [];
+      if (previousResponse) {
+        parts.push(`Previous Assistant Response (context for followup requests):\n${previousResponse}`);
+      }
+      if (lastChartPayload) {
+        parts.push(`Previous Chart Data JSON:\n${lastChartPayload}`);
+      }
+      if (sourcesText) {
+        parts.push(`Use these sources for data:\n${sourcesText}`);
+      }
+      if (parts.length === 0) {
+        return "Use your knowledge to generate reasonable sample data.";
+      }
+      return parts.join("\n\n");
+    })();
+
+    const followupHint = state.messages.length > 1
+      ? "\n\nIMPORTANT: This may be a followup to a previous chart/visualization request OR a request to show previous data as a chart. If the user says 'show in graphs', 'show as chart', 'plot this', or similar, extract the relevant numeric data from the 'Previous Assistant Response' and create a chart from it. If there is existing chart data in 'Previous Chart Data JSON', merge the user's request with it. Preserve the original chartType and all original data points unless the user explicitly asks to replace them."
+      : "";
+
+    const parsed = await structuredModel.invoke([
+      new SystemMessage(`You are a JSON chart data generator. Analyze the user's request and return structured chart data. Return valid JSON only.
+
+CRITICAL:
+- data is array of {name, value} objects (category is optional)
+- name: label for the data point (e.g., "Q1", "Product A")
+- value: numeric value only (no strings)
+- 3-12 data points
+- chartType: one of "bar", "line", "area", "pie"
+- Choose chartType based on data: use "bar" for comparisons, "line" for trends, "pie" for proportions, "area" for cumulative trends
+- xKey and yKey should match the data field names
+
+${contextSection}${followupHint}`),
+      new HumanMessage(state.userQuery),
+    ]);
+
+    // Validate data values are finite numbers
+    const validData = parsed.data.filter(
+      (d) => typeof d.value === "number" && isFinite(d.value)
+    );
+
+    const normalizedResponse = {
+      title: parsed.title || "Chart Visualization",
+      chartType: parsed.chartType,
+      description: parsed.description || "",
+      data: validData,
+      xKey: parsed.xKey || "name",
+      yKey: parsed.yKey || "value",
+    };
+
+    const completedStep: ReasoningStep = {
+      step: "chartNode",
+      status: "completed",
+      detail: `Generated ${parsed.chartType} chart: ${validData.length} data points`,
+    };
+
+    const uiPayload: UIPayload = {
+      type: "chart",
+      title: normalizedResponse.title,
+      data: normalizedResponse,
+      node: "chartNode",
+    };
+
+    const dataSummary = validData
+      .map((d) => `${d.name}: ${d.value}`)
+      .join(", ");
+
+    log.debug("Normalized chart output:", JSON.stringify(normalizedResponse).slice(0, 300));
+
+    return {
+      finalResponse: `Here's a ${parsed.chartType} chart showing ${validData.length} data points:\n\n${dataSummary}`,
+      uiPayloads: [uiPayload],
+      confidence: 0.9,
+      reasoningSteps: [reasoningStep, completedStep],
+    };
+  });
+}
+
 async function browserAgentNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  graphLog("browserAgent", "Starting browser automation for:", state.userQuery);
+  log.debug("Starting browser automation for:", state.userQuery);
 
   const inProgressStep: ReasoningStep = {
     step: "browserAgent",
@@ -948,45 +1279,54 @@ async function browserAgentNode(state: AskStateType): Promise<Partial<AskStateTy
     detail: "Initializing browser automation",
   };
 
-  return timed("browserAgent", async () => {
+  return withTiming(log, "browserAgent", async () => {
     if (!statefulBrowserAgent.isReady()) {
-      graphLog("browserAgent", "Initializing browser agent...");
+      log.debug("Initializing browser agent...");
       await statefulBrowserAgent.initialize();
     }
 
     const sessionId = await browserSessionManager.createSession();
-    graphLog("browserAgent", "Created browser session:", sessionId);
+    log.debug("Created browser session:", sessionId);
+
+    const recentHistory = state.messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-4)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+      .join("\n");
+
+    const taskWithHistory = state.messages.length > 1
+      ? `CONVERSATION CONTEXT (for reference):\n${recentHistory}\n\nTASK: ${state.userQuery}`
+      : state.userQuery;
 
     let fullResponse = "";
+    let error: unknown = null;
 
     try {
-      const stream = statefulBrowserAgent.executeTaskStream(state.userQuery, sessionId);
+      const stream = statefulBrowserAgent.executeTaskStream(taskWithHistory, sessionId);
 
       for await (const chunk of stream) {
         fullResponse += chunk;
       }
+    } catch (err) {
+      error = err;
+    } finally {
+      try {
+        await statefulBrowserAgent.closeSession(sessionId);
+        await browserSessionManager.closeSession();
+        log.debug("Browser session cleaned up:", sessionId);
+      } catch (cleanupError) {
+        log.warn('Browser session cleanup error:', cleanupError);
+      }
+    }
 
-      const completedStep: ReasoningStep = {
-        step: "browserAgent",
-        status: "completed",
-        detail: "Browser automation complete",
-      };
-
-      graphLog("browserAgent", "Browser task complete, response length:", fullResponse.length);
-
-      return {
-        finalResponse: fullResponse,
-        confidence: 0.85,
-        reasoningSteps: [inProgressStep, completedStep],
-      };
-    } catch (error) {
+    if (error) {
       const errorStep: ReasoningStep = {
         step: "browserAgent",
         status: "error",
         detail: error instanceof Error ? error.message : "Browser automation failed",
       };
 
-      graphError("browserAgent", { sessionId, error });
+      log.error("Browser agent error:", { sessionId, error });
 
       return {
         finalResponse: fullResponse || `Browser automation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -994,6 +1334,20 @@ async function browserAgentNode(state: AskStateType): Promise<Partial<AskStateTy
         reasoningSteps: [inProgressStep, errorStep],
       };
     }
+
+    const completedStep: ReasoningStep = {
+      step: "browserAgent",
+      status: "completed",
+      detail: "Browser automation complete",
+    };
+
+    log.debug("Browser task complete, response length:", fullResponse.length);
+
+    return {
+      finalResponse: fullResponse,
+      confidence: 0.85,
+      reasoningSteps: [inProgressStep, completedStep],
+    };
   });
 }
 
@@ -1006,9 +1360,14 @@ async function replanNode(state: AskStateType): Promise<Partial<AskStateType>> {
     detail: `Low confidence — refining search approach (attempt ${state.retryCount + 1}/${MAX_RETRIES})`,
   };
 
-  const refinedQuery = state.researchResults.length > 0
-    ? `${state.userQuery} more details`
-    : state.userQuery;
+  let refinedQuery: string;
+  if (state.messages.length > 1) {
+    refinedQuery = await rewriteQueryWithContext(state);
+  } else if (state.researchResults.length > 0) {
+    refinedQuery = `${state.userQuery} more details`;
+  } else {
+    refinedQuery = state.userQuery;
+  }
 
   const retryCount = state.retryCount + 1;
 
@@ -1021,6 +1380,54 @@ async function replanNode(state: AskStateType): Promise<Partial<AskStateType>> {
   return {
     userQuery: refinedQuery,
     retryCount,
+    researchResults: [],
+    sources: [],
     reasoningSteps: [reasoningStep, completedStep],
   };
+}
+
+// === DESKTOP CONFIRMATION NODE (HITL) ===
+// NOTE: This node is dormant until a preceding node produces `desktopActions`.
+// Currently, `browserAgentNode` and all other nodes return only `finalResponse`
+// and `confidence` without populating `desktopActions`, so the interrupt path
+// is unreachable in normal use. Future work should wire explicit destructive
+// actions into `state.desktopActions` before relying on this HITL flow.
+// Per LangGraph docs: code before interrupt() reruns on resume, so any
+// side effects must be idempotent.
+
+async function desktopConfirmationNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  // If no pending desktop actions, pass through
+  if (!state.desktopActions || state.desktopActions.length === 0) {
+    return { desktopActions: [] };
+  }
+
+  // Call interrupt to pause graph and wait for user confirmation
+  const confirmationPayload = {
+    type: 'desktop_confirmation',
+    action: state.desktopActions[0].type,
+    description: state.desktopActions[0].description,
+    actions: state.desktopActions,
+  };
+
+  // This pauses graph execution and waits for resume with Command({ resume: { confirmed: boolean } })
+  const resumeValue = interrupt(confirmationPayload) as { confirmed: boolean } | undefined;
+
+  const confirmed = resumeValue?.confirmed ?? false;
+  const logResult = createLogger("Graph");
+
+  if (confirmed) {
+    logResult.debug("Desktop action confirmed");
+    const confirmedActions: DesktopAction[] = state.desktopActions.map(a => ({
+      ...a,
+      success: true,
+    }));
+    return { desktopActions: confirmedActions };
+  } else {
+    logResult.debug("Desktop action cancelled by user");
+    const cancelledActions: DesktopAction[] = state.desktopActions.map(a => ({
+      ...a,
+      success: false,
+    }));
+    return { desktopActions: cancelledActions };
+  }
 }

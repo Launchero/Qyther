@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { SearchResult } from '../components/ResultsList';
 import { getFileTypeFromName } from '../utils/fileUtils';
+import { logInfo, logError } from '../utils/debugLogger';
 
 export interface FileSearchResult {
   path: string;
@@ -77,18 +78,9 @@ const CACHE_MAX_SIZE = 100;
 const CACHE_TTL_MS = 30000; // 30 seconds
 const lruCache = new LRUCache<string, FileSearchResult[]>(CACHE_MAX_SIZE, CACHE_TTL_MS);
 
-/**
- * Clear the file search cache. Useful for testing and HMR cleanup.
- */
-export function clearFileSearchCache(): void {
-  lruCache.clear();
-}
-
 // Cleanup cache on Vite HMR
-// @ts-expect-error - vite/client types provide import.meta.hot
-if (typeof import.meta !== 'undefined' && import.meta.hot) {
-  // @ts-expect-error - vite/client types provide import.meta.hot
-  import.meta.hot.dispose(() => {
+if (typeof import.meta !== 'undefined' && 'hot' in import.meta) {
+  (import.meta as any).hot.dispose(() => {
     lruCache.clear();
   });
 }
@@ -151,7 +143,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
         // Retry with exponential backoff
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 100; // 100ms, 200ms, 400ms
-          console.log(`[useFileSearch] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          logInfo(`[useFileSearch] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -173,7 +165,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     // Check cache first (LRU automatically updates access time)
     const cached = lruCache.get(trimmedQuery);
     if (cached) {
-      console.log(`[useFileSearch] Cache hit for "${searchQuery}"`);
+      logInfo(`[useFileSearch] Cache hit for "${searchQuery}"`);
       setResults(cached);
       setIsLoading(false);
       setError(null);
@@ -189,14 +181,14 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
       if (isMountedRef.current) {
         lruCache.set(trimmedQuery, fileResults);
         
-        console.log(`[useFileSearch] Found ${fileResults.length} results for "${searchQuery}"`);
+        logInfo(`[useFileSearch] Found ${fileResults.length} results for "${searchQuery}"`);
         setResults(fileResults);
         setError(null);
       }
     } catch (err) {
       if (isMountedRef.current) {
         const errorMessage = err instanceof Error ? err.message : 'Search failed';
-        console.error('[useFileSearch] Search error:', errorMessage, err);
+        logError('[useFileSearch] Search error:', errorMessage, err);
         setError(errorMessage);
         setResults([]);
       }
@@ -241,7 +233,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     };
   }, [query, enabled, debounceMs, searchFiles]);
 
-  const searchResults: SearchResult[] = results.map((file, index) => {
+  const searchResults: SearchResult[] = useMemo(() => results.map((file, index) => {
     // Normalize folder detection: path ending with separator is always a folder
     const isFolder = file.isFolder || file.path.endsWith('\\') || file.path.endsWith('/');
     const fileType = getFileTypeFromName(file.name, isFolder);
@@ -260,7 +252,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
         fileType,
       },
     });
-  });
+  }), [results]);
 
   return {
     fileResults: searchResults,

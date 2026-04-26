@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { AttachedFile } from '../components/ChatInputArea';
+import type { AttachedFile } from '../types/ask-types';
+import { logError } from '../utils/debugLogger';
 
 export function useContextAttachments() {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -38,7 +39,7 @@ export function useContextAttachments() {
         addFile({ name: fileName, path: result.path, type: 'file' });
       }
     } catch (error) {
-      console.error('[useContextAttachments] File picker error:', error);
+      logError('[useContextAttachments] File picker error:', error);
     }
   }, [addFile]);
 
@@ -51,7 +52,7 @@ export function useContextAttachments() {
         addFile({ name: folderName, path: result.path, type: 'file' });
       }
     } catch (error) {
-      console.error('[useContextAttachments] Folder picker error:', error);
+      logError('[useContextAttachments] Folder picker error:', error);
     }
   }, [addFile]);
 
