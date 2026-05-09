@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Vite HMR type lacks .hot property */
 import type { SearchResult } from '../components/ResultsList';
 import { getFileTypeFromName } from '../utils/fileUtils';
 import { logInfo, logError } from '../utils/debugLogger';
@@ -150,7 +151,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     }
     
     throw lastError;
-  }, [options.maxResults, options.excludeHidden, options.excludeSystem, options.includeMetadata]);
+  }, [options.maxResults]);
 
   const searchFiles = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -240,8 +241,8 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     return ({
       id: `file-${index}-${file.path}`,
       title: file.name,
-      subtitle: `${file.path}${file.size ? ` • ${file.size}` : ''}${file.dateModified ? ` • ${file.dateModified}` : ''}`,
-      icon: isFolder ? '📁' : '📄',
+      subtitle: `${file.path}${file.size ? ` � ${file.size}` : ''}${file.dateModified ? ` � ${file.dateModified}` : ''}`,
+      icon: isFolder ? '' : '📄',
       type: 'file',
       action: file.path,
       metadata: {

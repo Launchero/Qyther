@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { calculateCost, formatCost, formatTokenCount, calculateTokensPerSecond, getDisplayModelName, MODEL_PRICING, type TaskMetrics } from '../../../utils/costCalculator';
+import { formatCost, formatTokenCount, calculateTokensPerSecond, getDisplayModelName, MODEL_PRICING, type TaskMetrics } from '../../../utils/costCalculator';
 import { ClockIcon, CaretDownIcon, SquaresFourIcon } from '@phosphor-icons/react';
 
 interface TaskMetricsProps {

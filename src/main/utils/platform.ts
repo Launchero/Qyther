@@ -22,6 +22,7 @@ export interface SystemInfo {
   nodeVersion: string;
   appVersion: string;
   userDataPath: string;
+  currentDate: string;
 }
 
 /**
@@ -107,6 +108,12 @@ export function getSystemInfo(): SystemInfo {
     nodeVersion: process.version,
     appVersion: app.getVersion(),
     userDataPath: app.getPath('userData'),
+    currentDate: new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
   };
 }
 

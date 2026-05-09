@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any -- LLM/component payload shapes are dynamic */
+﻿import React, { useRef, useEffect } from 'react';
 import { ChatMessageActions } from './ask-mode/ChatMessageActions';
 import { GenerativeUI, GenerativeUIType } from './ask-mode/GenerativeUI';
 import { GenerativeUISkeleton } from './ask-mode/GenerativeUI/GenerativeUISkeleton';

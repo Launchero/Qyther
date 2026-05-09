@@ -1,10 +1,9 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MemorySaver } from '@langchain/langgraph';
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
-import { loadMcpTools } from '@langchain/mcp-adapters';
-import type { RunnableToolLike } from '@langchain/core/runnables';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Browser/MCP tool results are highly dynamic */
 import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
 import { createLogger } from '../../utils/logger';
@@ -334,7 +333,7 @@ Current session: ${sessionId}`),
     return this.isInitialized;
   }
   
-  async extractAllLinks(sessionId: string): Promise<string[]> {
+  async extractAllLinks(_sessionId: string): Promise<string[]> {
     if (!this.mcpClient) {
       throw new Error('MCP client not initialized');
     }

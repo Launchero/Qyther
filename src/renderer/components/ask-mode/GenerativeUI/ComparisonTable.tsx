@@ -1,4 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Comparison payload shapes are dynamic */
+﻿import React, { useMemo, useCallback } from 'react';
 import { DownloadSimpleIcon, CodeIcon, FileIcon } from '@phosphor-icons/react';
 
 export interface ComparisonItem {

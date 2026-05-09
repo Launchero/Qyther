@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CommandPalette } from './components/CommandPalette';
-import { LicenseActivation } from './components/LicenseActivation';
-import { ApiKeySetup } from './components/ApiKeySetup';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useSearch } from './hooks/useSearch';
 import { useFileSearch } from './hooks/useFileSearch';
@@ -37,53 +35,6 @@ const DEFAULT_COMMANDS: SearchResult[] = [
 
 export function App() {
   const { toggleTheme } = useTheme();
-  const [isLicensed, setIsLicensed] = useState(false);
-  const [licenseChecked, setLicenseChecked] = useState(false);
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-  const [apiConfigChecked, setApiConfigChecked] = useState(false);
-  
-  // Check license on mount
-  useEffect(() => {
-    async function checkLicense() {
-      try {
-        const storedKey = localStorage.getItem('qyther_license_key');
-        if (storedKey) {
-          const response = await window.electronAPI.license.verify(storedKey);
-          if (response.success) {
-            setIsLicensed(true);
-          } else {
-            // Stored key is invalid, clear it
-            localStorage.removeItem('qyther_license_key');
-          }
-        }
-      } catch {
-        // License check failed or not available
-        setIsLicensed(false);
-      } finally {
-        setLicenseChecked(true);
-      }
-    }
-    
-    checkLicense();
-  }, []);
-
-  // Check API config after license is confirmed
-  useEffect(() => {
-    if (!isLicensed) return;
-    
-    async function checkApiConfig() {
-      try {
-        const config = await window.electronAPI.apiConfig.load();
-        setApiKeyConfigured(config.configured);
-      } catch {
-        setApiKeyConfigured(false);
-      } finally {
-        setApiConfigChecked(true);
-      }
-    }
-    
-    checkApiConfig();
-  }, [isLicensed]);
   
   // Fetch installed applications on mount
   const [apps, setApps] = React.useState<SearchResult[]>([]);
@@ -128,7 +79,7 @@ export function App() {
   } = useSearch(allItems);
   
   const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
-  const { windowMode, isManuallyExpanded, isCollapsing, setIsManuallyExpanded } = useWindowMode({ searchQuery, searchMode });
+  const { windowMode, isCollapsing } = useWindowMode({ searchQuery, searchMode });
   const { recentFiles, addRecentFile } = useRecentFiles(4);
   const { executingId, execute } = useCommandExecution({
     onExecuted: (result) => {
@@ -250,6 +201,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!isResizingRef.current) return;
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingRef.current) return;
       const delta = e.clientY - resizeStartY.current;
@@ -269,25 +222,13 @@ export function App() {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      isResizingRef.current = false;
+      setIsResizing(false);
     };
   }, []);
 
   return (
     <div className="w-full h-full max-w-full flex flex-col relative overflow-hidden m-0 p-0">
-      {/* License Activation Overlay - blocks entire app until licensed */}
-      {licenseChecked && !isLicensed && (
-        <LicenseActivation onActivated={() => setIsLicensed(true)} />
-      )}
-
-      {/* API Key Setup - appears after license activation */}
-      {licenseChecked && isLicensed && !apiConfigChecked && (
-        <div className="absolute inset-0 bg-background/50 z-40 flex items-center justify-center">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      )}
-      {licenseChecked && isLicensed && apiConfigChecked && !apiKeyConfigured && (
-        <ApiKeySetup onConfigured={() => setApiKeyConfigured(true)} />
-      )}
 
       {/* Background overlay - MUST be behind CommandPalette (z-0) */}
       <div className="fixed inset-0 bg-transparent z-0" />

@@ -8,7 +8,7 @@ export interface ThinkingStep {
   step: string;
   status: string;
   detail: string;
-  data?: any;
+  data?: unknown;
   update?: boolean;
 }
 
@@ -19,6 +19,15 @@ export interface UIPayload {
   node: string;
 }
 
+export interface ChatMetrics {
+  tokensUsed: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+  durationMs: number;
+  model: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -27,10 +36,10 @@ export interface ChatMessage {
   isStreaming?: boolean;
   hasStructuredData?: boolean;
   dataType?: GenerativeUIType;
-  structuredData?: any;
+  structuredData?: Record<string, unknown>;
   uiPayloads?: UIPayload[];
   thinkingSteps?: ThinkingStep[];
-  metrics?: any;
+  metrics?: ChatMetrics;
   reasoning?: { steps: Array<{ stepNumber: number; action: string; reasoning: string; confidence: number }> };
   sources?: Array<{
     id: string;
@@ -56,9 +65,9 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string;
   title: string;
-  messages: ChatMessage[];
-  createdAt: Date;
-  updatedAt: Date;
+  messages: Array<{ id?: string; role: string; content: string; timestamp: Date | string }>;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   model: string;
 }
 
@@ -84,7 +93,7 @@ interface UseChatSessionReturn {
   createNewSession: (title?: string) => Promise<string>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  listSessions: () => Promise<ChatSession[]>;
+  listSessions: () => Promise<import('../types').ChatSession[]>;
   clearHistory: () => Promise<void>;
   initializeChat: () => Promise<void>;
 }
@@ -101,6 +110,7 @@ export function useChatSession(): UseChatSessionReturn {
 
   useEffect(() => {
     initializeChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initializeChat calls IPC only, safe on mount
   }, []);
 
   useEffect(() => {
@@ -108,9 +118,9 @@ export function useChatSession(): UseChatSessionReturn {
       chunk: string;
       isComplete: boolean;
       error?: string;
-      metrics?: any;
-      reasoning?: any;
-      thinkingSteps?: any[];
+      metrics?: ChatMetrics;
+      reasoning?: { steps: Array<{ stepNumber: number; action: string; reasoning: string; confidence: number }> };
+      thinkingSteps?: ThinkingStep[];
       selfCorrected?: boolean;
       iterationsUsed?: number;
       validationScore?: number;
@@ -118,7 +128,7 @@ export function useChatSession(): UseChatSessionReturn {
       qualityScore?: number;
       verificationSkipped?: boolean;
       fullContent?: string | null;
-      uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>;
+      uiPayloads?: Array<{ type: string; title: string; data: Record<string, unknown>; node: string }>;
       sources?: Array<{ url: string; title: string; excerpt: string }>;
     }) => {
       if (data.isComplete) {
@@ -475,9 +485,12 @@ export function useChatSession(): UseChatSessionReturn {
       if (session) {
         setSessionId(sessionIdToLoad);
         // Normalize Date fields which may arrive as strings over IPC
-        const normalizedMessages = session.messages.map((m: ChatMessage) => ({
+        const normalizedMessages = session.messages.map((m) => ({
           ...m,
+          id: m.id || `msg-${Date.now()}`,
           timestamp: m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp),
+          isStreaming: false,
+          role: m.role as 'user' | 'assistant',
         }));
         setMessages(normalizedMessages);
         setThinkingSteps([]);
@@ -504,9 +517,10 @@ export function useChatSession(): UseChatSessionReturn {
     }
   };
 
-  const listSessions = async (): Promise<ChatSession[]> => {
+  const listSessions = async () => {
     try {
-      return await window.electronAPI.chat.listSessions();
+      const sessions = await window.electronAPI.chat.listSessions();
+      return sessions;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to list sessions';
       setError(errorMsg);

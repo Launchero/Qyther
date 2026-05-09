@@ -140,14 +140,42 @@ export function registerIPCHandlers(): void {
     }
   });
 
-  // Open URL handler
-  ipcMain.handle('url:open', async (_, url: string): Promise<void> => {
-    await shell.openExternal(url);
+  // Open URL handler - validates URL protocol to prevent arbitrary protocol handlers
+  ipcMain.handle('url:open', async (_, url: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        log.warn('Blocked URL with invalid protocol:', parsed.protocol);
+        return { success: false, error: 'Only http and https URLs are allowed' };
+      }
+      await shell.openExternal(url);
+      return { success: true };
+    } catch {
+      log.error('Invalid URL:', url);
+      return { success: false, error: 'Invalid URL format' };
+    }
   });
 
-  // Open file/folder handler
-  ipcMain.handle('file:open', async (_, path: string): Promise<void> => {
-    await shell.openPath(path);
+  // Open file/folder handler - validates path to prevent arbitrary file access
+  ipcMain.handle('file:open', async (_, path: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (!path || typeof path !== 'string' || path.length > 1000) {
+        return { success: false, error: 'Invalid path' };
+      }
+      // Reject paths with known dangerous patterns
+      if (path.includes('\\\\') && !path.startsWith('\\\\')) {
+        return { success: false, error: 'Invalid path' };
+      }
+      const result = await shell.openPath(path);
+      if (result) {
+        log.warn('shell.openPath returned error:', result);
+        return { success: false, error: result };
+      }
+      return { success: true };
+    } catch {
+      log.error('Failed to open path:', path);
+      return { success: false, error: 'Failed to open path' };
+    }
   });
 
   // Reveal file in folder handler
@@ -282,7 +310,7 @@ export function registerIPCHandlers(): void {
   });
 
   // Debug log handler - receives logs from renderer process
-  ipcMain.handle('debug:log', (event, message: string, data?: any) => {
+  ipcMain.handle('debug:log', (event, message: string, data?: unknown) => {
     log.debug(message, data ? JSON.stringify(data, null, 2) : '');
   });
 

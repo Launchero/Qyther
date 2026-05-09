@@ -2,11 +2,22 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // #region agent log
 const PRELOAD_LOGGING_ENABLED = process.env.LOG_PRELOAD === 'true';
-const PRELOAD_LOG_ENDPOINT = process.env.LOG_PRELOAD_ENDPOINT || 'http://127.0.0.1:7593/ingest/711a8501-3d31-485b-8bdd-ee2778fa3e69';
-const PRELOAD_SESSION_ID = process.env.LOG_PRELOAD_SESSION_ID || 'e0162f';
+// Remote logging endpoint must be explicitly configured - disabled by default for security
+const PRELOAD_LOG_ENDPOINT = process.env.LOG_PRELOAD_ENDPOINT || '';
+const PRELOAD_SESSION_ID = process.env.LOG_PRELOAD_SESSION_ID || '';
 
-const logToServer = (message: string, data: any = {}, hypothesisId: string = 'A') => {
-  if (!PRELOAD_LOGGING_ENABLED) return;
+const logToServer = (message: string, data: unknown = {}, hypothesisId: string = 'A') => {
+  if (!PRELOAD_LOGGING_ENABLED || !PRELOAD_LOG_ENDPOINT) return;
+
+  // Validate endpoint is localhost to prevent data exfiltration
+  try {
+    const parsed = new URL(PRELOAD_LOG_ENDPOINT);
+    if (parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost') {
+      return; // Reject non-local endpoints
+    }
+  } catch {
+    return; // Invalid URL
+  }
 
   fetch(PRELOAD_LOG_ENDPOINT, {
     method: 'POST',
@@ -21,7 +32,9 @@ const logToServer = (message: string, data: any = {}, hypothesisId: string = 'A'
       runId: 'initial',
       hypothesisId,
     }),
-  }).catch(() => {});
+  }).catch(() => {
+    // Silently ignore network errors - preload should not fail on logging issues
+  });
 };
 // #endregion
 
@@ -66,6 +79,83 @@ ipcRenderer.on('desktop:screenshot:capture', async (_event, reqId: string) => {
     ipcRenderer.send('desktop:screenshot:error', reqId, error instanceof Error ? error.message : 'Unknown error');
   }
 });
+
+// IPC message types for chat stream events
+interface StreamMetrics {
+  tokensUsed: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+  durationMs: number;
+  model: string;
+}
+
+interface StreamReasoning {
+  steps: Array<{
+    stepNumber: number;
+    action: string;
+    reasoning: string;
+    confidence: number;
+  }>;
+}
+
+interface StreamThinkingStep {
+  type: string;
+  step: string;
+  status: string;
+  detail: string;
+  data?: unknown;
+  update?: boolean;
+}
+
+interface StreamChunkData {
+  chunk: string;
+  isComplete: boolean;
+  metrics?: StreamMetrics;
+  reasoning?: StreamReasoning;
+  thinkingSteps?: StreamThinkingStep[];
+  selfCorrected?: boolean;
+  iterationsUsed?: number;
+  validationScore?: number;
+  qualityScore?: number;
+  confidence?: number;
+  verificationSkipped?: boolean;
+  uiPayloads?: UIPayloadForRenderer[];
+  sources?: SourceItem[];
+}
+
+interface UIPayloadForRenderer {
+  type: string;
+  title: string;
+  data: Record<string, unknown>;
+  node: string;
+}
+
+interface SourceItem {
+  url: string;
+  title: string;
+  excerpt: string;
+}
+
+interface ThinkingStepData {
+  type: string;
+  step: string;
+  status: string;
+  detail: string;
+  data?: unknown;
+  update?: boolean;
+}
+
+interface BrowserProgressData {
+  sessionId: string;
+  progress: {
+    step: number;
+    maxSteps: number;
+    status: 'navigating' | 'clicking' | 'typing' | 'extracting' | 'complete' | 'error';
+    url?: string;
+    message: string;
+  };
+}
 
 // Define strict API surface for renderer
 export const electronAPI = {
@@ -166,7 +256,7 @@ export const electronAPI = {
 
   // Debug logging
   debug: {
-    log: (message: string, data?: any) => ipcRenderer.invoke('debug:log', message, data),
+    log: (message: string, data?: unknown) => ipcRenderer.invoke('debug:log', message, data),
   },
 
   // Chat API
@@ -186,8 +276,8 @@ export const electronAPI = {
     isReady: () => ipcRenderer.invoke('chat:isReady'),
     resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) =>
       ipcRenderer.invoke('chat:resumeGraph', { threadId, resumeValue }),
-    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => callback(data);
+    onStreamChunk: (callback: (data: StreamChunkData) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: StreamChunkData) => callback(data);
       ipcRenderer.on('chat:stream-chunk', handler);
       return () => {
         ipcRenderer.removeListener('chat:stream-chunk', handler);
@@ -200,8 +290,8 @@ export const electronAPI = {
         ipcRenderer.removeListener('chat:stream-replace', handler);
       };
     },
-    onThinkingStep: (callback: (data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => callback(data);
+    onThinkingStep: (callback: (data: ThinkingStepData) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: ThinkingStepData) => callback(data);
       ipcRenderer.on('chat:thinking-step', handler);
       return () => {
         ipcRenderer.removeListener('chat:thinking-step', handler);
@@ -257,8 +347,8 @@ export const electronAPI = {
     createSession: (config?: { headed?: boolean }) => ipcRenderer.invoke('browser:createSession', config),
     closeSession: (sessionId: string) => ipcRenderer.invoke('browser:closeSession', sessionId),
     extractLinks: () => ipcRenderer.invoke('browser:extractLinks'),
-    onProgress: (callback: (data: { sessionId: string; progress: any }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string; progress: any }) => callback(data);
+    onProgress: (callback: (data: BrowserProgressData) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: BrowserProgressData) => callback(data);
       ipcRenderer.on('browser:progress', handler);
       return () => {
         ipcRenderer.removeListener('browser:progress', handler);
@@ -298,11 +388,6 @@ export const electronAPI = {
       ipcRenderer.invoke('dialog:openFile', options),
     openFolder: (options?: { defaultPath?: string }) =>
       ipcRenderer.invoke('dialog:openFolder', options),
-  },
-
-  // License (Gumroad-based verification)
-  license: {
-    verify: (licenseKey: string) => ipcRenderer.invoke('license:verify', licenseKey),
   },
 
   // API Config (buyer-provided API keys)

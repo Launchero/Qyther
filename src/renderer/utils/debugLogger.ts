@@ -31,7 +31,9 @@ const rendererLevel = getRendererLogLevel();
 interface LogData {
   location?: string;
   message?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -117,7 +119,7 @@ export function logWindowMode(
   electronWindow?: string
 ) {
   if (!shouldLog(LogLevel.info)) return;
-  const logData: any = { mode };
+  const logData: Record<string, unknown> = { mode };
 
   if (viewportSize) {
     logData.viewportSize = viewportSize;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { SearchResult } from '@/components/ResultsList';
-import { FILE_ACTIONS, getActionsForItem, type FileAction } from '@/utils/fileActions';
+import { getActionsForItem, type FileAction } from '@/utils/fileActions';
 
 export function useActionPanel() {
   const [isOpen, setIsOpen] = useState(false);

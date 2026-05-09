@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { CaretDownIcon, PaperPlaneRightIcon, PaperclipIcon, XIcon, GlobeIcon } from '@phosphor-icons/react';
 import { SearchWebToggle } from './SearchWebToggle';
 import { ShortcutKey } from '@/components/common/ShortcutKeys';
@@ -54,7 +54,7 @@ export function UnifiedCommandBar({
     useDragAndDrop({
       onFilesDrop: (files) => {
         files.forEach((file) => {
-          const filePath = (file as any).path || '';
+          const filePath = (file as File & { path?: string }).path || '';
           onAddFile?.({ name: file.name, path: filePath, type: 'file' });
         });
       },

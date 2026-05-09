@@ -94,7 +94,7 @@ export function SearchBar({
     if (currentMode !== activeMode) {
       setActiveMode(currentMode);
     }
-  }, [currentMode]);
+  }, [currentMode, activeMode]);
 
   const handleModeChange = (mode: SearchMode) => {
     setActiveMode(mode);

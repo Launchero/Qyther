@@ -72,8 +72,9 @@ export function AskModeExpanded({
 
   // Browser automation event listeners
   useEffect(() => {
-    const handleBrowserProgress = (data: { sessionId: string; progress: BrowserProgress }) => {
-      dispatch({ type: 'SET_PROGRESS', progress: data.progress });
+    const handleBrowserProgress = (data: { sessionId: string; progress: unknown }) => {
+      const progress = data.progress as BrowserProgress;
+      dispatch({ type: 'SET_PROGRESS', progress });
     };
 
     const handleBrowserError = (data: { sessionId: string; error: string }) => {
@@ -139,19 +140,18 @@ export function AskModeExpanded({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [browserState.enabled, browserState.sessionActive]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       const sessions = await listSessions();
       setHistoryItems(sessions.slice(0, 10));
     } catch (err) {
       logError('[AskModeExpanded] Failed to load history:', err);
     }
-  };
+  }, [listSessions]);
 
   useEffect(() => {
     loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadHistory]);
 
   const handleNewChat = useCallback(async () => {
     onClearAttachments?.();
@@ -159,7 +159,7 @@ export function AskModeExpanded({
     setWelcomeState(true);
     setHasSentMessage(false);
     loadHistory(); // Refresh list after creating a new session
-  }, [createNewSession, onClearAttachments]);
+  }, [createNewSession, onClearAttachments, loadHistory]);
 
   // Keep a ref to the latest searchQuery so the registered callback always has current value
   const searchQueryRef = useRef(searchQuery);
@@ -215,7 +215,7 @@ export function AskModeExpanded({
     await loadSession(sessionIdToLoad);
     setWelcomeState(false);
     loadHistory(); // Refresh list after switching sessions
-  }, [loadSession]);
+  }, [loadSession, loadHistory]);
 
   const handleCopy = useCallback(async (content: string) => {
     try {

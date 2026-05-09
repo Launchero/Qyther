@@ -1,4 +1,73 @@
 // Define ElectronAPI type locally to avoid cross-context imports
+
+export interface ChatMetrics {
+  tokensUsed: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+  durationMs: number;
+  model: string;
+}
+
+export interface ReasoningTrace {
+  steps: Array<{ stepNumber: number; action: string; reasoning: string; confidence: number }>;
+}
+
+export interface UIPayload {
+  type: string;
+  title: string;
+  data: Record<string, unknown>;
+  node: string;
+}
+
+export interface Source {
+  url: string;
+  title: string;
+  excerpt: string;
+}
+
+export interface ThinkingStepData {
+  type: string;
+  step: string;
+  status: string;
+  detail: string;
+  data?: unknown;
+  update?: boolean;
+}
+
+export interface StreamChunkData {
+  chunk: string;
+  isComplete: boolean;
+  error?: string;
+  metrics?: ChatMetrics;
+  reasoning?: ReasoningTrace;
+  thinkingSteps?: ThinkingStepData[];
+  selfCorrected?: boolean;
+  iterationsUsed?: number;
+  validationScore?: number;
+  qualityScore?: number;
+  confidence?: number;
+  verificationSkipped?: boolean;
+  fullContent?: string | null;
+  uiPayloads?: UIPayload[];
+  sources?: Source[];
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: Array<{ id?: string; role: string; content: string; timestamp: Date | string }>;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  model: string;
+}
+
+export interface BrowserProgressData {
+  type: string;
+  message: string;
+  [key: string]: unknown;
+}
+
 export interface ElectronAPI {
   // App info
   getVersion: () => Promise<string>;
@@ -68,12 +137,7 @@ export interface ElectronAPI {
 
   // Debug logging
   debug: {
-    log: (message: string, data?: any) => Promise<void>;
-  };
-
-  // License (Gumroad-based verification)
-  license: {
-    verify: (licenseKey: string) => Promise<{ success: boolean; error?: string; purchase?: any }>;
+    log: (message: string, data?: unknown) => Promise<void>;
   };
 
   // API Config (buyer-provided API keys)
@@ -90,17 +154,17 @@ export interface ElectronAPI {
     sendMessage: (content: string, sessionId?: string) => Promise<{ success: boolean; response?: string; error?: string }>;
     sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => Promise<{ success: boolean; response?: string; error?: string }>;
     createSession: (title?: string) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
-    getCurrentSession: () => Promise<any>;
-    getSession: (sessionId: string) => Promise<any>;
-    listSessions: () => Promise<any[]>;
+    getCurrentSession: () => Promise<ChatSession | null>;
+    getSession: (sessionId: string) => Promise<ChatSession | null>;
+    listSessions: () => Promise<ChatSession[]>;
     switchSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     clearHistory: () => Promise<{ success: boolean; error?: string }>;
     isReady: () => Promise<boolean>;
     resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) => Promise<{ success: boolean; error?: string }>;
-    onStreamChunk: (callback: (data: { chunk: string; isComplete: boolean; metrics?: any; reasoning?: any; thinkingSteps?: any[]; selfCorrected?: boolean; iterationsUsed?: number; validationScore?: number; qualityScore?: number; confidence?: number; verificationSkipped?: boolean; uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>; sources?: Array<{ url: string; title: string; excerpt: string }> }) => void) => () => void;
+    onStreamChunk: (callback: (data: StreamChunkData) => void) => () => void;
     onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => () => void;
-    onThinkingStep: (callback: (data: { type: string; step: string; status: string; detail: string; data?: any; update?: boolean }) => void) => () => void;
+    onThinkingStep: (callback: (data: ThinkingStepData) => void) => () => void;
     onUIPayloadStarted: (callback: (data: { type: string }) => void) => () => void;
     onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => () => void;
     onUIPayloadReset: (callback: () => void) => () => void;
@@ -140,7 +204,7 @@ export interface ElectronAPI {
     createSession: (config?: { headed?: boolean }) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
     closeSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     extractLinks: () => Promise<{ success: boolean; links?: string[]; error?: string }>;
-    onProgress: (callback: (data: { sessionId: string; progress: any }) => void) => () => void;
+    onProgress: (callback: (data: { sessionId: string; progress: unknown }) => void) => () => void;
     onChunk: (callback: (data: { sessionId: string; chunk: string }) => void) => () => void;
     onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
   };

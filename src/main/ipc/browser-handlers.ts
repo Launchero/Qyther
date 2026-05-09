@@ -97,7 +97,7 @@ export function registerBrowserHandlers(): void {
     }
   });
 
-  ipcMain.handle('browser:closeSession', async (_, sessionId?: string) => {
+  ipcMain.handle('browser:closeSession', async (_, _sessionId?: string) => {
     try {
       await langChainAgent.closeBrowserSession();
       

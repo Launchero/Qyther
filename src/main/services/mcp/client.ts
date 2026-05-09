@@ -1,4 +1,4 @@
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { MultiServerMCPClient, type Connection } from "@langchain/mcp-adapters";
 import type { RunnableToolLike } from "@langchain/core/runnables";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import { loadPreferences } from "../../preferences";
@@ -24,7 +24,7 @@ export class MCPService {
     }
 
     try {
-      const mcpServers: Record<string, any> = {};
+      const mcpServers: Record<string, Connection> = {};
       const enabledServers: string[] = [];
       
       for (const server of mcpConfig.servers || []) {
@@ -41,7 +41,7 @@ export class MCPService {
           };
         } else if (server.type === 'http' && server.url) {
           mcpServers[server.name] = {
-            transport: "streamable-http",
+            transport: "http",
             url: server.url,
           };
         }

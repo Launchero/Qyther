@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Form data shapes are dynamic */
+﻿import React, { useState } from 'react';
 import { LinkIcon, CheckIcon } from '@phosphor-icons/react';
 
 export interface FormField {

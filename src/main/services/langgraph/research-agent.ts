@@ -48,6 +48,8 @@ const FAST_PATTERNS = {
   thanks: /^\s*(thanks?|thank\s*you|ty|thx|cheers|appreciate\s*it)\s*$/i,
   acknowledgement: /^\s*(ok|okay|sure|yep|yeah|yup|nope|nah|no|got\s*it|alright|cool)\s*$/i,
   farewell: /^\s*(bye|goodbye|see\s*you|cya|later|take\s*care)\s*$/i,
+  date: /\b(what('?s| is)?\s+(today('?s| is)?\s+)?(the\s+)?date|today('?s| is)?\s+(the\s+)?date|current\s+date|what\s+day|day\s+of\s+week|what\s+day\s+is\s+it)\b/i,
+  time: /\b(what('?s| is)?\s+(the\s+)?time|current\s+time|what\s+time|tell\s+me\s+the\s+time)\b/i,
 };
 
 const FAST_RESPONSES: Record<string, string> = {
@@ -55,11 +57,28 @@ const FAST_RESPONSES: Record<string, string> = {
   thanks: "You're welcome! Let me know if you need anything else.",
   acknowledgement: "Got it! What would you like to do next?",
   farewell: "Goodbye! Feel free to come back anytime.",
+  date: (() => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
+    return `Today is **${dateStr}**.\n\nThe current day of the week is ${dayOfWeek}.`;
+  })(),
+  time: (() => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return `The current time is **${timeStr}**.`;
+  })(),
 };
 
 function detectFastPath(query: string): string | null {
   const trimmed = query.trim();
   if (trimmed.length === 0 || trimmed.length > 60) return null;
+
+  // Check for date/time queries first — these need to work even with question marks
+  if (FAST_PATTERNS.date.test(trimmed)) return 'date';
+  if (FAST_PATTERNS.time.test(trimmed)) return 'time';
+
+  // For other fast paths, reject if it has a question mark
   if (/[?]/.test(trimmed)) return null;
 
   for (const [type, pattern] of Object.entries(FAST_PATTERNS)) {
@@ -144,9 +163,11 @@ const chartOutputSchema = z.object({
   yKey: z.string().optional().default("value"),
 });
 
+// LangGraph compiled graph - types are highly dynamic due to StateGraph complexity
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedGraph: any = null;
 
-export async function getAskGraph(): Promise<any> {
+export async function getAskGraph() {
   if (cachedGraph) return cachedGraph;
 
   const compileStart = Date.now();
@@ -218,10 +239,9 @@ export async function getAskGraph(): Promise<any> {
   }
 
   log.debug("Compiled workflow with nodes:", Object.keys(workflow.nodes).join(", "));
-  log.debug("Edge structure:", JSON.stringify(Array.from(workflow.edges).map((e: any) => ({
+  log.debug("Edge structure:", JSON.stringify(Array.from(workflow.edges).map((e: [string, string]) => ({
     source: e[0],
     target: e[1],
-    conditional: e[2],
   })), null, 2));
 
   return cachedGraph;
@@ -567,7 +587,7 @@ async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<As
       });
 
       const parsed = JSON.parse(searchResult);
-      const sources: Source[] = parsed.results?.map((r: any) => ({
+      const sources: Source[] = parsed.results?.map((r: { url: string; title: string; snippet: string }) => ({
         url: r.url,
         title: r.title,
         excerpt: r.snippet,
@@ -875,7 +895,7 @@ async function fallbackSearchNode(state: AskStateType): Promise<Partial<AskState
     });
 
     const parsed = JSON.parse(searchResult);
-    const sources: Source[] = parsed.results?.map((r: any) => ({
+    const sources: Source[] = parsed.results?.map((r: { url: string; title: string; snippet: string }) => ({
       url: r.url,
       title: r.title,
       excerpt: r.snippet,

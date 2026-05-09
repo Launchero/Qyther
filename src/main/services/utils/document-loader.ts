@@ -1,14 +1,14 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import * as unzipper from 'unzipper';
 import { createRequire } from 'node:module';
 import { createLogger } from '../../utils/logger';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Document loader handles multiple dynamic file formats */
 
 const log = createLogger('DocLoader');
 
 // CJS-only modules must be loaded via createRequire for electron-vite ESM bundling
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 const xlsx = require('xlsx');
 const epub2 = require('epub2');
@@ -85,16 +85,22 @@ async function extractPdf(filePath: string, fileName: string): Promise<string> {
   const buffer = await fs.readFile(filePath);
   log.debug('PDF buffer size:', buffer.length, 'bytes, starts with:', buffer.slice(0, 5).toString('ascii'));
 
+  let parser: any;
   try {
-    const data = await pdfParse(buffer);
-    log.debug('PDF parse result - pages:', data.numpages, ', text length:', data.text?.length || 0);
+    parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    const text = result.text ?? '';
+    const pageInfo = result.info as { numpages?: number } | undefined;
+    const numpages = pageInfo?.numpages ?? 0;
 
-    if (!data.text || data.text.trim().length === 0) {
+    log.debug('PDF parse result - pages:', numpages, ', text length:', text.length);
+
+    if (!text || text.trim().length === 0) {
       return `[PDF "${fileName}" appears to be image-only or scanned. OCR is required to extract text — convert to text-based PDF or paste content manually.]`;
     }
 
-    const pageNote = data.numpages > 1 ? `\n[PDF: ${data.numpages} pages]` : '';
-    return data.text.trim() + pageNote;
+    const pageNote = numpages > 1 ? `\n[PDF: ${numpages} pages]` : '';
+    return text.trim() + pageNote;
   } catch (err: any) {
     log.error('PDF extraction error:', err?.message || err);
     const message = err?.message?.toLowerCase() || '';
@@ -106,6 +112,8 @@ async function extractPdf(filePath: string, fileName: string): Promise<string> {
       return `[PDF "${fileName}" appears to be corrupted or has an unsupported format.]`;
     }
     return `[Error extracting PDF "${fileName}": ${err?.message || 'Unknown error'}]`;
+  } finally {
+    parser?.destroy?.();
   }
 }
 

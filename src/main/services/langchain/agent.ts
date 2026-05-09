@@ -4,10 +4,10 @@ import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
 import { mcpService } from '../mcp/client';
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import type { RunnableToolLike } from "@langchain/core/runnables";
 import { statefulBrowserAgent } from '../browser/stateful-browser-agent';
 import { browserSessionManager } from '../browser/browser-session-manager';
 import { createLogger } from '../../utils/logger';
+/* eslint-disable @typescript-eslint/no-explicit-any -- LLM agent config shapes are highly dynamic */
 
 const log = createLogger('LangChain');
 
@@ -20,8 +20,8 @@ export interface ChatMessage {
   // P2 features metadata
   hasStructuredData?: boolean;
   dataType?: 'table' | 'form' | 'comparison' | 'list';
-  structuredData?: any;
-  uiPayloads?: Array<{ type: string; title: string; data: any; node: string }>;
+  structuredData?: Record<string, unknown>;
+  uiPayloads?: Array<{ type: string; title: string; data: Record<string, unknown>; node: string }>;
   sources?: Array<{
     id: string;
     url: string;

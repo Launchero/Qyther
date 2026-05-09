@@ -61,7 +61,9 @@ npm run lint       # ESLint check
 | Agent produced wrong output               | `skill-issue-diagnosis`                          |
 | Delegating multi-part work                | `parallel-orchestration`                         |
 | Structuring intent before coding          | `instruction-first`                              |
-| Plan mode research                        | `plan-mode-enhancement` (rule)                   |
+| Plan mode research & subagent task definition      | `plan-mode-enhancement` (rule)                      |
+| **Executing approved plan (DEFAULT)**              | `plan-executor-orchestrator`                        |
+| Sequential subagent handoff & verification         | `agent-handoff-verification` (rule)                 |
 | Electron main process / architecture      | `electron-core`                                  |
 | Electron + React integration              | `electron-react-core`                            |
 | IPC patterns (main <-> renderer)          | `electron-react-ipc`                             |

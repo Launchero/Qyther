@@ -7,23 +7,18 @@ const log = createLogger('Shortcuts');
 
 // Windows API constants
 const VK_SPACE = 0x20;
-const VK_LMENU = 0xA4; // Left Alt
-const VK_RMENU = 0xA5; // Right Alt
 const VK_MENU = 0x12;  // Alt (either)
 const WH_KEYBOARD_LL = 13;
 const WM_KEYDOWN = 0x0100;
-const WM_KEYUP = 0x0101;
 const WM_SYSKEYDOWN = 0x0104;
-const WM_SYSKEYUP = 0x0105;
 
 // Native hook state
 let keyboardHook: unknown = null;
 let user32: ReturnType<typeof import('koffi').load> | null = null;
-let kernel32: ReturnType<typeof import('koffi').load> | null = null;
 let hookCallback: unknown = null;
+let messagePumpInterval: ReturnType<typeof setInterval> | null = null;
 
 // Track Alt key state and debounce
-let isAltPressed = false;
 let lastToggleTime = 0;
 const TOGGLE_DEBOUNCE_MS = 300;
 
@@ -37,7 +32,6 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
 
     // Load Windows DLLs
     user32 = koffi.load('user32.dll');
-    kernel32 = koffi.load('kernel32.dll');
 
     // Define KBDLLHOOKSTRUCT for low-level keyboard hook
     const KBDLLHOOKSTRUCT = koffi.struct('KBDLLHOOKSTRUCT', {
@@ -59,10 +53,6 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
       'uint32',        // dwThreadId
     ]);
 
-    const UnhookWindowsHookEx = user32.func('__stdcall', 'UnhookWindowsHookEx', 'bool', [
-      'void *',        // hhk
-    ]);
-
     const CallNextHookEx = user32.func('__stdcall', 'CallNextHookEx', 'int', [
       'void *',        // hhk
       'int',           // nCode
@@ -72,13 +62,6 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
 
     const GetAsyncKeyState = user32.func('__stdcall', 'GetAsyncKeyState', 'int16', [
       'int',           // vKey
-    ]);
-
-    const GetMessageW = user32.func('__stdcall', 'GetMessageW', 'int', [
-      'void *',        // lpMsg
-      'void *',        // hWnd
-      'uint',          // wMsgFilterMin
-      'uint',          // wMsgFilterMax
     ]);
 
     const TranslateMessage = user32.func('__stdcall', 'TranslateMessage', 'bool', [
@@ -96,21 +79,12 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
         const kb = koffi.decode(lParam as Buffer, KBDLLHOOKSTRUCT);
 
         // Check if Alt is pressed (high bit set means key is down)
-        const altState = GetAsyncKeyState(VK_MENU);
-        const isAltDown = (altState & 0x8000) !== 0;
-
-        // Track Alt key state
-        if (kb.vkCode === VK_MENU) {
-          if (wParam === WM_KEYDOWN || wParam === WM_SYSKEYDOWN) {
-            isAltPressed = true;
-          } else if (wParam === WM_KEYUP || wParam === WM_SYSKEYUP) {
-            isAltPressed = false;
-          }
-        }
+        const altKeyState = GetAsyncKeyState(VK_MENU);
+        const isAltPhysicallyDown = (altKeyState & 0x8000) !== 0;
 
         // Check for Alt+Space (only on key down, with debounce)
         const now = Date.now();
-        if (kb.vkCode === VK_SPACE && isAltDown && (wParam === WM_KEYDOWN || wParam === WM_SYSKEYDOWN)) {
+        if (kb.vkCode === VK_SPACE && isAltPhysicallyDown && (wParam === WM_KEYDOWN || wParam === WM_SYSKEYDOWN)) {
           if (now - lastToggleTime < TOGGLE_DEBOUNCE_MS) {
             log.debug('Alt+Space debounced, ignoring');
           } else {
@@ -162,7 +136,7 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
     // Start a message pump in a separate interval to process hook messages
     // This is necessary because the hook runs in the context of the message pump
     const msgBuffer = Buffer.alloc(koffi.sizeof(MSG));
-    setInterval(() => {
+    messagePumpInterval = setInterval(() => {
       // Peek at messages to keep the hook alive
       while (PeekMessageW(msgBuffer, null, 0, 0, 1)) { // PM_REMOVE = 1
         TranslateMessage(msgBuffer);
@@ -176,6 +150,11 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
 }
 
 function cleanupWindowsGlobalHotkey(): void {
+  if (messagePumpInterval !== null) {
+    clearInterval(messagePumpInterval);
+    messagePumpInterval = null;
+  }
+
   if (keyboardHook && user32) {
     try {
       const UnhookWindowsHookEx = user32.func('__stdcall', 'UnhookWindowsHookEx', 'bool', ['void *']);

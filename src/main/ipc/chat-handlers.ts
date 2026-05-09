@@ -8,6 +8,24 @@ import * as path from 'path';
 import { extractDocument, getFormatConfig, DOCUMENT_EXTENSIONS } from '../services/utils/document-loader';
 import { createLogger } from '../utils/logger';
 
+interface GraphStateValues {
+  finalResponse?: string;
+  uiPayloads?: Array<{ type: string; title: string; data: Record<string, unknown>; node: string }>;
+  desktopActions?: Array<{ type: string; description: string; success: boolean; result?: string }>;
+  __interrupt__?: Array<{ value: { type: string; action: string; description: string } }>;
+  retryCount?: number;
+  qualityScore?: number;
+  confidence?: number;
+  sources?: Array<{ url: string; title: string; excerpt: string }>;
+  reasoningSteps?: Array<{ step: string; status: string; detail: string }>;
+  userQuery?: string;
+  [key: string]: unknown;
+}
+
+interface GraphState {
+  values: GraphStateValues;
+}
+
 const log = createLogger('Chat');
 
 // Serialize SQLite state access to prevent SQLITE_BUSY errors from concurrent reads/writes
@@ -192,8 +210,6 @@ export function registerChatHandlers(): void {
         await langChainAgent.switchSession(sessionId);
       }
 
-      let fullResponse = '';
-      
       const response = await langChainAgent.sendMessage(content, (chunk: string) => {
         // Send chunks to renderer via webContents
         event.sender.send('chat:stream-chunk', { chunk, isComplete: false });
@@ -331,7 +347,16 @@ export function registerChatHandlers(): void {
       const history = await langChainAgent.getCurrentSession();
 
       // Build messages array — inject attachment context first if files are attached
-      const messages: any[] = [];
+      const messages: Array<HumanMessage | AIMessage | SystemMessage> = [];
+
+      // Inject current date as system context so the LLM can answer date-related queries
+      const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      messages.push(new SystemMessage(`You have access to the current date. Today is ${today}. When asked about the date, day, or time, use this information directly. Do NOT say you don't have access to a clock or calendar — use the date provided here.`));
 
       if (attachmentContents.length > 0) {
         const attachmentContext = attachmentContents.map(a =>
@@ -359,7 +384,7 @@ export function registerChatHandlers(): void {
       }
 
       let fullResponse = '';
-      let thinkingSteps: Array<{ type: string; step: string; status: string; detail: string; data?: any }> = [];
+      let thinkingSteps: Array<{ type: string; step: string; status: string; detail: string; data?: unknown }> = [];
       const startTime = Date.now();
       let estimatedTokens = 0;
 
@@ -369,7 +394,6 @@ export function registerChatHandlers(): void {
         'browserAgent',
       ]);
 
-      let currentLoopIteration = 0;
       let streamedContent = '';
       const nodeRunCounts = new Map<string, number>();
 
@@ -412,7 +436,6 @@ export function registerChatHandlers(): void {
             if (isLoopNode && runCount > 1) {
               // New iteration: reset streamed content and update the UI
               if (runCount === 2) {
-                currentLoopIteration++;
                 // Replace the entire response with the new attempt's content
                 streamedContent = '';
                 // Reset UI payload state for the retry
@@ -426,7 +449,7 @@ export function registerChatHandlers(): void {
               const textContent = typeof contentChunk === 'string'
                 ? contentChunk
                 : Array.isArray(contentChunk)
-                  ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+                  ? contentChunk.filter((c: { type: string; text: string }) => c.type === 'text').map((c: { type: string; text: string }) => c.text).join('')
                   : '';
 
               if (textContent) {
@@ -513,7 +536,7 @@ export function registerChatHandlers(): void {
             const existingStep = thinkingSteps.find(s => s.status === 'in_progress' && s.type === 'tool_start');
             if (existingStep) {
               existingStep.status = 'completed';
-              existingStep.detail = `Completed: ${existingStep.data?.name || 'tool'}`;
+              existingStep.detail = `Completed: ${(existingStep.data as { name?: string } | undefined)?.name || 'tool'}`;
               event.sender.send('chat:thinking-step', { ...existingStep, update: true });
             }
           }
@@ -533,8 +556,8 @@ export function registerChatHandlers(): void {
       }
 
       // Get final state from checkpointer to ensure we have the last finalResponse
-      let uiPayloads: any[] = [];
-      let graphState: any;
+      let uiPayloads: GraphStateValues['uiPayloads'] = [];
+      let graphState: GraphState | undefined;
       try {
         graphState = await withStateLock(() =>
           graph.getState({ configurable: { thread_id: turnThreadId } })
@@ -545,14 +568,14 @@ export function registerChatHandlers(): void {
           fullResponse = stateFinalResponse;
           streamedContent = stateFinalResponse;
         }
-        uiPayloads = (graphState?.values?.uiPayloads as any[]) || [];
+        uiPayloads = (graphState?.values?.uiPayloads as GraphStateValues['uiPayloads']) || [];
       } catch (e) {
         log.warn('Could not get final graph state, using streamed content:', e);
       }
 
       // Emit desktop confirmation request when graph hit an interrupt() for destructive action.
       // LangGraph stores interrupt state; when interrupted, the graph pauses waiting for resume.
-      const interruptState = graphState?.values?.__interrupt__ as Array<{ value: any }> | undefined;
+      const interruptState = graphState?.values?.__interrupt__ as Array<{ value: { type: string; action: string; description: string } }> | undefined;
       const needsConfirmation = Array.isArray(interruptState) && interruptState.length > 0
         && interruptState[0]?.value?.type === 'desktop_confirmation';
       if (needsConfirmation) {
@@ -589,19 +612,6 @@ export function registerChatHandlers(): void {
           ? `fast:${process.env.FAST_MODEL} → ${process.env.MODEL}`
           : process.env.MODEL || 'qwen3.5-plus',
       };
-
-      // Debug trace: log the complete graph execution path
-      const executedNodes = thinkingSteps
-        .filter(s => s.type === "node_start")
-        .map(s => s.step);
-      const nodesWithTiming = thinkingSteps
-        .filter(s => s.type === "node_start" || s.type === "node_end")
-        .reduce((acc, s) => {
-          if (!acc[s.step]) acc[s.step] = {};
-          if (s.type === "node_start") acc[s.step].started = Date.now() - startTime;
-          if (s.type === "node_end") acc[s.step].ended = Date.now() - startTime;
-          return acc;
-        }, {} as Record<string, { started?: number; ended?: number }>);
 
       // Format reasoning steps for the ReasoningTrace component
       const reasoning = {
@@ -752,7 +762,7 @@ export function registerChatHandlers(): void {
               const textContent = typeof contentChunk === 'string'
                 ? contentChunk
                 : Array.isArray(contentChunk)
-                  ? contentChunk.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+                  ? contentChunk.filter((c: { type: string; text: string }) => c.type === 'text').map((c: { type: string; text: string }) => c.text).join('')
                   : '';
 
               if (textContent) {
@@ -777,8 +787,8 @@ export function registerChatHandlers(): void {
       }
 
       // Get final state
-      let uiPayloads: any[] = [];
-      let graphState: any;
+      let uiPayloads: GraphStateValues['uiPayloads'] = [];
+      let graphState: GraphState | undefined;
       try {
         graphState = await withStateLock(() =>
           graph.getState({ configurable: { thread_id: threadId } })
@@ -787,13 +797,13 @@ export function registerChatHandlers(): void {
         if (stateFinalResponse) {
           fullResponse = stateFinalResponse;
         }
-        uiPayloads = (graphState?.values?.uiPayloads as any[]) || [];
+        uiPayloads = (graphState?.values?.uiPayloads as GraphStateValues['uiPayloads']) || [];
       } catch (e) {
         log.warn('Could not get final graph state after resume:', e);
       }
 
       // Merge desktop actions into uiPayloads (single completion event)
-      const desktopActions = (graphState?.values?.desktopActions as any[]) || [];
+      const desktopActions = (graphState?.values?.desktopActions as GraphStateValues['desktopActions']) || [];
       if (desktopActions.length > 0) {
         uiPayloads = [
           ...uiPayloads,

@@ -1,7 +1,10 @@
+// Load environment variables from .env file — MUST be first so dotenv runs
+// before any module-scope ChatOpenAI instances read process.env.*
+import 'dotenv/config';
+
 import { app, Menu } from 'electron';
 import { createMainWindow } from './windows';
 import { registerIPCHandlers } from './ipc/handlers';
-import { registerLicenseHandlers } from './ipc/license-verify';
 import { registerApiConfigHandlers } from './ipc/api-config';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { createTray, destroyTray } from './tray';
@@ -15,9 +18,6 @@ import { getAskGraph } from './services/langgraph/research-agent';
 import { execSync } from 'child_process';
 import { createLogger } from './utils/logger';
 
-// Load environment variables from .env file
-import 'dotenv/config';
-
 // Polyfill Node.js globals for ESM compatibility (required by better-sqlite3)
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -25,6 +25,15 @@ globalThis.__filename = fileURLToPath(import.meta.url);
 globalThis.__dirname = dirname(globalThis.__filename);
 
 const log = createLogger('App');
+
+// Global error handlers - prevent silent crashes
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('Unhandled rejection at:', promise, 'reason:', reason);
+});
 
 // Enable security features
 app.enableSandbox();
@@ -49,7 +58,18 @@ logSystemInfo();
 
 app.whenReady().then(async () => {
   log.info('App ready');
-  
+
+  // Validate required environment variables for API features
+  const missingEnvVars: string[] = [];
+  if (!process.env.API_KEY) missingEnvVars.push('API_KEY');
+  if (!process.env.BASE_URL) missingEnvVars.push('BASE_URL');
+  if (!process.env.MODEL) missingEnvVars.push('MODEL');
+
+  if (missingEnvVars.length > 0) {
+    log.warn('Missing required environment variables for API features:', missingEnvVars.join(', '));
+    log.info('Users will be prompted to configure these via API Key Setup');
+  }
+
   initializePreferences();
   
   if (isWindows()) {
@@ -69,9 +89,6 @@ app.whenReady().then(async () => {
   
   registerIPCHandlers();
   log.info('IPC handlers registered');
-  
-  registerLicenseHandlers();
-  log.info('License handlers registered');
 
   registerApiConfigHandlers();
   log.info('API config handlers registered');

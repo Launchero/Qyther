@@ -20,7 +20,7 @@ export interface SearchResult {
     kind?: string;
     fileType?: string;
     shortcut?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -92,7 +92,7 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
       map.set(index, () => handleItemClick(index));
     });
     return map;
-  }, [results.length, handleItemClick]);
+  }, [results, handleItemClick]);
 
   const askCallbacks = useMemo(() => {
     if (!onAskAbout) return null;
@@ -101,7 +101,7 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
       map.set(index, () => handleItemAskAbout(index));
     });
     return map;
-  }, [results.length, onAskAbout, handleItemAskAbout]);
+  }, [results, onAskAbout, handleItemAskAbout]);
 
   // Scroll selected item into view with RAF batching to avoid layout thrashing
   useEffect(() => {

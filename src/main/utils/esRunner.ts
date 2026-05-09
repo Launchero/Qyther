@@ -191,21 +191,21 @@ function filterSystemFiles(
 /**
  * Process a single ES output item
  */
-function processEsItem(json: any): FileSearchResult {
-  const fullPath = json.filename || json.Path || json.Name || '';
+function processEsItem(json: unknown): FileSearchResult {
+  const item = json as Record<string, unknown>;
+  const fullPath = (item.filename as string) || (item.Path as string) || (item.Name as string) || '';
   const fileName = path.basename(fullPath);
-  const extension = path.extname(fullPath).toLowerCase();
   
   // Determine if it's a folder - primary check: Extension === 'Folder' (from -ext flag)
   // Fallback: folders report no Size, files always have a Size
-  const isFolder = json.Extension === 'Folder' || json.FileKind === 'Folder'
-    || (!json.Size && !json.size && !json.file_size && !json.FileSize);
+  const isFolder = item.Extension === 'Folder' || item.FileKind === 'Folder'
+    || (!item.Size && !item.size && !item.file_size && !item.FileSize);
   
   return {
     path: fullPath,
     name: fileName,
-    size: json.size || json.Size || json.file_size || json.FileSize,
-    dateModified: json['date_modified'] || json['Date Modified'] || json.dateModified || json.DateModified,
+    size: (item.size || item.Size || item.file_size || item.FileSize) as number | undefined,
+    dateModified: (item['date_modified'] || item['Date Modified'] || item.dateModified || item.DateModified) as string | undefined,
     isFolder,
   };
 }
@@ -262,7 +262,7 @@ function parseEsOutput(stdout: string): FileSearchResult[] {
         
         const json: EsJsonOutput = JSON.parse(cleanedLine);
         results.push(processEsItem(json));
-      } catch (parseError) {
+      } catch {
         // Skip lines that can't be parsed as JSON
         log.debug('Could not parse JSON line:', line.substring(0, 100));
       }

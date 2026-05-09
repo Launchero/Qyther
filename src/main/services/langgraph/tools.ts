@@ -27,7 +27,7 @@ async function searchTavily(query: string, maxResults: number): Promise<string> 
     }
 
     const data = await response.json();
-    const results: Array<{ title: string; url: string; snippet: string }> = (data.results || []).map((r: any) => ({
+    const results: Array<{ title: string; url: string; snippet: string }> = (data.results || []).map((r: { title?: string; url?: string; snippet?: string; content?: string }) => ({
       title: r.title || "",
       url: r.url || "",
       snippet: r.content || r.snippet || "",

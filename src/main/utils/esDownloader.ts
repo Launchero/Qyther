@@ -5,7 +5,6 @@ import * as https from 'https';
 import { pipeline } from 'stream';
 import { promisify } from 'util';
 import extractZip from 'extract-zip';
-import type { IncomingMessage } from 'http';
 import { isWindows } from './platform';
 import { createLogger } from './logger';
 
@@ -64,11 +63,11 @@ async function getDownloadUrl(): Promise<string> {
       response.on('end', () => {
         try {
           const release = JSON.parse(data);
-          const asset = release.assets?.find((a: any) => a.name === 'ES-1.1.0.36.x64.zip' || a.name.endsWith('.x64.zip'));
+          const asset = release.assets?.find((a: { name: string; browser_download_url: string }) => a.name === 'ES-1.1.0.36.x64.zip' || a.name.endsWith('.x64.zip'));
           
           if (!asset) {
             // Fallback to any ZIP file
-            const fallbackAsset = release.assets?.find((a: any) => a.name.endsWith('.zip'));
+            const fallbackAsset = release.assets?.find((a: { name: string }) => a.name.endsWith('.zip'));
             if (fallbackAsset) {
               resolve(fallbackAsset.browser_download_url);
               return;
@@ -219,47 +218,6 @@ function downloadFile(url: string, destPath: string, redirectCount = 0): Promise
       reject(new Error(`Download error: ${err.message}`));
     });
   });
-}
-
-function handleDownloadResponse(
-  response: IncomingMessage,
-  file: fs.WriteStream,
-  esPath: string,
-  resolve: () => void,
-  reject: (error: Error) => void
-) {
-  if (response.statusCode !== 200) {
-    file.close();
-    fs.unlinkSync(esPath);
-    reject(new Error(`Failed to download es.exe: Status ${response.statusCode}`));
-    return;
-  }
-
-  pipelineAsync(response, file)
-    .then(() => {
-      log.debug('Download complete:', esPath);
-      
-      // Verify file was downloaded
-      const stats = fs.statSync(esPath);
-      log.debug('File size:', `${(stats.size / 1024).toFixed(2)} KB`);
-      
-      if (stats.size < 1000) {
-        // File too small, likely an error page
-        fs.unlinkSync(esPath);
-        reject(new Error('Downloaded file too small - may be an error page'));
-        return;
-      }
-      
-      resolve();
-    })
-    .catch((err) => {
-      log.error('Pipeline error:', err.message);
-      file.close();
-      if (fs.existsSync(esPath)) {
-        fs.unlinkSync(esPath);
-      }
-      reject(new Error(`Failed to save es.exe: ${err.message}`));
-    });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import type { AttachedFile } from '../types/ask-types';
 import { logError } from '../utils/debugLogger';
 
@@ -19,8 +19,8 @@ export function useContextAttachments() {
 
   const openFilePicker = useCallback(async () => {
     try {
-      const electronAPI = window.electronAPI as any;
-      const result = await electronAPI.dialog.openFile({
+      const { dialog } = window.electronAPI;
+      const result = await dialog.openFile({
         filters: [
           { name: 'All Supported Files', extensions: [
             'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx',
@@ -45,8 +45,8 @@ export function useContextAttachments() {
 
   const openFolderPicker = useCallback(async () => {
     try {
-      const electronAPI = window.electronAPI as any;
-      const result = await electronAPI.dialog.openFolder({});
+      const { dialog } = window.electronAPI;
+      const result = await dialog.openFolder({});
       if (result && result.path && !result.cancelled) {
         const folderName = result.path.split(/[\\/]/).pop() || 'folder';
         addFile({ name: folderName, path: result.path, type: 'file' });

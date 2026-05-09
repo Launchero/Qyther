@@ -63,7 +63,7 @@ function getStepBadge(step: ThinkingStep): { label: string; className: string } 
   if (step.step === 'webSearch' || step.step === 'externalSearchFanOut' || step.step === 'fallbackSearch') {
     return { label: 'web', className: 'step-badge web' };
   }
-  if (step.data?.name === 'web_search') {
+  if ((step.data as { name?: string } | undefined)?.name === 'web_search') {
     return { label: 'web', className: 'step-badge web' };
   }
   if (step.step.includes('file') || step.step.includes('read')) {
