@@ -7,6 +7,7 @@ import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
 import { UnifiedCommandBar } from './ask-mode/UnifiedCommandBar';
 import { browserReducer, initialBrowserState } from '../hooks/useBrowserState';
+import { desktopReducer, initialDesktopState } from '../hooks/useDesktopState';
 import { usesMetaKey } from '@/utils/shortcuts';
 import type { BrowserProgress } from './ask-mode/BrowserProgressPanel';
 import type { InlineChatSession } from './ask-mode/RecentChatsInline';
@@ -27,6 +28,7 @@ export interface AskModeExpandedProps {
   onAddFile?: (file: AttachedFile) => void;
   recentSearchResults?: Array<{ title: string; type: string }>;
   mcpCount?: number;
+  registerInput?: (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
 }
 
 export function AskModeExpanded({
@@ -43,6 +45,7 @@ export function AskModeExpanded({
   onAddFile,
   recentSearchResults = [],
   mcpCount = 0,
+  registerInput,
 }: AskModeExpandedProps) {
   const {
     messages,
@@ -54,6 +57,8 @@ export function AskModeExpanded({
     createNewSession,
     loadSession,
     listSessions,
+    desktopConfirmation,
+    confirmDesktopAction,
   } = useChatSession();
 
   const [showMCPModal, setShowMCPModal] = useState(false);
@@ -69,6 +74,9 @@ export function AskModeExpanded({
 
   // Browser automation state with useReducer
   const [browserState, dispatch] = useReducer(browserReducer, initialBrowserState);
+
+  // Desktop automation state with useReducer
+  const [desktopState, desktopDispatch] = useReducer(desktopReducer, initialDesktopState);
 
   // Browser automation event listeners
   useEffect(() => {
@@ -88,6 +96,17 @@ export function AskModeExpanded({
     return () => {
       cleanupProgress();
       cleanupError();
+    };
+  }, []);
+
+  // Desktop automation event listeners
+  useEffect(() => {
+    // Note: desktop events come through the chat session stream, not separate IPC
+    // The progress is emitted by the DesktopAgent and forwarded via chat:thinking-step
+    // We handle desktop progress through the existing chat streaming mechanism
+
+    return () => {
+      // No cleanup needed - desktop events flow through chat session
     };
   }, []);
 
@@ -133,12 +152,16 @@ export function AskModeExpanded({
         e.preventDefault();
         handleCloseBrowserSession();
       }
+      if (metaOrCtrl && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        handleToggleDesktopMode();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browserState.enabled, browserState.sessionActive]);
+  }, [browserState.enabled, browserState.sessionActive, desktopState.enabled, desktopState.sessionActive]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -290,6 +313,33 @@ export function AskModeExpanded({
     }
   }, []);
 
+  // Desktop mode handlers
+  const handleToggleDesktopMode = useCallback(async () => {
+    const newEnabled = !desktopState.enabled;
+    desktopDispatch({ type: 'TOGGLE_MODE', enabled: newEnabled });
+    logInfo('[AskModeExpanded] Desktop mode toggled:', newEnabled ? 'enabled' : 'disabled');
+  }, [desktopState.enabled]);
+
+  const handlePauseDesktop = useCallback(() => {
+    desktopDispatch({ type: 'SET_PAUSED', paused: true });
+    logInfo('[AskModeExpanded] Desktop automation paused');
+  }, []);
+
+  const handleResumeDesktop = useCallback(() => {
+    desktopDispatch({ type: 'SET_PAUSED', paused: false });
+    logInfo('[AskModeExpanded] Desktop automation resumed');
+  }, []);
+
+  // Desktop elapsed time timer
+  useEffect(() => {
+    if (desktopState.sessionActive && desktopState.startTime && !desktopState.isPaused) {
+      const timer = setInterval(() => {
+        desktopDispatch({ type: 'SET_ELAPSED', elapsedMs: Date.now() - desktopState.startTime! });
+      }, 100);
+      return () => clearInterval(timer);
+    }
+  }, [desktopState.sessionActive, desktopState.startTime, desktopState.isPaused]);
+
   // MCP keyboard shortcuts
   useMCPKeyboardShortcuts({
     onOpenMCPModal: () => setShowMCPModal(true),
@@ -343,6 +393,28 @@ export function AskModeExpanded({
           />
         )}
 
+        {/* Desktop Session Status Indicator */}
+        {desktopState.sessionActive && desktopState.progress && (
+          <BrowserProgressPanel
+            progress={desktopState.progress as unknown as BrowserProgress}
+            reasoning={desktopState.progress.status === 'capturing' ? 'Capturing screen to understand current state' : undefined}
+            upcomingSteps={
+              desktopState.progress.status === 'capturing'
+                ? ['Analyze screen content', 'Plan next action', 'Execute interaction']
+                : undefined
+            }
+            metrics={{
+              elapsedMs: desktopState.elapsedMs,
+              estimatedTokens: Math.floor(desktopState.elapsedMs / 100),
+              confidence: Math.max(70, 100 - Math.floor(desktopState.elapsedMs / 1000)),
+            }}
+            onPause={handlePauseDesktop}
+            onResume={handleResumeDesktop}
+            onStop={() => desktopDispatch({ type: 'RESET' })}
+            isPaused={desktopState.isPaused}
+          />
+        )}
+
         {/* Main Chat Area with Welcome State and Messages */}
         <div className="chat-body">
           <ChatMessagesList
@@ -350,6 +422,9 @@ export function AskModeExpanded({
             isLoading={isLoading}
             welcomeState={welcomeState}
             browserModeEnabled={browserState.enabled}
+            desktopModeEnabled={desktopState.enabled}
+            desktopConfirmation={desktopConfirmation}
+            onConfirmDesktopAction={confirmDesktopAction}
             onSendExample={(query) => {
               handleSendMessage(query);
               setWelcomeState(false);
@@ -388,6 +463,7 @@ export function AskModeExpanded({
           onOpenMCPModal={() => setShowMCPModal(true)}
           webSearchEnabled={webSearchEnabled}
           onToggleWebSearch={() => setWebSearchEnabled(prev => !prev)}
+          registerInput={registerInput}
         />
 
         {/* MCP Tool Modal */}

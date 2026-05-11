@@ -244,6 +244,7 @@ export const electronAPI = {
 
       return ipcRenderer.invoke('file:search', query, options);
     },
+    getEverythingStatus: () => ipcRenderer.invoke('file:everything:status'),
   },
 
   // Applications

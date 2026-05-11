@@ -118,13 +118,17 @@ export function App() {
 
   // Combine base results (commands/apps) with file results
   const results = React.useMemo(() => {
-    // Prioritize file results when there's a search query
-    if (searchQuery.trim().length > 0 && fileResults.length > 0) {
-      // Show file results first, then base results
-      return [...fileResults, ...baseResults];
+    if (searchQuery.trim().length > 0) {
+      if (searchMode === 'ai') {
+        return baseResults;
+      }
+      if (fileResults.length > 0) {
+        return [...fileResults, ...baseResults];
+      }
+      return baseResults;
     }
     return baseResults;
-  }, [baseResults, fileResults, searchQuery]);
+  }, [baseResults, fileResults, searchQuery, searchMode]);
 
   if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
     logDebug('[App] Final results merged:', {

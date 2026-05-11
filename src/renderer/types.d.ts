@@ -119,6 +119,7 @@ export interface ElectronAPI {
       relevanceScore?: number;
       category?: string;
     }>>;
+    getEverythingStatus: () => Promise<{ running: boolean; esExists: boolean; platformSupported: boolean }>;
   };
 
   // Applications

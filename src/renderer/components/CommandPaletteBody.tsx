@@ -5,6 +5,7 @@ import { SearchEmptyState } from './SearchEmptyState';
 import type { AttachedFile } from '@/types/ask-types';
 import type { RecentFile } from '@/hooks/useRecentFiles';
 import type { SearchMode } from './ModeTabs';
+import type { RegisterInputFn } from './CommandPaletteHeader';
 
 interface CommandPaletteBodyProps {
   showResults: boolean;
@@ -31,6 +32,7 @@ interface CommandPaletteBodyProps {
   onAskAboutFile?: (result: SearchResult) => void;
   onQuickAction?: (action: string) => void;
   mcpCount?: number;
+  registerInput?: RegisterInputFn;
 }
 
 function CommandPaletteBodyImpl({
@@ -58,6 +60,7 @@ function CommandPaletteBodyImpl({
   onQuickAction,
   onAskAboutFile,
   mcpCount = 0,
+  registerInput,
 }: CommandPaletteBodyProps) {
   // Show chat interface in expanded Ask mode
   if (searchMode === 'ai' && windowMode === 'expanded') {
@@ -75,6 +78,7 @@ function CommandPaletteBodyImpl({
           onAddFile={onAddFile}
           mcpCount={mcpCount}
           recentSearchResults={results.filter(r => r.type === 'file').slice(0, 3).map(r => ({ title: r.title, type: r.type }))}
+          registerInput={registerInput}
         />
       </div>
     );

@@ -394,6 +394,38 @@ export async function searchFiles(
 }
 
 /**
+ * Check if the Everything application is running and accessible
+ * Uses a minimal query to test the IPC connection
+ */
+export async function isEverythingRunning(): Promise<boolean> {
+  if (!isWindows()) {
+    return false;
+  }
+
+  const esPath = getEsPath();
+  const command = `"${esPath}" "" -n 0`;
+
+  try {
+    await execAsync(command, {
+      encoding: 'utf8',
+      timeout: 3000,
+    });
+    return true;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '';
+    if (errorMessage.includes('Everything IPC window not found')) {
+      return false;
+    }
+    if (errorMessage.includes('not recognized') || errorMessage.includes('ENOENT')) {
+      return false;
+    }
+    // Other errors might mean es.exe exists but Something else failed
+    log.debug('isEverythingRunning: unexpected error:', errorMessage);
+    return false;
+  }
+}
+
+/**
  * Format file size for display
  */
 export function formatFileSize(bytes?: number): string {

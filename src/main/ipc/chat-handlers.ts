@@ -12,7 +12,7 @@ interface GraphStateValues {
   finalResponse?: string;
   uiPayloads?: Array<{ type: string; title: string; data: Record<string, unknown>; node: string }>;
   desktopActions?: Array<{ type: string; description: string; success: boolean; result?: string }>;
-  __interrupt__?: Array<{ value: { type: string; action: string; description: string } }>;
+  __interrupt__?: Array<{ value: { type: string; action: string; description: string; dangerLevel?: string; args?: Record<string, unknown>; confirmationId?: string; sessionId?: string } }>;
   retryCount?: number;
   qualityScore?: number;
   confidence?: number;
@@ -391,158 +391,178 @@ export function registerChatHandlers(): void {
       const responseNodes = new Set([
         'generalChat', 'synthesizeWithSelfCheck',
         'internalKnowledge', 'quickVerify', 'fastPath', 'fallbackSearch',
-        'browserAgent',
+        'browserAgent', 'desktopAgent',
       ]);
 
       let streamedContent = '';
       const nodeRunCounts = new Map<string, number>();
 
-      const GRAPH_TIMEOUT_MS = 60_000; // 60 seconds max for graph execution
+      const GRAPH_TIMEOUT_MS = 120_000; // 120 seconds max for graph execution (desktop/browser agents need more time)
       const abortController = new AbortController();
 
+      const stream = graph.streamEvents(
+        { messages, userQuery: content, attachments: attachmentContents },
+        {
+          version: "v2",
+          configurable: { thread_id: turnThreadId },
+          recursionLimit: 50,
+          signal: abortController.signal,
+          timeout: GRAPH_TIMEOUT_MS,
+        }
+      );
+
       try {
-        const stream = graph.streamEvents(
-          { messages, userQuery: content, attachments: attachmentContents },
-          {
-            version: "v2",
-            configurable: { thread_id: turnThreadId },
-            recursionLimit: 50,
-            signal: abortController.signal,
-            timeout: GRAPH_TIMEOUT_MS,
-          }
-        );
-
         for await (const streamEvent of stream) {
-          if (abortController.signal.aborted) {
-            log.warn('Aborting stream iteration due to timeout or cancellation');
-            break;
+        if (abortController.signal.aborted) {
+          log.warn('Aborting stream iteration due to timeout or cancellation');
+          break;
+        }
+
+        const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
+        const eventName = streamEvent.event;
+        const streamName = streamEvent.name;
+
+        if (eventName === "on_chat_model_stream") {
+          if (!nodeName || !responseNodes.has(nodeName)) {
+            continue;
           }
 
-          const nodeName = streamEvent.metadata?.langgraph_node as string | undefined;
-          const eventName = streamEvent.event;
-          const streamName = streamEvent.name;
+          // Track how many times each node has run
+          const runCount = (nodeRunCounts.get(nodeName) || 0) + 1;
+          nodeRunCounts.set(nodeName, runCount);
 
-          if (eventName === "on_chat_model_stream") {
-            if (!nodeName || !responseNodes.has(nodeName)) {
-              continue;
+          // Detect loop: if synthesize/quickVerify/replan runs more than once, it's a retry
+          const isLoopNode = ['synthesizeWithSelfCheck', 'quickVerify', 'replan'].includes(nodeName);
+          if (isLoopNode && runCount > 1) {
+            // New iteration: reset streamed content and update the UI
+            if (runCount === 2) {
+              // Replace the entire response with the new attempt's content
+              streamedContent = '';
+              // Reset UI payload state for the retry
+              event.sender.send('chat:ui-payload-reset', {});
             }
+          }
 
-            // Track how many times each node has run
-            const runCount = (nodeRunCounts.get(nodeName) || 0) + 1;
-            nodeRunCounts.set(nodeName, runCount);
+          const contentChunk = streamEvent.data.chunk?.content;
 
-            // Detect loop: if synthesize/quickVerify/replan runs more than once, it's a retry
-            const isLoopNode = ['synthesizeWithSelfCheck', 'quickVerify', 'replan'].includes(nodeName);
-            if (isLoopNode && runCount > 1) {
-              // New iteration: reset streamed content and update the UI
-              if (runCount === 2) {
-                // Replace the entire response with the new attempt's content
-                streamedContent = '';
-                // Reset UI payload state for the retry
-                event.sender.send('chat:ui-payload-reset', {});
+          if (contentChunk) {
+            const textContent = typeof contentChunk === 'string'
+              ? contentChunk
+              : Array.isArray(contentChunk)
+                ? contentChunk.filter((c: { type: string; text: string }) => c.type === 'text').map((c: { type: string; text: string }) => c.text).join('')
+                : '';
+
+            if (textContent) {
+              if (isLoopNode && runCount > 1) {
+                // On retries, accumulate fresh content for this attempt only
+                streamedContent += textContent;
+                // Replace the entire assistant message in the UI
+                event.sender.send('chat:stream-replace', { content: streamedContent, isComplete: false });
+              } else {
+                streamedContent += textContent;
+                fullResponse += textContent;
+                event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
               }
             }
+          }
 
-            const contentChunk = streamEvent.data.chunk?.content;
+          if (nodeName === 'synthesizeWithSelfCheck' && runCount > 0) {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.6, message: 'Synthesizing results...' });
+          }
 
-            if (contentChunk) {
-              const textContent = typeof contentChunk === 'string'
-                ? contentChunk
-                : Array.isArray(contentChunk)
-                  ? contentChunk.filter((c: { type: string; text: string }) => c.type === 'text').map((c: { type: string; text: string }) => c.text).join('')
-                  : '';
+          if (nodeName === 'chartNode' && runCount > 0) {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.7, message: 'Rendering visualization...' });
+          }
+        } else if (eventName === "on_chain_start" && streamName) {
+          const step: typeof thinkingSteps[number] = {
+            type: "node_start",
+            step: streamName,
+            status: "in_progress",
+            detail: `Starting ${streamName}`,
+          };
+          thinkingSteps.push(step);
+          event.sender.send('chat:thinking-step', step);
 
-              if (textContent) {
-                if (isLoopNode && runCount > 1) {
-                  // On retries, accumulate fresh content for this attempt only
-                  streamedContent += textContent;
-                  // Replace the entire assistant message in the UI
-                  event.sender.send('chat:stream-replace', { content: streamedContent, isComplete: false });
-                } else {
-                  streamedContent += textContent;
-                  fullResponse += textContent;
-                  event.sender.send('chat:stream-chunk', { chunk: textContent, isComplete: false });
-                }
-              }
-            }
-
-            if (nodeName === 'synthesizeWithSelfCheck' && runCount > 0) {
-              event.sender.send('chat:ui-payload-progress', { progress: 0.6, message: 'Synthesizing results...' });
-            }
-
-            if (nodeName === 'chartNode' && runCount > 0) {
-              event.sender.send('chat:ui-payload-progress', { progress: 0.7, message: 'Rendering visualization...' });
-            }
-          } else if (eventName === "on_chain_start" && streamName) {
+          if (streamName === 'comparisonNode') {
+            event.sender.send('chat:ui-payload-started', { type: 'comparison' });
+            event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing comparison request...' });
+          }
+          if (streamName === 'formNode') {
+            event.sender.send('chat:ui-payload-started', { type: 'form' });
+            event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing configuration requirements...' });
+          }
+          if (streamName === 'chartNode') {
+            event.sender.send('chat:ui-payload-started', { type: 'chart' });
+            event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing data...' });
+          }
+          if (streamName === 'desktopAgent') {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing desktop task...' });
+          }
+        } else if (eventName === "on_chain_end" && streamName) {
+          const existingStep = thinkingSteps.find(s => s.step === streamName && s.status === 'in_progress');
+          if (existingStep) {
+            existingStep.status = 'completed';
+            existingStep.detail = `Completed ${streamName}`;
+            event.sender.send('chat:thinking-step', { ...existingStep, update: true });
+          } else {
             const step: typeof thinkingSteps[number] = {
-              type: "node_start",
+              type: "node_end",
               step: streamName,
-              status: "in_progress",
-              detail: `Starting ${streamName}`,
+              status: "completed",
+              detail: `Completed ${streamName}`,
             };
             thinkingSteps.push(step);
             event.sender.send('chat:thinking-step', step);
+          }
 
-            if (streamName === 'comparisonNode') {
-              event.sender.send('chat:ui-payload-started', { type: 'comparison' });
-              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing comparison request...' });
-            }
-            if (streamName === 'formNode') {
-              event.sender.send('chat:ui-payload-started', { type: 'form' });
-              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing configuration requirements...' });
-            }
-            if (streamName === 'chartNode') {
-              event.sender.send('chat:ui-payload-started', { type: 'chart' });
-              event.sender.send('chat:ui-payload-progress', { progress: 0.2, message: 'Analyzing data...' });
-            }
-          } else if (eventName === "on_chain_end" && streamName) {
-            const existingStep = thinkingSteps.find(s => s.step === streamName && s.status === 'in_progress');
-            if (existingStep) {
-              existingStep.status = 'completed';
-              existingStep.detail = `Completed ${streamName}`;
-              event.sender.send('chat:thinking-step', { ...existingStep, update: true });
-            } else {
-              const step: typeof thinkingSteps[number] = {
-                type: "node_end",
-                step: streamName,
-                status: "completed",
-                detail: `Completed ${streamName}`,
-              };
-              thinkingSteps.push(step);
-              event.sender.send('chat:thinking-step', step);
-            }
-
-            // Send final progress for structured UI nodes
-            if (streamName === 'comparisonNode') {
-              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Building comparison table...' });
-            }
-            if (streamName === 'formNode') {
-              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Validating form fields...' });
-            }
-            if (streamName === 'chartNode') {
-              event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Rendering visualization...' });
-            }
-          } else if (eventName === "on_tool_start") {
-            const step: typeof thinkingSteps[number] = {
-              type: "tool_start",
-              step: "tool_execution",
-              status: "in_progress",
-              detail: `Executing: ${streamName}`,
-              data: streamEvent.data.input,
-            };
-            thinkingSteps.push(step);
-            event.sender.send('chat:thinking-step', step);
-          } else if (eventName === "on_tool_end") {
-            const existingStep = thinkingSteps.find(s => s.status === 'in_progress' && s.type === 'tool_start');
-            if (existingStep) {
-              existingStep.status = 'completed';
-              existingStep.detail = `Completed: ${(existingStep.data as { name?: string } | undefined)?.name || 'tool'}`;
-              event.sender.send('chat:thinking-step', { ...existingStep, update: true });
-            }
+          // Send final progress for structured UI nodes
+          if (streamName === 'comparisonNode') {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Building comparison table...' });
+          }
+          if (streamName === 'formNode') {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Validating form fields...' });
+          }
+          if (streamName === 'chartNode') {
+            event.sender.send('chat:ui-payload-progress', { progress: 0.9, message: 'Rendering visualization...' });
+          }
+        } else if (eventName === "on_tool_start") {
+          const step: typeof thinkingSteps[number] = {
+            type: "tool_start",
+            step: "tool_execution",
+            status: "in_progress",
+            detail: `Executing: ${streamName}`,
+            data: streamEvent.data.input,
+          };
+          thinkingSteps.push(step);
+          event.sender.send('chat:thinking-step', step);
+        } else if (eventName === "on_tool_end") {
+          const existingStep = thinkingSteps.find(s => s.status === 'in_progress' && s.type === 'tool_start');
+          if (existingStep) {
+            existingStep.status = 'completed';
+            existingStep.detail = `Completed: ${(existingStep.data as { name?: string } | undefined)?.name || 'tool'}`;
+            event.sender.send('chat:thinking-step', { ...existingStep, update: true });
           }
         }
-      } finally {
-        // Timeout is handled by LangGraph's native timeout option; no manual cleanup needed
+      }
+      } catch (streamError) {
+        // Error boundary: catch node-level failures without crashing the entire request
+        log.error('Graph stream error:', streamError instanceof Error ? streamError.message : String(streamError));
+        event.sender.send('chat:stream-chunk', {
+          chunk: '',
+          isComplete: true,
+          error: streamError instanceof Error ? streamError.message : 'Graph execution error',
+        });
+        // Attempt graceful recovery: get whatever state was accumulated
+        try {
+          const recoveryState = await withStateLock(() =>
+            graph.getState({ configurable: { thread_id: turnThreadId } })
+          ) as { values?: Record<string, unknown> };
+          if (recoveryState?.values?.finalResponse) {
+            fullResponse = recoveryState.values.finalResponse as string;
+          }
+        } catch {
+          // State unavailable; fall through with whatever content was streamed
+        }
       }
 
       // Handle timeout: check if the signal was aborted due to timeout
@@ -575,7 +595,7 @@ export function registerChatHandlers(): void {
 
       // Emit desktop confirmation request when graph hit an interrupt() for destructive action.
       // LangGraph stores interrupt state; when interrupted, the graph pauses waiting for resume.
-      const interruptState = graphState?.values?.__interrupt__ as Array<{ value: { type: string; action: string; description: string } }> | undefined;
+      const interruptState = graphState?.values?.__interrupt__ as Array<{ value: { type: string; action: string; description: string; dangerLevel?: string; args?: Record<string, unknown>; confirmationId?: string; sessionId?: string } }> | undefined;
       const needsConfirmation = Array.isArray(interruptState) && interruptState.length > 0
         && interruptState[0]?.value?.type === 'desktop_confirmation';
       if (needsConfirmation) {
@@ -588,9 +608,11 @@ export function registerChatHandlers(): void {
             description: interruptPayload.description,
           },
           pendingAction: {
-            id: `pending-${Date.now()}`,
+            id: interruptPayload.confirmationId || `pending-${Date.now()}`,
             type: interruptPayload.action,
             description: interruptPayload.description,
+            dangerLevel: interruptPayload.dangerLevel,
+            args: interruptPayload.args,
             timestamp: new Date(),
             success: false,
             reversible: true,
@@ -610,7 +632,7 @@ export function registerChatHandlers(): void {
         durationMs,
         model: process.env.FAST_MODEL
           ? `fast:${process.env.FAST_MODEL} → ${process.env.MODEL}`
-          : process.env.MODEL || 'qwen3.5-plus',
+          : process.env.MODEL || 'qwen3.6-plus',
       };
 
       // Format reasoning steps for the ReasoningTrace component
@@ -721,16 +743,16 @@ export function registerChatHandlers(): void {
   ): Promise<{ success: boolean; response?: string; error?: string }> => {
     try {
       const graph = await getAskGraph();
-      const command = new Command({ resume: resumeValue });
+      const command = new Command({ resume: resumeValue.confirmed });
 
       let fullResponse = '';
       const responseNodes = new Set([
         'generalChat', 'synthesizeWithSelfCheck',
         'internalKnowledge', 'quickVerify', 'fastPath', 'fallbackSearch',
-        'browserAgent',
+        'browserAgent', 'desktopAgent',
       ]);
 
-      const RESUME_TIMEOUT_MS = 30_000; // 30 seconds max for resume (shorter than initial)
+      const RESUME_TIMEOUT_MS = 60_000; // 60 seconds max for resume (desktop confirmation flows need more time)
       const abortController = new AbortController();
 
       try {
@@ -771,6 +793,25 @@ export function registerChatHandlers(): void {
               }
             }
           }
+        }
+      } catch (resumeError) {
+        // Error boundary for resume graph
+        log.error('Resume graph stream error:', resumeError instanceof Error ? resumeError.message : String(resumeError));
+        event.sender.send('chat:stream-chunk', {
+          chunk: '',
+          isComplete: true,
+          error: resumeError instanceof Error ? resumeError.message : 'Resume graph execution error',
+        });
+        // Attempt to recover whatever state was accumulated
+        try {
+          const recoveryState = await withStateLock(() =>
+            graph.getState({ configurable: { thread_id: threadId } })
+          ) as { values?: Record<string, unknown> };
+          if (recoveryState?.values?.finalResponse) {
+            fullResponse = recoveryState.values.finalResponse as string;
+          }
+        } catch {
+          // State unavailable; use whatever was streamed
         }
       } finally {
         // Timeout is handled by LangGraph's native timeout option; no manual cleanup needed

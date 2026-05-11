@@ -2,7 +2,7 @@
 
 ## Stack
 
-- Electron 41, React 19, TypeScript 5.7, Vite 6
+- Electron 42, React 19, TypeScript 6.0, Vite 8
 - Global shortcut: Alt+Space
 - Performance target: <500ms cold start
 
@@ -55,38 +55,35 @@ npm run lint       # ESLint check
 ### Skill Navigation
 
 
-| Situation                                 | Use This Skill                                   |
+| Situation | Use This Skill |
 | ----------------------------------------- | ------------------------------------------------ |
-| Starting any task (master entry point)    | `karpathy-universal`                             |
-| Agent produced wrong output               | `skill-issue-diagnosis`                          |
-| Delegating multi-part work                | `parallel-orchestration`                         |
-| Structuring intent before coding          | `instruction-first`                              |
-| Plan mode research & subagent task definition      | `plan-mode-enhancement` (rule)                      |
-| **Executing approved plan (DEFAULT)**              | `plan-executor-orchestrator`                        |
-| Sequential subagent handoff & verification         | `agent-handoff-verification` (rule)                 |
-| Electron main process / architecture      | `electron-core`                                  |
-| Electron + React integration              | `electron-react-core`                            |
-| IPC patterns (main <-> renderer)          | `electron-react-ipc`                             |
-| Security best practices                   | `electron-react-security`                        |
-| Performance optimization                  | `electron-react-performance`                     |
-| Component design patterns                 | `electron-react-components`                      |
-| React fundamentals                        | `react-core`                                     |
-| TypeScript type patterns                  | `typescript-core`                                |
-| Library API research                      | `context7-integration`                           |
-| Browser UI testing                        | `browser-use-testing`                            |
-| Electron-vite build config                | `electron-react-build`                           |
-| React 19 state patterns                   | `electron-react-state`                           |
-| Parallel Context7 research                | `context7-parallel-research`                     |
-| Web tool selection logic                  | `web-tools-decision-tree`                        |
-| Search/install skills from skills.sh      | `agent-skill-finder`                             |
-| LangGraph StateGraph / research agent     | `langgraph-agent-patterns`                       |
-| MCP server integration (tool calling)     | `mcp-server-integration`                         |
-| Structured LLM output to React components | `generative-ui-components`                       |
-| Window modes, shortcuts, launcher UX      | `command-launcher-ux`                            |
-| Cost tracking, source citations, trust    | `source-transparency`                            |
-| Systematic debugging methodology          | `systematic-debugging` (obra/superpowers)        |
-| Subagent-driven development patterns      | `subagent-driven-development` (obra/superpowers) |
-| Frontend polish and design taste          | `polish` (pbakaus/impeccable)                    |
+| Agent produced wrong output | `skill-issue-diagnosis` |
+| **Executing approved plan (DEFAULT)** | `plan-executor-orchestrator` |
+| Sequential subagent handoff & verification | `agent-handoff-verification` (rule) |
+| Electron main process / architecture | `electron-core` |
+| Electron + React integration | `electron-react-core` |
+| IPC patterns (main <-> renderer) | `electron-react-ipc` |
+| Security best practices | `electron-react-security` |
+| Performance optimization | `electron-react-performance` |
+| Component design patterns | `electron-react-components` |
+| Library API research | `context7-integration` |
+| Browser UI testing | `browser-use-testing` |
+| Electron-vite build config | `electron-react-build` |
+| React 19 state patterns | `electron-react-state` |
+| Parallel Context7 research | `context7-parallel-research` |
+| LangGraph StateGraph / research agent | `langgraph-agent-patterns` |
+| MCP server integration (tool calling) | `mcp-server-integration` |
+| Structured LLM output to React components | `generative-ui-components` |
+| Cost tracking, source citations, trust | `source-transparency` |
+| Electron data persistence (SQLite, better-sqlite3) | `electron-data` |
+| Electron performance profiling | `electron-performance` |
+| TypeScript type patterns | `typescript-core` |
+| TypeScript performance optimization | `typescript-performance` |
+| TypeScript security patterns | `typescript-security` |
+| TypeScript UI patterns | `typescript-ui` |
+| Session data analysis (SQLite narratives) | `session-analytics` |
+| Raw SQLite patterns (hooks state) | `sqlite-patterns` |
+| Windows-specific hook development | `cursor-hooks-windows-dev` |
 
 
 ### Simplicity Rules (Enforced)

@@ -3,7 +3,7 @@ import { hideMainWindow, setWindowMode, getWindowMode, toggleWindowMode, getMain
 import { windowManager } from '../windowManager';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { searchFiles, formatFileSize, formatDate } from '../utils/esRunner';
+import { searchFiles, formatFileSize, formatDate, isEverythingRunning } from '../utils/esRunner';
 import { getSystemInfo, getPlatform, getPlatformName, isWindows, isMacOS, isLinux } from '../utils/platform';
 import { registerChatHandlers } from './chat-handlers';
 import { registerMCPHandlers } from './mcp-handlers';
@@ -306,6 +306,25 @@ export function registerIPCHandlers(): void {
     } catch (error) {
       log.error('File search error:', error);
       throw error;
+    }
+  });
+
+  // Everything application status handler
+  ipcMain.handle('file:everything:status', async (): Promise<{ running: boolean; esExists: boolean; platformSupported: boolean }> => {
+    try {
+      const platformSupported = isWindows();
+      if (!platformSupported) {
+        return { running: false, esExists: false, platformSupported: false };
+      }
+
+      const esPath = require('../utils/esDownloader').getEsPath();
+      const esExists = require('fs').existsSync(esPath);
+      const running = esExists ? await isEverythingRunning() : false;
+
+      return { running, esExists, platformSupported };
+    } catch (error) {
+      log.error('Error checking Everything status:', error);
+      return { running: false, esExists: false, platformSupported: isWindows() };
     }
   });
 

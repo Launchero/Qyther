@@ -28,6 +28,7 @@ export interface UnifiedCommandBarProps {
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onAddFile?: (file: AttachedFile) => void;
+  registerInput?: (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
 }
 
 export function UnifiedCommandBar({
@@ -47,6 +48,7 @@ export function UnifiedCommandBar({
   onAttachFile,
   onAttachFolder: _onAttachFolder,
   onAddFile,
+  registerInput,
 }: UnifiedCommandBarProps) {
   const [hasSent, setHasSent] = useState(hasSentMessage);
 
@@ -64,6 +66,13 @@ export function UnifiedCommandBar({
     value,
     maxHeight: 120,
   });
+
+  // Register the unified-command textarea with the focus manager
+  useEffect(() => {
+    if (registerInput && textareaRef) {
+      return registerInput('unified-command', textareaRef as React.RefObject<HTMLElement | null>);
+    }
+  }, [registerInput, textareaRef]);
 
   useEffect(() => {
     if (hasSentMessage !== hasSent) {

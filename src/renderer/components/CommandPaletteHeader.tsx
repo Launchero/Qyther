@@ -4,6 +4,8 @@ import { type SearchMode } from './ModeTabs';
 import { ModeTabs } from './ModeTabs';
 import { cn } from '@/lib/utils';
 
+export type RegisterInputFn = (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
+
 export interface CommandPaletteHeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -13,6 +15,7 @@ export interface CommandPaletteHeaderProps {
   windowMode: 'expanded' | 'compact' | 'custom';
   headerRef: React.RefObject<HTMLDivElement | null>;
   isCollapsing?: boolean;
+  registerInput?: RegisterInputFn;
 }
 
 export function CommandPaletteHeader({
@@ -24,6 +27,7 @@ export function CommandPaletteHeader({
   windowMode,
   headerRef,
   isCollapsing = false,
+  registerInput,
 }: CommandPaletteHeaderProps) {
   const isAskMode = searchMode === 'ai';
   const [askTabsExpanded, setAskTabsExpanded] = useState(false);
@@ -69,6 +73,7 @@ export function CommandPaletteHeader({
           onModeChange={onSearchModeChange}
           onTabsExpanded={onTabsExpanded}
           windowMode={windowMode}
+          registerInput={registerInput}
         />
       )}
     </div>

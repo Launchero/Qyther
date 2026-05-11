@@ -133,7 +133,7 @@ class LangChainAgent extends EventEmitter {
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      model: process.env.MODEL || 'qwen3.5-plus',
+      model: process.env.MODEL || 'qwen3.6-plus',
     };
     
     this.sessions.set(sessionId, session);
@@ -267,7 +267,7 @@ class LangChainAgent extends EventEmitter {
               outputTokens: Math.floor(estimatedTokens * 0.7),
               estimatedCost: (estimatedTokens * 0.0002) / 1000, // Approximate cost
               durationMs,
-              model: process.env.MODEL || 'qwen3.5-plus',
+              model: process.env.MODEL || 'qwen3.6-plus',
             },
           };
           
@@ -337,7 +337,7 @@ class LangChainAgent extends EventEmitter {
             outputTokens: Math.floor(estimatedTokens * 0.7),
             estimatedCost: (estimatedTokens * 0.0002) / 1000,
             durationMs,
-            model: process.env.MODEL || 'qwen3.5-plus',
+            model: process.env.MODEL || 'qwen3.6-plus',
           },
         };
         
@@ -374,7 +374,7 @@ class LangChainAgent extends EventEmitter {
             outputTokens: Math.floor(estimatedTokens * 0.7),
             estimatedCost: (estimatedTokens * 0.0002) / 1000,
             durationMs,
-            model: process.env.MODEL || 'qwen3.5-plus',
+            model: process.env.MODEL || 'qwen3.6-plus',
           },
         };
         

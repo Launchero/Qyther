@@ -95,6 +95,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
   const [results, setResults] = useState<FileSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [everythingStatus, setEverythingStatus] = useState<{ running: boolean; esExists: boolean; platformSupported: boolean } | null>(null);
   
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
@@ -107,6 +108,21 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
         clearTimeout(debounceTimeoutRef.current);
       }
     };
+  }, []);
+
+  // Check Everything status on mount
+  useEffect(() => {
+    window.electronAPI.file.getEverythingStatus()
+      .then(status => {
+        if (isMountedRef.current) {
+          setEverythingStatus(status);
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current) {
+          setEverythingStatus({ running: false, esExists: false, platformSupported: false });
+        }
+      });
   }, []);
 
 
@@ -123,10 +139,10 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
       try {
         // Pass options to use enhanced backend features
         return await window.electronAPI.file.search(searchQuery, {
-          maxResults: options.maxResults || 50,
-          excludeHidden: true,
-          excludeSystem: true,
-          includeMetadata: true,
+          maxResults: options.maxResults ?? 50,
+          excludeHidden: options.excludeHidden ?? true,
+          excludeSystem: options.excludeSystem ?? true,
+          includeMetadata: options.includeMetadata ?? true,
         });
       } catch (err) {
         lastError = err instanceof Error ? err : new Error('Search failed');
@@ -151,13 +167,33 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     }
     
     throw lastError;
-  }, [options.maxResults]);
+  }, [options.maxResults, options.excludeHidden, options.excludeSystem, options.includeMetadata]);
 
   const searchFiles = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResults([]);
       setIsLoading(false);
       setError(null);
+      return;
+    }
+
+    // Check Everything status before searching
+    if (everythingStatus && !everythingStatus.running) {
+      if (!everythingStatus.platformSupported) {
+        setError('File search is only available on Windows');
+        setResults([]);
+        setIsLoading(false);
+        return;
+      }
+      if (!everythingStatus.esExists) {
+        setError('es.exe not found. Please restart the application to download it.');
+        setResults([]);
+        setIsLoading(false);
+        return;
+      }
+      setError('Everything application is not running. Please start Everything to use file search.');
+      setResults([]);
+      setIsLoading(false);
       return;
     }
 
@@ -198,7 +234,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
         setIsLoading(false);
       }
     }
-  }, [searchWithRetry]);
+  }, [searchWithRetry, everythingStatus]);
 
   // Debounced search effect
   useEffect(() => {
@@ -260,6 +296,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     isLoading,
     error,
     clearError: () => setError(null),
+    everythingStatus,
     // NEW optional fields for enhanced UI feedback (backward compatible)
     retry: () => {
       if (query && query.trim()) {

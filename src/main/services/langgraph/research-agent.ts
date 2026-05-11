@@ -1,5 +1,4 @@
-import { StateGraph, END, interrupt } from "@langchain/langgraph";
-import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
+import { StateGraph, END, MemorySaver } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { AskState, AskStateType, Source, ReasoningStep, UIPayload, DesktopAction } from "./state";
@@ -7,14 +6,13 @@ import { webSearchTool } from "./tools";
 import { z } from "zod";
 import { statefulBrowserAgent } from "../browser/stateful-browser-agent";
 import { browserSessionManager } from "../browser/browser-session-manager";
-import path from "path";
-import { app } from "electron";
+import { desktopAgent } from "../desktop/desktop-agent";
 import { createLogger, withTiming } from "../../utils/logger";
 
 const log = createLogger("Graph");
 
 const chatModel = new ChatOpenAI({
-  model: process.env.MODEL || "qwen3.5-plus",
+  model: process.env.MODEL || "qwen3.6-plus",
   apiKey: process.env.API_KEY,
   configuration: {
     baseURL: process.env.BASE_URL,
@@ -25,7 +23,7 @@ const chatModel = new ChatOpenAI({
 
 // Cheap, fast model for classification/routing only
 const routerModel = new ChatOpenAI({
-  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.5-plus",
+  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.6-plus",
   apiKey: process.env.API_KEY,
   configuration: { baseURL: process.env.BASE_URL },
   temperature: 0,
@@ -35,10 +33,20 @@ const routerModel = new ChatOpenAI({
 
 // Separate model for verification — lower temperature for analytical, critical evaluation
 const verifierModel = new ChatOpenAI({
-  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.5-plus",
+  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.6-plus",
   apiKey: process.env.API_KEY,
   configuration: { baseURL: process.env.BASE_URL },
   temperature: 0.1,
+  streaming: false,
+});
+
+// Dedicated model for query rewriting — needs more tokens than routerModel (10) for complex rewrites
+const rewriteModel = new ChatOpenAI({
+  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.6-plus",
+  apiKey: process.env.API_KEY,
+  configuration: { baseURL: process.env.BASE_URL },
+  temperature: 0,
+  maxTokens: 100,
   streaming: false,
 });
 
@@ -57,18 +65,24 @@ const FAST_RESPONSES: Record<string, string> = {
   thanks: "You're welcome! Let me know if you need anything else.",
   acknowledgement: "Got it! What would you like to do next?",
   farewell: "Goodbye! Feel free to come back anytime.",
-  date: (() => {
+  date: "__DYNAMIC__",
+  time: "__DYNAMIC__",
+};
+
+function getFastPathResponse(type: string): string {
+  if (type === "date") {
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
     return `Today is **${dateStr}**.\n\nThe current day of the week is ${dayOfWeek}.`;
-  })(),
-  time: (() => {
+  }
+  if (type === "time") {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     return `The current time is **${timeStr}**.`;
-  })(),
-};
+  }
+  return FAST_RESPONSES[type] || "";
+}
 
 function detectFastPath(query: string): string | null {
   const trimmed = query.trim();
@@ -166,15 +180,34 @@ const chartOutputSchema = z.object({
 // LangGraph compiled graph - types are highly dynamic due to StateGraph complexity
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedGraph: any = null;
+let cachedGraphEnvKey: string | null = null;
+
+function getGraphEnvCacheKey(): string {
+  return [
+    process.env.MODEL || "qwen3.6-plus",
+    process.env.FAST_MODEL || "",
+    process.env.BASE_URL || "",
+    process.env.API_KEY ? process.env.API_KEY.slice(0, 8) : "",
+  ].join("|");
+}
+
+export function clearGraphCache(): void {
+  cachedGraph = null;
+  cachedGraphEnvKey = null;
+}
 
 export async function getAskGraph() {
-  if (cachedGraph) return cachedGraph;
+  const envKey = getGraphEnvCacheKey();
+  if (cachedGraph && cachedGraphEnvKey === envKey) return cachedGraph;
+
+  if (cachedGraphEnvKey && cachedGraphEnvKey !== envKey) {
+    log.debug("Graph cache invalidated: env vars changed");
+  }
+  cachedGraphEnvKey = envKey;
 
   const compileStart = Date.now();
 
-  const dbPath = path.join(app.getPath("userData"), "langgraph.db");
-
-  const checkpointer = await SqliteSaver.fromConnString(dbPath);
+  const checkpointer = new MemorySaver();
 
   const workflow = new StateGraph(AskState)
     .addNode("classify", classifyNode)
@@ -190,6 +223,7 @@ export async function getAskGraph() {
     .addNode("formNode", formNode)
     .addNode("chartNode", chartNode)
     .addNode("browserAgent", browserAgentNode)
+    .addNode("desktopAgent", desktopAgentNode)
     .addNode("desktopConfirmation", desktopConfirmationNode)
     .addEdge("__start__", "classify")
     .addConditionalEdges("classify", routeAfterClassify, {
@@ -198,6 +232,7 @@ export async function getAskGraph() {
       external: "externalSearchFanOut",
       general: "generalChat",
       browser: "browserAgent",
+      desktop: "desktopAgent",
       comparison: "comparisonNode",
       form: "formNode",
       chart: "chartNode",
@@ -228,6 +263,7 @@ export async function getAskGraph() {
     .addEdge("formNode", END)
     .addEdge("chartNode", END)
     .addEdge("browserAgent", "desktopConfirmation")
+    .addEdge("desktopAgent", "desktopConfirmation")
     .addEdge("desktopConfirmation", END);
 
   cachedGraph = workflow.compile({ checkpointer });
@@ -273,12 +309,14 @@ async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>>
   const fastPath = detectFastPath(state.userQuery);
   if (fastPath) {
     log.debug("Fast-path detected:", fastPath);
+    // Still compute actual complexity for accuracy (routing uses detectFastPath directly)
+    const complexity = assessComplexity(state.userQuery);
     const reasoningStep: ReasoningStep = {
       step: "classify",
       status: "completed",
       detail: `Fast-path: ${fastPath}`,
     };
-    return { intent: "general", complexityScore: "simple", reasoningSteps: [reasoningStep] };
+    return { intent: "general", complexityScore: complexity, reasoningSteps: [reasoningStep] };
   }
 
   const complexity = assessComplexity(state.userQuery);
@@ -303,12 +341,13 @@ async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>>
 This is a CONTEXTUAL FOLLOWUP — the user is referring to previous conversation content. Use the conversation history to understand what "this/that/it/them" refers to, then classify the intent based on the original topic.
 
 CRITICAL: If this is a followup to a chart/visualization request, classify as "research" (the chart node will be reached via keyword detection in routing).
-If this is a followup to a comparison, form, or browser request, preserve the previous intent.
+If this is a followup to a comparison, form, browser, or desktop request, preserve the previous intent.
 
 Intents:
 - research: Requires current facts, news, or information not reliably in training data
 - general: Conversational, creative writing, or training-data knowledge
 - browser: Requires interactive web page navigation
+- desktop: Requires interaction with the desktop, opening applications, clicking/typing on screen, or system operations
 
 Complexity:
 - simple: Short, single-concept queries (<30 chars, no question marks)
@@ -328,6 +367,7 @@ Intents:
 - research: Requires current facts, news, or information not reliably in training data
 - general: Conversational, creative writing, or training-data knowledge
 - browser: Requires interactive web page navigation
+- desktop: Requires interaction with the desktop, opening applications, clicking/typing on screen, or system operations
 
 Complexity:
 - simple: Short, single-concept queries (<30 chars, no question marks)
@@ -353,7 +393,7 @@ Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
 
     const [rawIntent, rawComplexity] = content.split("/");
 
-    const validIntents = ["research", "general", "browser"];
+    const validIntents = ["research", "general", "browser", "desktop"];
     const intent = validIntents.includes(rawIntent) ? rawIntent : "general";
     const validComplexity = ["simple", "medium", "complex"];
     const complexityScore = validComplexity.includes(rawComplexity) ? rawComplexity : assessComplexity(state.userQuery);
@@ -420,6 +460,9 @@ function routeAfterClassify(state: AskStateType): string {
     if (intent === "browser") {
       return "browser";
     }
+    if (intent === "desktop") {
+      return "desktop";
+    }
     return "internal";
   })();
 
@@ -432,7 +475,7 @@ function routeAfterClassify(state: AskStateType): string {
 async function fastPathNode(state: AskStateType): Promise<Partial<AskStateType>> {
   const fastPath = detectFastPath(state.userQuery);
 
-  // Guard: if somehow called without a matching pattern, fall back to general chat
+  // Guard: if somehow called without a matching pattern, provide a graceful fallback
   if (!fastPath) {
     const reasoningStep: ReasoningStep = {
       step: "fastPath",
@@ -441,13 +484,13 @@ async function fastPathNode(state: AskStateType): Promise<Partial<AskStateType>>
     };
 
     return {
-      finalResponse: "",
-      confidence: 0,
+      finalResponse: "I'm not sure how to respond to that. Let me think about it for a moment.",
+      confidence: 0.5,
       reasoningSteps: [reasoningStep],
     };
   }
 
-  const response = FAST_RESPONSES[fastPath];
+  const response = getFastPathResponse(fastPath);
 
   const reasoningStep: ReasoningStep = {
     step: "fastPath",
@@ -549,7 +592,7 @@ Current query: ${state.userQuery}
 Rewritten query:`);
 
   try {
-    const response = await routerModel.invoke([rewrittenPrompt]);
+    const response = await rewriteModel.invoke([rewrittenPrompt]);
     const rewritten = (response.content as string).trim();
     log.debug("Query rewritten:", state.userQuery, "→", rewritten);
     return rewritten || state.userQuery;
@@ -753,7 +796,8 @@ User Query: ${state.userQuery}${attachmentContext}`);
       uiPayloads,
       qualityScore: 0,
       validationScore: 0,
-      validationCritique: "",
+      // Preserve validationCritique on retries so the model can reference previous feedback
+      validationCritique: state.retryCount === 0 ? "" : state.validationCritique,
       reasoningSteps: [reasoningStep, completedStep],
     };
   });
@@ -850,10 +894,7 @@ ${state.sources.length > 0 ? `Sources: ${state.sources.length} sources available
 // === ROUTER: after quick verify ===
 
 function routeAfterQuickVerify(state: AskStateType): "pass" | "fail" {
-  if (state.qualityScore > 0) {
-    return state.qualityScore >= 0.6 ? "pass" : "fail";
-  }
-  return state.verified ? "pass" : "fail";
+  return state.qualityScore >= 0.6 ? "pass" : "fail";
 }
 
 // === ROUTER: after internal knowledge ===
@@ -1371,7 +1412,105 @@ async function browserAgentNode(state: AskStateType): Promise<Partial<AskStateTy
   });
 }
 
-// === REPLAN NODE ===
+// === DESKTOP AGENT NODE ===
+// HITL is handled by LangGraph's native interrupt() inside the ReAct loop (desktop-agent.ts).
+
+async function desktopAgentNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  log.info("[DesktopAgent] Starting desktop automation for query:", state.userQuery.substring(0, 100));
+
+  const inProgressStep: ReasoningStep = {
+    step: "desktopAgent",
+    status: "in_progress",
+    detail: "Initializing desktop automation",
+  };
+
+  return withTiming(log, "desktopAgent", async () => {
+    log.debug("[DesktopAgent] Checking if desktop agent is ready:", desktopAgent.isReady());
+    if (!desktopAgent.isReady()) {
+      log.info("[DesktopAgent] Initializing desktop agent...");
+      await desktopAgent.initialize();
+      log.info("[DesktopAgent] Desktop agent initialized successfully");
+    } else {
+      log.debug("[DesktopAgent] Desktop agent already initialized");
+    }
+
+    const sessionId = `desktop-${Date.now()}`;
+    log.info("[DesktopAgent] Created desktop session:", sessionId);
+
+    const recentHistory = state.messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-4)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+      .join("\n");
+
+    const taskWithHistory = state.messages.length > 1
+      ? `CONVERSATION CONTEXT (for reference):\n${recentHistory}\n\nTASK: ${state.userQuery}`
+      : state.userQuery;
+
+    let fullResponse = "";
+    let error: unknown = null;
+    const desktopActions: DesktopAction[] = [];
+
+    try {
+      log.info("[DesktopAgent] Starting executeTaskStream");
+      const stream = desktopAgent.executeTaskStream(taskWithHistory, sessionId);
+
+      let chunkCount = 0;
+      for await (const chunk of stream) {
+        chunkCount++;
+        fullResponse += chunk;
+        log.debug(`[DesktopAgent] Received stream chunk ${chunkCount}, total length: ${fullResponse.length}`);
+      }
+      log.info(`[DesktopAgent] Stream complete, received ${chunkCount} chunk(s), total response length: ${fullResponse.length}`);
+    } catch (err) {
+      error = err;
+      log.error("[DesktopAgent] Stream error:", err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      try {
+        await desktopAgent.closeSession(sessionId);
+        log.debug("[DesktopAgent] Desktop session cleaned up:", sessionId);
+      } catch (cleanupError) {
+        log.warn('[DesktopAgent] Desktop session cleanup error:', cleanupError);
+      }
+    }
+
+    if (error) {
+      const errorStep: ReasoningStep = {
+        step: "desktopAgent",
+        status: "error",
+        detail: error instanceof Error ? error.message : "Desktop automation failed",
+      };
+
+      log.error("[DesktopAgent] Desktop agent error:", { sessionId, error });
+
+      return {
+        finalResponse: fullResponse || `Desktop automation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        confidence: 0,
+        desktopSessionId: sessionId,
+        desktopActions: [{ type: 'error', description: error instanceof Error ? error.message : 'Unknown', success: false }],
+        reasoningSteps: [inProgressStep, errorStep],
+      };
+    }
+
+    const completedStep: ReasoningStep = {
+      step: "desktopAgent",
+      status: "completed",
+      detail: "Desktop automation complete",
+    };
+
+    log.info("[DesktopAgent] Desktop task complete, response:", fullResponse.substring(0, 200));
+
+    return {
+      finalResponse: fullResponse,
+      confidence: 0.85,
+      desktopSessionId: sessionId,
+      desktopActions,
+      reasoningSteps: [inProgressStep, completedStep],
+    };
+  });
+}
+
+// === DESKTOP CONFIRMATION NODE ===
 
 async function replanNode(state: AskStateType): Promise<Partial<AskStateType>> {
   const reasoningStep: ReasoningStep = {
@@ -1391,63 +1530,45 @@ async function replanNode(state: AskStateType): Promise<Partial<AskStateType>> {
 
   const retryCount = state.retryCount + 1;
 
+  // Preserve previous search results so the synthesis node has full context
+  const previousResults = [...state.researchResults];
+  const previousSources = [...state.sources];
+
   const completedStep: ReasoningStep = {
     step: "replan",
     status: "completed",
-    detail: `Refined query: "${refinedQuery}"`,
+    detail: `Refined query: "${refinedQuery}" (preserving ${previousResults.length} previous results)`,
   };
 
   return {
     userQuery: refinedQuery,
     retryCount,
-    researchResults: [],
-    sources: [],
+    researchResults: previousResults,
+    sources: previousSources,
     reasoningSteps: [reasoningStep, completedStep],
   };
 }
 
-// === DESKTOP CONFIRMATION NODE (HITL) ===
-// NOTE: This node is dormant until a preceding node produces `desktopActions`.
-// Currently, `browserAgentNode` and all other nodes return only `finalResponse`
-// and `confidence` without populating `desktopActions`, so the interrupt path
-// is unreachable in normal use. Future work should wire explicit destructive
-// actions into `state.desktopActions` before relying on this HITL flow.
-// Per LangGraph docs: code before interrupt() reruns on resume, so any
-// side effects must be idempotent.
+// === DESKTOP CONFIRMATION NODE (HITL Summary) ===
+// HITL confirmation is handled inside the custom ReAct loop (desktop-agent.ts).
+// This node serves as a summary checkpoint after the desktop agent finishes.
+// It logs the executed actions and can optionally trigger a post-execution review.
 
 async function desktopConfirmationNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  // If no pending desktop actions, pass through
   if (!state.desktopActions || state.desktopActions.length === 0) {
     return { desktopActions: [] };
   }
 
-  // Call interrupt to pause graph and wait for user confirmation
-  const confirmationPayload = {
-    type: 'desktop_confirmation',
-    action: state.desktopActions[0].type,
-    description: state.desktopActions[0].description,
-    actions: state.desktopActions,
-  };
-
-  // This pauses graph execution and waits for resume with Command({ resume: { confirmed: boolean } })
-  const resumeValue = interrupt(confirmationPayload) as { confirmed: boolean } | undefined;
-
-  const confirmed = resumeValue?.confirmed ?? false;
   const logResult = createLogger("Graph");
+  logResult.debug(`Desktop confirmation: ${state.desktopActions.length} action(s) executed`);
 
-  if (confirmed) {
-    logResult.debug("Desktop action confirmed");
-    const confirmedActions: DesktopAction[] = state.desktopActions.map(a => ({
-      ...a,
-      success: true,
-    }));
-    return { desktopActions: confirmedActions };
-  } else {
-    logResult.debug("Desktop action cancelled by user");
-    const cancelledActions: DesktopAction[] = state.desktopActions.map(a => ({
-      ...a,
-      success: false,
-    }));
-    return { desktopActions: cancelledActions };
+  const deniedActions = state.desktopActions.filter(a => a.result === 'denied_by_user');
+  if (deniedActions.length > 0) {
+    logResult.debug(`Desktop actions denied by user: ${deniedActions.map(a => a.type).join(', ')}`);
   }
+
+  // Clear desktopActions after processing so they don't accumulate across graph runs
+  return {
+    desktopActions: [],
+  };
 }

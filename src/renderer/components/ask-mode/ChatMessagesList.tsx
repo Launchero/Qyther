@@ -4,6 +4,7 @@ import autoAnimate from '@formkit/auto-animate';
 import { ChatMessageBubble, ChatMessage } from '../ChatMessageBubble';
 import { ChatErrorBanner } from './ChatErrorBanner';
 import { ChatWelcomeState } from './ChatWelcomeState';
+import { DesktopConfirmationDialog } from './DesktopConfirmationDialog';
 import type { InlineChatSession } from './RecentChatsInline';
 
 interface ChatMessagesListProps {
@@ -11,6 +12,9 @@ interface ChatMessagesListProps {
   isLoading: boolean;
   welcomeState: boolean;
   browserModeEnabled: boolean;
+  desktopModeEnabled?: boolean;
+  desktopConfirmation?: { threadId: string; action: string; description: string; planActions: Array<{ type: string; description: string; success: boolean; result?: string }> } | null;
+  onConfirmDesktopAction?: (confirmed: boolean) => void;
   onSendExample: (query: string) => void;
   onEnableBrowserMode?: () => void;
   onCopy?: (content: string) => void;
@@ -33,6 +37,9 @@ export function ChatMessagesList({
   isLoading,
   welcomeState,
   browserModeEnabled,
+  desktopModeEnabled: _desktopModeEnabled = false,
+  desktopConfirmation = null,
+  onConfirmDesktopAction = () => {},
   onSendExample,
   onEnableBrowserMode,
   onCopy,
@@ -115,6 +122,17 @@ export function ChatMessagesList({
                 onFormSubmit={onFormSubmit}
               />
             ))}
+            {/* Desktop Confirmation Dialog */}
+            {desktopConfirmation && (
+              <div className="desktop-confirmation-container mx-[var(--spacing-6)] my-[var(--spacing-2)]" role="alert" aria-live="assertive">
+                <DesktopConfirmationDialog
+                  action={desktopConfirmation.action}
+                  description={desktopConfirmation.description}
+                  onConfirm={() => onConfirmDesktopAction(true)}
+                  onDeny={() => onConfirmDesktopAction(false)}
+                />
+              </div>
+            )}
             {isLoading && (
               <div className="flex gap-[var(--spacing-1)] p-3 self-start" role="status" aria-live="polite" aria-label="AI is typing">
                 <span className="typing-dot" />

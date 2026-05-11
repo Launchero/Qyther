@@ -20,6 +20,7 @@ export interface SearchBarProps {
   onTabsExpanded?: (expanded: boolean) => void;
   windowMode?: 'expanded' | 'compact' | 'custom';
   onSendMessage?: () => void;
+  registerInput?: (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
 }
 
 export function SearchBar({ 
@@ -31,16 +32,16 @@ export function SearchBar({
   onTabsExpanded,
   windowMode = 'expanded',
   onSendMessage,
+  registerInput,
 }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
-  const [activeMode, setActiveMode] = useState<SearchMode>(currentMode);
   const [tabsExpanded, setTabsExpanded] = useState(false);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const previousFocusRef = useRef<Element | null>(null);
 
   const isCompactWindow = windowMode === 'compact';
-  const isAskMode = activeMode === 'ai';
+  const isAskMode = currentMode === 'ai';
   const isCompactAskMode = isCompactWindow && isAskMode;
   const isExpandedAskMode = windowMode === 'expanded' && isAskMode;
   
@@ -54,9 +55,14 @@ export function SearchBar({
     ai: 'Ask anything about your code, files, or project...',
   };
 
-  const displayPlaceholder = placeholder || modePlaceholders[activeMode];
+  const displayPlaceholder = placeholder || modePlaceholders[currentMode];
 
-  // Focus input when Electron window is shown, restoring previous focus if available
+  // Register the searchbar input with the focus manager
+  useEffect(() => {
+    if (registerInput) {
+      return registerInput('searchbar', inputRef as React.RefObject<HTMLElement | null>);
+    }
+  }, [registerInput]);
   useEffect(() => {
     const handleWindowWillHide = () => {
       previousFocusRef.current = document.activeElement;
@@ -89,19 +95,10 @@ export function SearchBar({
     inputRef.current?.focus();
   }, []);
 
-  // Sync activeMode with currentMode prop (for keyboard shortcuts)
-  useEffect(() => {
-    if (currentMode !== activeMode) {
-      setActiveMode(currentMode);
-    }
-  }, [currentMode, activeMode]);
-
   const handleModeChange = (mode: SearchMode) => {
-    setActiveMode(mode);
     onModeChange?.(mode);
     setTabsExpanded(false);
     onTabsExpanded?.(false);
-    inputRef.current?.focus();
   };
 
   const toggleTabs = () => {
@@ -167,7 +164,7 @@ export function SearchBar({
       {/* Mode Tab - Mockup lines 92-234 */}
       <div ref={tabsContainerRef} className="flex-shrink-0 self-center">
         <ModeTabs
-          currentMode={activeMode}
+          currentMode={currentMode}
           onModeChange={handleModeChange}
           expanded={tabsExpanded}
           onToggle={toggleTabs}

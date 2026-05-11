@@ -6,6 +6,7 @@ import { type SearchMode } from './ModeTabs';
 import { type SearchResult } from './ResultsList';
 import type { AttachedFile } from '../types/ask-types';
 import type { RecentFile } from '@/hooks/useRecentFiles';
+import { useFocusManager } from '../hooks/useFocusManager';
 import { logComponentSizes, logInfo } from '../utils/debugLogger';
 import { cn } from '@/lib/utils';
 
@@ -67,7 +68,7 @@ export function CommandPalette({
   isCollapsing = false,
   mcpCount = 0,
 }: CommandPaletteProps) {
-  const [localSearchMode, setLocalSearchMode] = useState<SearchMode>('file');
+  const [localSearchMode, setLocalSearchMode] = useState<SearchMode>(parentSearchMode ?? 'file');
   const searchMode = parentSearchMode ?? localSearchMode;
   const setSearchMode = onSearchModeChange ?? setLocalSearchMode;
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -75,6 +76,11 @@ export function CommandPalette({
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
   const [localShowShortcuts, setLocalShowShortcuts] = useState(false);
+
+  const { registerInput } = useFocusManager({
+    searchMode,
+    windowMode: currentMode,
+  });
   const showShortcuts = parentShowShortcuts !== undefined ? parentShowShortcuts : localShowShortcuts;
   const toggleShortcuts = onToggleShortcuts ?? (() => setLocalShowShortcuts(prev => !prev));
 
@@ -198,6 +204,7 @@ export function CommandPalette({
         windowMode={currentMode}
         headerRef={headerRef}
         isCollapsing={isCollapsing}
+        registerInput={registerInput}
         />
       
       <CommandPaletteBody
@@ -225,6 +232,7 @@ export function CommandPalette({
         onQuickAction={onQuickAction}
         onAskAboutFile={onAskAboutFile}
         mcpCount={mcpCount}
+        registerInput={registerInput}
       />
       
       <CommandPaletteFooter

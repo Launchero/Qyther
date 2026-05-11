@@ -134,10 +134,27 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
     }
 
     if (fileSearchError) {
+      let errorMessage = 'No results found';
+      let errorHint = 'File search unavailable';
+
+      if (fileSearchError.includes('Everything')) {
+        errorMessage = 'No results found';
+        errorHint = 'Everything app is not running. Start it to enable file search.';
+      } else if (fileSearchError.includes('es.exe') || fileSearchError.includes('not found')) {
+        errorMessage = 'No results found';
+        errorHint = 'es.exe is missing. Restart the app to download it.';
+      } else if (fileSearchError.includes('Windows')) {
+        errorMessage = 'No results found';
+        errorHint = 'File search is only available on Windows';
+      } else if (fileSearchError.includes('timed out')) {
+        errorMessage = 'Search timed out';
+        errorHint = 'Try a more specific query';
+      }
+
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-muted-foreground text-sm">No results found</p>
-          <p className="text-xs text-destructive/80 mt-1">File search unavailable</p>
+          <p className="text-muted-foreground text-sm">{errorMessage}</p>
+          <p className="text-xs text-destructive/80 mt-1">{errorHint}</p>
         </div>
       );
     }

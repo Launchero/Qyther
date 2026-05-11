@@ -75,7 +75,7 @@ export class StatefulBrowserAgent extends EventEmitter {
 
       const apiKey = process.env.API_KEY;
       const baseURL = process.env.BASE_URL;
-      const model = process.env.MODEL || 'qwen3.5-plus';
+      const model = process.env.MODEL || 'qwen3.6-plus';
 
       if (!apiKey) {
         throw new Error('API_KEY not found in environment');

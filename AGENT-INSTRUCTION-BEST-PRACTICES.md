@@ -1,10 +1,10 @@
 # Evidence-Based Guide to Instructing Coding Agents in Cursor
 
-> **Compiled**: April 2026  
-> **Based on**: Latest research from arXiv (Jan-Apr 2026), industry deployments (Stripe, Microsoft, Anthropic), and production case studies
-> **Version**: 2.2 - Expanded with hallucination prevention, multi-agent workflows, security findings, and context engineering
+> **Compiled**: May 2026  
+> **Based on**: arXiv and industry sources (Jan–May 2026), plus production case studies (Stripe, Anthropic partners, SaaS)  
+> **Version**: 3.0 — Condensed edition: same evidence-backed patterns, less repetition; full templates live in the appendix
 
-This guide translates cutting-edge research on AI coding agent instruction into practical, implementable patterns for Cursor IDE, incorporating findings from 15+ peer-reviewed studies and real-world enterprise deployments.
+This guide translates research on AI coding agent instruction into practical patterns for Cursor. v3.0 merges duplicate sections, removes long illustrative code, and keeps citations where they change behavior.
 
 ---
 
@@ -20,10 +20,17 @@ This guide translates cutting-edge research on AI coding agent instruction into 
 8. [Cursor Hooks](#cursor-hooks)
 9. [Subagents & Parallel Workflows](#subagents--parallel-workflows)
 10. [Prompt Engineering](#prompt-engineering)
-11. [Context Management](#context-management)
-12. [Hallucination Prevention & Factuality](#hallucination-prevention--factuality)
-13. [Implementation Roadmap](#implementation-roadmap)
-14. [Appendix: Templates](#appendix-templates)
+11. [Tool Use Optimization](#tool-use-optimization)
+12. [Self-Correction and Verification](#self-correction-and-verification)
+13. [Structured Reasoning Patterns](#structured-reasoning-patterns)
+14. [Context Management](#context-management)
+15. [Production Deployments & Case Studies](#production-deployments--case-studies)
+16. [Emerging Trends & Future Directions](#emerging-trends--future-directions)
+17. [Hallucination Prevention & Factuality](#hallucination-prevention--factuality)
+18. [Implementation Roadmap](#implementation-roadmap)
+19. [Appendix: Templates](#appendix-templates)
+20. [References](#references)
+21. [Changelog](#changelog)
 
 ---
 
@@ -589,43 +596,6 @@ Implement feature using Test-Driven Development.
 
 ## Cursor Skills
 
-Dynamic capabilities loaded on-demand when relevant (unlike Rules which are always loaded).
-
-**Location**: `.cursor/skills/` (testing/, deployment/, domain-specific/)
-
-**Note**: Requires Cursor Nightly channel (Settings → Beta → Update Channel: Nightly)
-
----
-
-### Skill Structure
-
-```markdown
-# SKILL.md: [Skill Name]
-
-## Description
-[What this skill does]
-
-## When to Use
-[Trigger conditions]
-
-## Capabilities
-- [Capability 1]
-- [Capability 2]
-
-## Commands
-/[command-name]: [Description]
-
-## Workflows
-[Step-by-step workflows]
-
-## Examples
-[Usage examples]
-```
-
----
-
-## Cursor Skills
-
 Dynamic capabilities loaded on-demand when relevant.
 
 **Structure**:
@@ -738,51 +708,6 @@ interface StopHookOutput {
   followup_message?: string;  // Continue agent with this message
 }
 ```
-
----
-
-## Cursor Hooks
-
-Scripts that run before/after agent actions for custom workflows and long-running loops.
-
-**Configuration** (`.cursor/hooks.json`):
-```json
-{
-  "version": 1,
-  "hooks": {
-    "stop": [{ "command": "bun run .cursor/hooks/grind.ts" }]
-  }
-}
-```
-
-**Input/Output**:
-```typescript
-interface StopHookInput {
-  conversation_id: string;
-  status: "completed" | "aborted" | "error";
-  loop_count: number;
-}
-
-interface StopHookOutput {
-  followup_message?: string;  // Continue agent with this message
-}
-```
-
-**Example 1: Loop Hook** (`.cursor/hooks/grind.ts`):
-- Reads scratchpad for "DONE" or "BLOCKED" signals
-- Continues agent if task incomplete and under max iterations
-- Updates scratchpad with progress
-
-**Example 2: Notification Hook**:
-- Sends Slack/Teams notification on completion/error
-- Uses webhook URL from environment
-
-**Example 3: Validation Hook**:
-- Runs lint, typecheck, tests after agent completes
-- Returns followup_message if checks fail
-- Agent fixes issues and retries
-
-**Usage**: `/grind Make all tests pass` → Agent iterates up to 5 times
 
 ---
 
@@ -1200,142 +1125,27 @@ if (task.hasClearSequentialSteps) {
 
 ---
 
-### Failure Analysis & Recovery Mechanisms
+### Failure Analysis & Recovery
 
-**Top Failure Types in Production** (2026 Multi-Agent Study):
+**Top Failure Types** (2026 Multi-Agent Study):
 
-| Failure Type | Frequency | Description | Example |
-|--------------|-----------|-------------|---------|
-| **Coordination Failures** | 37% | Agents conflict or deadlock | Two agents modify same file |
-| **Verification Gaps** | 21% | Missing quality checks | Bug slips through review |
-| **Cascading Failures** | 18% | One agent failure propagates | Agent B waits for failed Agent A |
-| **Hallucination Propagation** | 15% | Errors amplify across agents | Wrong fact spreads through pipeline |
-| **Resource Contention** | 9% | Agents compete for resources | Rate limit exceeded |
+| Failure Type | Frequency | Description |
+|--------------|-----------|-------------|
+| **Coordination** | 37% | Agents conflict or deadlock |
+| **Verification Gaps** | 21% | Missing quality checks |
+| **Cascading Failures** | 18% | One failure propagates |
+| **Hallucination Propagation** | 15% | Errors amplify across agents |
+| **Resource Contention** | 9% | Agents compete for resources |
 
-#### Recovery Mechanisms
-
-**1. Bulkhead Patterns** (Isolate Failure Domains):
-```typescript
-// Isolate agents to prevent cascading failures
-class BulkheadIsolator {
-  private agentGroups: Map<string, AgentGroup>;
-  
-  execute(agentId: string, task: Task) {
-    const group = this.getAgentGroup(agentId);
-    try {
-      return group.execute(task);
-    } catch (error) {
-      // Failure contained to this group
-      // Other groups continue operating
-      this.handleFailure(agentId, error);
-      return null;
-    }
-  }
-}
-```
-
-**2. Circuit Breakers**:
-```typescript
-// Prevent repeated failures
-class CircuitBreaker {
-  private failureCount = 0;
-  private threshold = 5;
-  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
-  
-  async execute(agent: Agent, task: Task) {
-    if (this.state === 'OPEN') {
-      throw new Error('Circuit breaker open');
-    }
-    
-    try {
-      const result = await agent.execute(task);
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
-  }
-  
-  private onSuccess() {
-    this.failureCount = 0;
-  }
-  
-  private onFailure() {
-    this.failureCount++;
-    if (this.failureCount >= this.threshold) {
-      this.state = 'OPEN';
-      setTimeout(() => this.state = 'HALF_OPEN', 5000);
-    }
-  }
-}
-```
-
-**3. Timeout-Based Graceful Degradation**:
-```typescript
-// Prevent indefinite blocking
-async function executeWithTimeout<T>(
-  agent: Agent,
-  task: Task,
-  timeoutMs: number = 30000
-): Promise<T | null> {
-  const timeout = new Promise<null>((_, reject) =>
-    setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-  );
-  
-  try {
-    return await Promise.race([
-      agent.execute(task),
-      timeout
-    ]) as T;
-  } catch (error) {
-    // Graceful degradation: return default or skip
-    logger.warn(`Agent ${agent.id} timed out, skipping`);
-    return null;
-  }
-}
-```
-
-**4. Centralized Tool Registry** (Production Best Practice):
-```typescript
-// Instead of direct agent-to-tool calls:
-class CentralizedToolRegistry {
-  private tools: Map<string, Tool>;
-  private observability: ObservabilityService;
-  private rateLimiter: RateLimiter;
-  private validator: SchemaValidator;
-  
-  async execute(toolName: string, params: any) {
-    // Centralized observability
-    this.observability.trackToolCall(toolName, params);
-    
-    // Rate limiting
-    await this.rateLimiter.acquire(toolName);
-    
-    // Schema validation
-    this.validator.validate(toolName, params);
-    
-    // Execute with error tracking
-    try {
-      return await this.tools.get(toolName)!.execute(params);
-    } catch (error) {
-      this.observability.trackError(toolName, error);
-      throw error;
-    }
-  }
-}
-
-// Benefits:
-// - Centralized observability
-// - Error tracking across all agents
-// - Rate limiting to prevent abuse
-// - Schema validation for all inputs
-// - Consistent error handling
-```
+**Recovery Patterns**:
+- **Bulkhead isolation**: Contain failures to single agent groups
+- **Circuit breakers**: Prevent repeated failures (open after 5 failures)
+- **Timeouts**: Prevent indefinite blocking (default 30s)
+- **Centralized tool registry**: Observability, rate limiting, schema validation
 
 ---
 
-### State Management & Communication Patterns
+### State Management & Communication
 
 **Shared State vs Message-Based Communication**:
 
@@ -1631,147 +1441,11 @@ Run after each change:
 
 ---
 
-### Prompt Templates
+### Prompt templates
 
-### Template 1: Feature Implementation
+Copy-ready prompts (feature, bugfix, review, TDD) live in **[Appendix: Prompt Templates](#prompt-templates)**. Use them instead of pasting huge instructions into every chat.
 
-```markdown
-Implement [feature name] with the following requirements:
-
-## Requirements
-- [Requirement 1]
-- [Requirement 2]
-- [Requirement 3]
-
-## Constraints
-- Follow patterns in @[reference file]
-- Use [specific technology/pattern]
-- Avoid [anti-pattern]
-
-## Success Criteria
-- [Test 1] passes
-- [Test 2] passes
-- [Metric] achieved
-
-## Files to Reference
-- @[file 1] - [reason]
-- @[file 2] - [reason]
-
-## Commands to Run
-- `[command 1]` - [when]
-- `[command 2]` - [when]
-```
-
----
-
-### Template 2: Bug Fix
-
-```markdown
-Fix bug: [bug description]
-
-## Reproduction Steps
-1. [Step 1]
-2. [Step 2]
-3. [Observe bug]
-
-## Expected Behavior
-[What should happen]
-
-## Current Behavior
-[What actually happens]
-
-## Investigation
-- Check [file/area] for [potential cause]
-- Review recent changes to [file]
-- Test with [specific input]
-
-## Constraints
-- Don't break [existing functionality]
-- Maintain [specific behavior]
-- Follow pattern in @[file]
-
-## Verification
-- Reproduce original bug (should be fixed)
-- Run tests: `[test command]`
-- Check [edge case] still works
-```
-
----
-
-### Template 3: Code Review
-
-```markdown
-Review code for [purpose]:
-
-## Focus Areas
-- [ ] Bugs or logic errors
-- [ ] Security vulnerabilities
-- [ ] Performance issues
-- [ ] Code quality and maintainability
-- [ ] Test coverage
-- [ ] Error handling
-
-## Changed Files
-@[file 1]
-@[file 2]
-
-## Context
-- Related issue: #[issue number]
-- Affected users: [user group]
-- Risk level: [low/medium/high]
-
-## Output Format
-### ✅ Good
-[Positive observations]
-
-### ⚠️ Concerns
-[Potential issues]
-
-### ❌ Blockers
-[Critical issues]
-
-### Suggestions
-[Optional improvements]
-```
-
----
-
-### Template 4: Test-Driven Development
-
-```markdown
-Implement [feature] using TDD:
-
-## Test Cases to Write
-1. [Happy path scenario]
-2. [Edge case 1]
-3. [Edge case 2]
-4. [Error condition]
-5. [Boundary condition]
-
-## Test Requirements
-- Use [testing framework]
-- Follow pattern in @[test file]
-- Minimum [X]% coverage
-- Include [specific assertions]
-
-## Process
-1. Write all tests first (DO NOT implement)
-2. Run tests, confirm ALL fail
-3. Commit tests only
-4. Implement minimal code to pass
-5. Iterate until all pass
-6. Refactor
-7. Run full test suite
-
-## Commands
-- `[test command]` - after each change
-- `[lint command]` - after implementation
-- `[typecheck command]` - before commit
-```
-
----
-
-**Prompt Specificity Matters**: Vague prompts ("Add authentication") lead to 5+ clarifying messages. Specific prompts with endpoint, pattern reference, requirements, and test coverage save 10-15 minutes of back-and-forth.
+**Prompt specificity matters**: Vague prompts ("Add authentication") lead to 5+ clarifying messages. Specific prompts with endpoint, pattern reference, requirements, and test coverage save 10-15 minutes of back-and-forth.
 
 ---
 
@@ -1824,697 +1498,31 @@ Implement [feature] using TDD:
 
 ## Self-Correction and Verification
 
-**Reflection Pattern** (Generate-Evaluate-Refine):
-```typescript
-async function generateWithReflection(agent, request) {
-  const draft = await agent.generate(request);
-  const evaluation = await agent.evaluate(`Review: ${draft}`);
-  const refined = await agent.refine(draft, evaluation);
-  const verification = await agent.verify(refined);
-  return verification.passed ? refined : /* iterate */;
-}
-```
+**Default workflow in Cursor**: Generate a draft → run objective gates (`typecheck`, `lint`, tests) → ask for a focused critique pass → patch. Cap iterations (e.g. four rounds). **MultiCodeIF** shows **structured feedback** (what failed → where → why → how to fix → example) lifts constraint satisfaction from **63.0% → 83.4%** over four rounds.
 
-**Key Approaches**:
-- **ReflexiCoder**: RL-based self-correction internalized in model weights (94.51% HumanEval)
-- **ReVISE**: Test-time self-verification with confidence-aware decoding
-- **SPOC**: Spontaneous self-correction in single inference pass
-- **E²C**: Explicit planning phase before execution (80-90% token savings)
+| Approach | Setup | When it helps |
+|----------|-------|----------------|
+| **Outer-loop reflection** | No training | General coding; pair with explicit checklists |
+| **ReflexiCoder** (arXiv:2603.05863) | RL-trained model | **94.51%** HumanEval; ~**40%** less inference vs multi-call reflection |
+| **ReVISE** (arXiv:2502.14565) | Intrinsic verification | Better calibration; math-style reasoning |
+| **SPOC** (2025) | Single-pass finetune | Interleaved propose/verify; strong on structured reasoning benchmarks |
+| **Structured feedback loop** | Prompting only | Checklist-heavy or policy-heavy tasks |
 
-**When to Use**:
-- High-stakes code generation
-- Security-critical implementations  
-- Complex debugging scenarios
-- Tasks where errors are costly
-
----
-
-## Context Management
-
-**Core Concept**: Transform one-shot agents into robust, iterative systems by incorporating critical evaluation steps.
-
-**Traditional Pipeline** (Generate-and-Return):
-```
-User Request → Agent Generation → Output
-```
-
-**Reflection Pipeline** (Generate-Evaluate-Refine):
-```
-User Request → Draft Generation → Critical Evaluation → Refined Output → Verification → Final Output
-```
-
-**Implementation**:
-```typescript
-async function generateWithReflection(agent: Agent, request: string): Promise<string> {
-  // Step 1: Generate draft
-  const draft = await agent.generate(request);
-  
-  // Step 2: Critical evaluation
-  const evaluation = await agent.evaluate(`
-    Review this code critically:
-    ${draft}
-    
-    Check for:
-    - Logic errors
-    - Edge cases not handled
-    - Security vulnerabilities
-    - Performance issues
-    - Code quality problems
-  `);
-  
-  // Step 3: Refine based on evaluation
-  const refined = await agent.refine(draft, evaluation);
-  
-  // Step 4: Verify improvements
-  const verification = await agent.verify(refined);
-  
-  if (verification.passed) {
-    return refined;
-  } else {
-    // Iterate if needed
-    return generateWithReflection(agent, `${request}\n\nFix: ${verification.issues}`);
-  }
-}
-```
-
-**Use Cases**:
-- ✅ Code generation requiring high quality
-- ✅ Complex problem-solving tasks
-- ✅ Security-critical implementations
-- ✅ Tasks where errors are costly
-
----
-
-### Pattern 2: ReflexiCoder - RL-Based Self-Correction
-
-**Breakthrough** (arXiv:2603.05863, Mar 2026): Reinforcement learning framework that internalizes self-reflection and self-correction directly into model weights, eliminating reliance on external oracles or execution feedback.
-
-**Architecture**:
-```
-Initial Solution → Self-Reflection (Bug Detection) → Conditional Rewrite → Verification → Repeat
-```
-
-**Key Innovations**:
-1. **Bug-Aware Reflection**: Model learns to identify specific bug patterns
-2. **Optimization-Aware**: Detects performance and quality issues
-3. **Conditional Rewriting**: Only modifies code when reflection identifies issues
-4. **Weight Internalization**: Self-correction capability baked into model, not external loop
-
-**Performance**:
-- **HumanEval**: 94.51% (state-of-the-art)
-- **MBPP**: 81.80%
-- **Competitive with GPT-5.1** on complex benchmarks
-- **40% reduction in inference-time compute** vs external reflection loops
-
-**Training Approach**:
-```python
-# ReflexiCoder uses RL to optimize self-correction
-def reflexicoder_training():
-    for iteration in range(num_iterations):
-        # Generate initial solution
-        code = model.generate(problem)
-        
-        # Self-reflect (internalized)
-        reflection = model.reflect(code)
-        
-        # Self-correct based on reflection
-        corrected = model.correct(code, reflection)
-        
-        # Compute reward based on correctness
-        reward = evaluate(corrected)
-        
-        # Update model via RL (PPO)
-        model.update_weights(reward)
-```
-
-**When to Use**:
-- ✅ High-stakes code generation
-- ✅ No execution environment available
-- ✅ Need for rapid iteration
-- ✅ Complex debugging scenarios
-
----
-
-### Pattern 3: ReVISE - Test-Time Self-Verification
-
-**Research** (arXiv:2502.14565, Feb 2025): Enables LLMs to self-correct through **intrinsic self-verification** using curriculum learning based on online preference learning.
-
-**Key Features**:
-- **Test-Time Scaling**: Improves performance during inference, not just training
-- **Confidence-Aware Decoding**: Model knows when it's uncertain
-- **Intrinsic Verification**: No external reward model needed
-- **Reasoning Correction**: Can fix its own reasoning errors
-
-**Implementation**:
-```typescript
-async function reviseWithIntrinsicVerification(
-  model: ReVISEModel,
-  problem: string
-): Promise<string> {
-  // Generate with confidence scores
-  const { solution, confidence } = await model.generateWithConfidence(problem);
-  
-  if (confidence < threshold) {
-    // Trigger self-verification
-    const verification = await model.selfVerify(solution, problem);
-    
-    if (!verification.valid) {
-      // Self-correct based on verification feedback
-      return model.correct(solution, verification.feedback);
-    }
-  }
-  
-  return solution;
-}
-```
-
-**Results**:
-- Significant gains on mathematical reasoning
-- Improved performance on multi-step problems
-- Better calibration of confidence scores
-
----
-
-### Pattern 4: SPOC - Spontaneous Self-Correction
-
-**Breakthrough** (2025): Enables **spontaneous self-correction** where LLMs generate interleaved solutions and verifications in a **single inference pass**, with generation dynamically terminated based on verification outcomes.
-
-**Key Innovation**: Same model assigns dual roles:
-- **Solution Proposer**: Generates candidate solutions
-- **Verifier**: Evaluates solution correctness
-
-**Architecture**:
-```
-Single Forward Pass:
-[Problem] → [Propose Step 1] → [Verify Step 1] → 
-  ↓ (if valid)
-[Propose Step 2] → [Verify Step 2] → ... → [Final Solution]
-  ↓ (if invalid)
-[Backtrack & Revise] → Continue
-```
-
-**Performance Gains**:
-- **MATH500**: +8.8-11.6% improvement
-- **AMC23**: +10.0-20.0% improvement
-- **Efficiency**: Single pass vs multiple iterations
-
-**Implementation Pattern**:
-```typescript
-async function spocSolving(model: SPOCModel, problem: string): Promise<string> {
-  const trajectory: Step[] = [];
-  
-  while (!isComplete(trajectory)) {
-    // Generate next step with verification in same pass
-    const { step, verification } = await model.generateStepWithVerification(
-      problem,
-      trajectory
-    );
-    
-    if (verification.valid) {
-      trajectory.push(step);
-    } else {
-      // Spontaneous correction in same generation
-      const revisedStep = await model.reviseStep(
-        step,
-        verification.feedback,
-        trajectory
-      );
-      trajectory.push(revisedStep);
-    }
-  }
-  
-  return synthesizeSolution(trajectory);
-}
-```
-
-**When to Use**:
-- ✅ Mathematical reasoning problems
-- ✅ Algorithmic challenges
-- ✅ Multi-step proofs
-- ✅ Problems requiring backtracking
-
----
-
-### Pattern 5: Multi-Turn Feedback with Structured Refinement
-
-**Research** (MultiCodeIF, 2025): Hierarchical benchmark demonstrating that **structured feedback enables substantial gains** in constraint satisfaction.
-
-**Key Finding**: Constraint satisfaction rises from **63.0% → 83.4%** over four refinement rounds with structured feedback.
-
-**Feedback Hierarchy**:
-```
-Level 1: Binary Feedback (Pass/Fail)
-  ↓
-Level 2: Error Location (Which constraint violated)
-  ↓
-Level 3: Error Explanation (Why it's wrong)
-  ↓
-Level 4: Correction Hint (How to fix)
-  ↓
-Level 5: Worked Example (Show correct pattern)
-```
-
-**Implementation**:
-```typescript
-async function refineWithStructuredFeedback(
-  agent: Agent,
-  task: Task,
-  constraints: Constraint[]
-): Promise<string> {
-  let solution = await agent.generate(task);
-  
-  for (let round = 1; round <= 4; round++) {
-    // Check constraint satisfaction
-    const violations = checkConstraints(solution, constraints);
-    
-    if (violations.length === 0) {
-      return solution; // All constraints satisfied
-    }
-    
-    // Provide structured feedback based on level
-    const feedback = await generateStructuredFeedback(
-      violations,
-      solution,
-      round // Increase feedback detail each round
-    );
-    
-    // Refine solution
-    solution = await agent.refine(solution, feedback);
-  }
-  
-  return solution; // Best effort after 4 rounds
-}
-
-async function generateStructuredFeedback(
-  violations: Violation[],
-  solution: string,
-  round: number
-): Promise<string> {
-  if (round === 1) {
-    // Level 1-2: Point out violations
-    return `Found ${violations.length} constraint violations: ${violations.map(v => v.description)}`;
-  } else if (round === 2) {
-    // Level 3: Explain why wrong
-    return violations.map(v => `Issue: ${v.description}\nReason: ${v.explanation}`).join('\n');
-  } else if (round === 3) {
-    // Level 4: Suggest fixes
-    return violations.map(v => `Issue: ${v.description}\nFix: ${v.suggestion}`).join('\n');
-  } else {
-    // Level 5: Show examples
-    return violations.map(v => `Issue: ${v.description}\nExample: ${v.workedExample}`).join('\n');
-  }
-}
-```
-
-**Results by Round**:
-| Round | Feedback Level | Constraint Satisfaction |
-|-------|---------------|------------------------|
-| 1 | Binary + Location | 63.0% |
-| 2 | + Explanation | 71.2% |
-| 3 | + Correction Hint | 78.5% |
-| 4 | + Worked Example | 83.4% |
-
----
-
-### Comparative Analysis
-
-| Approach | Training Required | Inference Cost | Best For |
-|----------|------------------|----------------|----------|
-| **Reflection Pattern** | None | High (multiple passes) | General purpose |
-| **ReflexiCoder** | RL training | Low (single model) | Code generation |
-| **ReVISE** | Curriculum learning | Medium | Mathematical reasoning |
-| **SPOC** | Fine-tuning | Lowest (single pass) | Algorithmic problems |
-| **Multi-Turn Feedback** | None | Medium-High | Constraint-heavy tasks |
-
----
-
-### Implementation Recommendations
-
-**For Production Systems**:
-
-1. **Start with Reflection Pattern** (no training required):
-   - Easy to implement
-   - Works with any LLM
-   - Immediate quality improvements
-
-2. **Add Intrinsic Verification** (if training resources available):
-   - Fine-tune on self-correction trajectories
-   - Use RL for weight internalization
-   - Reduces inference cost long-term
-
-3. **Implement Structured Feedback** (for constraint-heavy tasks):
-   - Progressive feedback levels
-   - 4-round refinement loop
-   - 20%+ improvement in constraint satisfaction
-
-4. **Monitor and Measure**:
-   - Track correction success rate
-   - Measure inference cost vs quality tradeoff
-   - A/B test different patterns
+Security- or auth-critical changes still need human review—self-correction reduces mistakes; it does not replace gates.
 
 ---
 
 ## Structured Reasoning Patterns
 
-### Research Context (2025-2026)
+**E²C (Explore–Execute Chain)** (arXiv:2509.23946): Separate **planning** from **execution** (Plan mode → implement without re-planning). Reported **58.1%** AIME'24 with **<10%** of chain-of-thought token cost—good fit for multi-step coding when the plan is stable.
 
-Complex coding tasks require more than simple prompt-response patterns. Recent research has developed **structured reasoning paradigms** that separate planning from execution, incorporate explicit code execution traces, and provide built-in tooling for multi-step tasks.
+**Deep Agents runtime** (LangChain, Mar 2026): Built-in todos, filesystem/shell tools, and per-task context isolation for long-running workflows.
 
----
+Research-only trace formats (heavy **CoE** / **ET-CoT** setups) are rarely worth the complexity for IDE agents unless you control training data and evaluation.
 
-### Pattern 1: Explore-Execute Chain (E²C)
-
-**Research** (arXiv:2509.23946, Sep 2025): Separates reasoning into two distinct phases to address inefficiencies in traditional Chain-of-Thought methods.
-
-**Architecture**:
-```
-┌─────────────────────────────────────┐
-│  Phase 1: EXplore (Planning)        │
-│  - Generate high-level plan         │
-│  - Identify key steps               │
-│  - Consider alternatives            │
-│  - Minimal token usage              │
-└─────────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────┐
-│  Phase 2: EXecute (Implementation)  │
-│  - Deterministic execution          │
-│  - Follow established plan          │
-│  - No re-planning needed            │
-│  - Optimized for speed              │
-└─────────────────────────────────────┘
-```
-
-**Key Innovation**: Decoupling planning from execution avoids equal computational effort on both routine execution and complex planning.
-
-**Performance**:
-- **AIME'2024**: 58.1% accuracy
-- **Token Efficiency**: Uses <10% of decoding tokens required by comparable CoT methods
-- **Speed**: 5-10x faster than full Chain-of-Thought for routine tasks
-
-**Implementation**:
-```typescript
-async function exploreExecuteChain(
-  agent: Agent,
-  complexTask: string
-): Promise<string> {
-  // Phase 1: Explore (Planning)
-  const plan = await agent.explore(`
-    Plan the approach for: ${complexTask}
-    
-    Output ONLY:
-    1. High-level steps (3-5 bullets)
-    2. Key decisions needed
-    3. Files to modify
-    4. Dependencies to consider
-    
-    Keep plan concise - detailed work comes in execution phase.
-  `);
-  
-  // User reviews plan (optional)
-  await userReview(plan);
-  
-  // Phase 2: Execute (Implementation)
-  const result = await agent.execute(`
-    Execute the following plan:
-    ${plan}
-    
-    Implementation guidelines:
-    - Follow plan exactly
-    - No re-planning unless blocked
-    - Focus on implementation details
-    - Test each step
-  `);
-  
-  return result;
-}
-```
-
-**When to Use**:
-- ✅ Complex multi-step tasks
-- ✅ Tasks requiring human approval of approach
-- ✅ Token-constrained environments
-- ✅ Repetitive tasks with clear patterns
+**Rule of thumb**: Short tasks or crisp specs → **E²C**. Long orchestrations with many tools → **Deep Agents**. Always keep verification from the previous section.
 
 ---
-
-### Pattern 2: Chain of Execution (CoE)
-
-**Research** (arXiv:2510.23629, Oct 2025): Transforms code execution into explicit step-by-step chain-of-thought rationales using **TracePile** corpus.
-
-**TracePile Corpus**:
-- **2.6 million samples** spanning:
-  - Mathematics problems
-  - Algorithm implementations
-  - Algorithmic competition problems
-- Each sample includes execution trace as CoT rationale
-
-**Architecture**:
-```
-Problem → Generate Code → Execute Step-by-Step → 
-Trace Output as CoT → Fine-tune Model → Improved Reasoning
-```
-
-**Performance**:
-- **LLaMA3.1-8B**: +7.1% average improvement across math datasets
-- **Consistent gains** across all four base models tested
-- **Generalizes** to unseen problem types
-
-**Example Execution Trace**:
-```python
-# Problem: Calculate factorial(5)
-
-# Traditional CoT:
-# "I need to calculate 5! = 5 × 4 × 3 × 2 × 1 = 120"
-
-# Chain of Execution:
-def factorial(n):
-    result = 1          # Step 1: Initialize result = 1
-    for i in range(1, 6):  # Step 2: Loop i from 1 to 5
-        result *= i     # Step 3a: i=1, result=1×1=1
-                        # Step 3b: i=2, result=1×2=2
-                        # Step 3c: i=3, result=2×3=6
-                        # Step 3d: i=4, result=6×4=24
-                        # Step 3e: i=5, result=24×5=120
-    return result       # Step 4: Return 120
-
-# Output: 120
-```
-
-**Training Approach**:
-```python
-# Fine-tune with execution traces
-training_data = [
-    {
-        "problem": "Calculate factorial(5)",
-        "code": "def factorial(n): ...",
-        "execution_trace": [
-            {"step": 1, "action": "Initialize", "state": "result=1"},
-            {"step": 2, "action": "Loop i=1 to 5", "iterations": 5},
-            {"step": 3, "action": "Multiply", "final_state": "result=120"},
-            {"step": 4, "action": "Return", "output": 120}
-        ]
-    }
-]
-
-model.fine_tune(training_data)
-```
-
-**When to Use**:
-- ✅ Mathematical reasoning tasks
-- ✅ Algorithm implementation
-- ✅ Educational contexts (showing work)
-- ✅ Debugging complex logic
-
----
-
-### Pattern 3: Execution Trace Chain of Thought (ET-CoT)
-
-**Research** (2025): Generates execution traces using **custom code interpreters** as chain-of-thought rationales to improve code execution reasoning.
-
-**Key Features**:
-- Custom code interpreter generates detailed execution traces
-- Traces used as CoT for fine-tuning
-- Improves understanding of code behavior
-
-**Performance**:
-- **Qwen2.5-7B-Instruct** (fine-tuned with 127k examples):
-  - **CruxEval-O**: 70.0%
-  - **LiveCodeBench**: 88.3%
-
-**Implementation**:
-```typescript
-// Custom interpreter generates traces
-class ExecutionTraceGenerator {
-  async generateTrace(code: string, input: any): Promise<ExecutionTrace> {
-    const trace: ExecutionTrace = [];
-    const interpreter = new CustomInterpreter();
-    
-    // Execute code step-by-step, recording state
-    interpreter.onStep((step) => {
-      trace.push({
-        lineNumber: step.line,
-        operation: step.operation,
-        variables: { ...step.variables },
-        output: step.output
-      });
-    });
-    
-    await interpreter.execute(code, input);
-    return trace;
-  }
-}
-
-// Use traces for training
-const trainingExample = {
-  problem: "Reverse a linked list",
-  code: linkedListCode,
-  trace: await traceGenerator.generateTrace(linkedListCode, testInput),
-  explanation: generateExplanationFromTrace(trace)
-};
-```
-
-**When to Use**:
-- ✅ Code understanding tasks
-- ✅ Predicting code output
-- ✅ Debugging assistance
-- ✅ Code explanation generation
-
----
-
-### Pattern 4: Deep Agents Runtime (LangChain, Mar 2026)
-
-**Release**: LangChain's Deep Agents framework (March 2026) provides a **structured runtime** for multi-step AI agents with built-in planning, memory, and context isolation.
-
-**Key Features**:
-
-1. **Built-in Planning Tools**:
-```typescript
-// Native todo list management
-agent.writeTodos([
-  "Research existing authentication patterns",
-  "Design JWT integration",
-  "Implement login endpoint",
-  "Write tests",
-  "Update documentation"
-]);
-
-// Agent can update todos as it works
-agent.updateTodo(1, { status: "completed" });
-```
-
-2. **Filesystem Operations**:
-```typescript
-// Safe file operations with context
-agent.fileSystem.read("src/auth.ts");
-agent.fileSystem.write("src/auth/jwt.ts", code);
-agent.fileSystem.search("*.test.ts");
-```
-
-3. **Shell Access** (Sandboxed):
-```typescript
-// Run commands with output capture
-const testResult = await agent.shell.run("npm test");
-const buildOutput = await agent.shell.run("npm run build");
-```
-
-4. **Task Decomposition**:
-```typescript
-// Automatically break down complex tasks
-const subtasks = await agent.decompose(
-  "Add user authentication system",
-  {
-    maxSubtasks: 10,
-    estimatedTime: "2 hours",
-    dependencies: ["existing-user-model", "database-access"]
-  }
-);
-
-// Returns structured subtask list with dependencies
-```
-
-5. **Context Isolation**:
-```typescript
-// Each subtask gets isolated context
-const subtaskContext = await agent.createContext({
-  parentContext: mainContext,
-  additionalFiles: ["src/auth.ts"],
-  inheritedVariables: ["userId", "sessionToken"]
-});
-```
-
-**Architecture**:
-```
-┌──────────────────────────────────────┐
-│     Orchestrator Agent               │
-│  - Receives high-level task          │
-│  - Decomposes into subtasks          │
-│  - Manages todo list                 │
-└──────────────────────────────────────┘
-           ↓ delegates to
-┌──────────────────────────────────────┐
-│     Specialist Agents                │
-│  - Research Agent                    │
-│  - Implementation Agent              │
-│  - Testing Agent                     │
-│  - Documentation Agent               │
-└──────────────────────────────────────┘
-           ↓ uses
-┌──────────────────────────────────────┐
-│     Shared Runtime                   │
-│  - File system access                │
-│  - Shell execution                   │
-│  - Memory/context management         │
-│  - Tool registry                     │
-└──────────────────────────────────────┘
-```
-
-**When to Use**:
-- ✅ Complex multi-day projects
-- ✅ Tasks requiring extensive research
-- ✅ Projects with many dependencies
-- ✅ Team collaboration scenarios
-
----
-
-### Pattern Comparison
-
-| Pattern | Planning | Execution | Token Efficiency | Best For |
-|---------|----------|-----------|------------------|----------|
-| **E²C** | Explicit phase | Deterministic | ⭐⭐⭐⭐⭐ (<10% tokens) | Complex tasks with clear steps |
-| **CoE** | Implicit | Trace-based | ⭐⭐⭐ | Math/algorithm problems |
-| **ET-CoT** | None | Interpreter-guided | ⭐⭐⭐ | Code understanding |
-| **Deep Agents** | Built-in tools | Multi-agent | ⭐⭐ | Long-running projects |
-
----
-
-### Implementation Recommendations
-
-**For Production Systems**:
-
-1. **Start with E²C Pattern** (easiest to implement):
-   - No special training required
-   - Works with any LLM
-   - Immediate token savings
-   - Human-in-the-loop for planning
-
-2. **Add Execution Traces** (for reasoning tasks):
-   - Implement custom interpreter
-   - Generate traces for training data
-   - Fine-tune on trace-augmented data
-
-3. **Consider Deep Agents** (for complex workflows):
-   - Use LangChain framework
-   - Leverage built-in planning
-   - Enable multi-agent coordination
-
-4. **Combine with Self-Correction**:
-   - Use structured reasoning for planning
-   - Apply reflection patterns during execution
-   - Verify outputs at each step
-
----
-
 ## Context Management
 
 ### Research-Backed Strategies
@@ -2724,2083 +1732,175 @@ Starting with the payment processor interface..."
 
 ## Production Deployments & Case Studies
 
-### Enterprise-Scale Deployments
+### Enterprise Results
 
-#### Case Study 1: Stripe (Anthropic Collaboration)
+| Case Study | Scale | Key Result | Source |
+|-----------|-------|------------|--------|
+| **Stripe** | 1,370 engineers | 10k LOC migration in 4 days (vs 10 weeks) | Anthropic |
+| **incident.io** | 4-5 agents parallel | Feature built in 10 min (est. 2 hours) | AI-native |
+| **Series B SaaS** | Domain-specialized | $253k/year savings, 340% ROI | 3-month study |
 
-**Scale**: 1,370 engineers company-wide  
-**Deployment**: Zero-configuration setup  
-**Security**: Signed enterprise binary for security
+**Series B SaaS Metrics**: Code review 87% faster (2-4h → 15-30min), features 67% faster (2-3w → 4-7d), test coverage +80% (40% → 85-95%), bugs -70% (15-20/mo → 4-6/mo).
 
-**Results**:
-```
-Scala-to-Java Migration:
-- 10,000 lines of code
-- Completed in: 4 days
-- Estimated without AI: 10 engineering weeks
-- Time savings: ~96%
+### Productivity Research
 
-Adoption Metrics:
-- 10,000+ agent interactions in first month
-- 84% engineer satisfaction
-- 0 security incidents
-```
+| Study | Finding | Caveat |
+|-------|---------|--------|
+| McKinsey (2026) | Up to 2x faster task completion | Short, well-defined tasks only |
+| Forrester (Q4 2025) | 72% developer velocity increase | Systemic changes needed for org velocity |
+| Time savings avg | 3.6 hours/week/developer | Shifts time to higher-value activities |
 
-**Key Success Factors**:
-- Zero-configuration deployment (removed adoption barriers)
-- Enterprise security binary (addressed security concerns)
-- Company-wide rollout (critical mass for knowledge sharing)
-- Collaboration with Anthropic (direct support channel)
+**Adoption**: 84% of developers use or plan AI tools; 51% use daily; 22% of merged code is AI-authored. Multi-agent market: $8.5B (2026) → $35B (2030).
 
-**Lesson**: Enterprise deployments can work at scale with proper security measures.
+### Security (AppSec Santa, Mar 2026)
 
----
+**25.1% of AI-generated code has vulnerabilities** (534 samples, 6 LLMs). GPT-5.2: 19.1% (best); Claude Opus 4.6/DeepSeek V3/Llama 4: 29.2% (worst). Injection: 33.1% of findings. 74 CVEs attributed to AI code.
 
-#### Case Study 2: incident.io (AI-Native Development)
+**Mitigation**: Mandatory security review, automated scanning in CI/CD, human gates for critical code, enterprise binary signing (Stripe-Anthropic model).
 
-**Scale**: 4-5 Claude agents running simultaneously  
-**Usage**: UI building, tooling improvement, test writing, documentation
+### Task-Stratified Performance (Pinna et al., Feb 2026)
 
-**Results**:
-```
-JavaScript Editor Feature:
-- Requirements: Multiline support, line numbers, code completion
-- Built in: 10 minutes
-- Claude estimate: 2 hours
-- Time savings: 92%
-
-Daily Workflow:
-- 4-5 agents running in parallel
-- Sequential pipeline: research → draft → review → deploy
-- Human-in-the-loop for production deploys only
-```
-
-**Key Success Factors**:
-- Multi-agent parallel execution (4-5x throughput)
-- Sequential pipeline for complex workflows
-- Human review only at critical gates
-- AI for diagnosis, humans for targeted fixes
-
-**Lesson**: Multi-agent workflows dramatically accelerate feature development.
-
----
-
-#### Case Study 3: Series B SaaS Startup (Domain-Specialized Agents)
-
-**Investment**: 3-month implementation  
-**Annual Savings**: $253k
-
-**Architecture**:
-```
-Domain-Specialized Agents:
-├── Frontend Agent (React/TypeScript)
-├── Backend Agent (Node.js/PostgreSQL)
-├── DevOps Agent (AWS/GCP)
-└── Testing Agent (Vitest/Playwright)
-
-Integration:
-- GitHub Actions workflow
-- Automated code review
-- CI/CD pipeline integration
-- Human-in-the-loop gates for production
-```
-
-**Results (3 months)**:
-```
-Code Review:
-- Before: 2-4 hours per PR
-- After: 15-30 minutes per PR
-- Improvement: 87% faster
-
-Feature Delivery:
-- Before: 2-3 weeks
-- After: 4-7 days
-- Improvement: 67% faster
-
-Test Coverage:
-- Before: 40-50%
-- After: 85-95%
-- Improvement: 80% higher
-
-Production Bugs:
-- Before: 15-20/month
-- After: 4-6/month
-- Improvement: 70% reduction
-
-Financial Impact:
-- Annual savings: $253k
-- ROI: 340%
-- Payback period: 3.5 months
-```
-
-**Key Success Factors**:
-- Domain specialization (higher quality output)
-- GitHub Actions integration (seamless workflow)
-- Automated code review (consistent quality)
-- Human gates for production (risk mitigation)
-
-**Lesson**: Domain-specialized agents with proper integration deliver measurable ROI.
-
----
-
-### Productivity Metrics Research
-
-#### McKinsey Research (2026)
-
-**Study**: Controlled experiments with professional developers
-
-**Findings**:
-```
-Task Completion Speed:
-- Documentation: 50% faster
-- New code writing: ~50% faster
-- Code refactoring: ~67% faster
-- Overall: Up to 2x faster
-
-Caveats:
-- Limited to short, well-defined tasks
-- Excludes integration, review, deployment phases
-- Individual productivity ≠ organizational velocity
-```
-
-**Implication**: AI coding assistants dramatically improve individual task speed, but organizational velocity improvements require systemic changes.
-
----
-
-#### Forrester Report (Q4 2025)
-
-**Study**: Teams using advanced AI coding platforms
-
-**Finding**: **72% increase in developer velocity**
-
-**Components**:
-- 45% from faster code generation
-- 18% from reduced rework
-- 9% from better code quality
-
-**Implication**: Velocity gains come from combination of speed + quality improvements.
-
----
-
-#### Time Savings Analysis
-
-**Average**: 3.6 hours per week saved per developer
-
-**Breakdown**:
-```
-Time Allocation (40-hour week):
-- Before AI: 
-  - Coding: 16 hours
-  - Debugging: 8 hours
-  - Code review: 6 hours
-  - Meetings: 6 hours
-  - Other: 4 hours
-
-- After AI:
-  - Coding: 10 hours (-37%)
-  - Debugging: 5 hours (-38%)
-  - Code review: 3 hours (-50%)
-  - Meetings: 6 hours (unchanged)
-  - Other: 16 hours (+300% - architecture, planning, user research)
-```
-
-**Implication**: AI doesn't eliminate work - it shifts time from routine coding to higher-value activities.
-
----
-
-### Adoption Statistics (2026)
-
-**Market Overview**:
-```
-Developer Adoption:
-- 84% use or plan to use AI tools
-- 51% of professional developers use AI daily
-- 91% AI adoption within active developer samples
-- 22% of merged code is AI-authored
-
-Tool Usage:
-- GitHub Copilot: 20M+ all-time users (mid-2025)
-- Cursor: Rapid growth in pro segment
-- Claude Code: Enterprise leader
-- Market size: $3.0-3.5 billion (Gartner, 2025)
-
-Market Growth:
-- Multi-agent systems: $8.5B (2026) → $35B (2030)
-- 57% of companies deploy AI agents in production
-- 40% of enterprise apps will feature task-specific agents by end-2026
-```
-
-**Implication**: AI coding has crossed the chasm from early adopter to mainstream.
-
----
-
-### Security in Production
-
-#### AppSec Santa Study (Mar 2026)
-
-**Methodology**: 534 code samples, 6 LLMs, OWASP Top 10 evaluation
-
-**Critical Findings**:
-```
-Vulnerability Rates:
-- Overall: 25.1% confirmed vulnerabilities
-- GPT-5.2: 19.1% (best)
-- Claude Opus 4.6, DeepSeek V3, Llama 4 Maverick: 29.2% (worst)
-- Spread: 10.1 percentage points
-
-Most Common Issues:
-- SSRF: 32 confirmed findings
-- Injection: 33.1% of all findings
-- Security Misconfiguration: 25 findings
-```
-
-**Real-World Impact**:
-- 74 CVEs attributed to AI-generated code (Mar 2026)
-- Claude Code: 49 cases
-- Estimated actual: 5-10x higher (underreporting)
-- **The Register**: "Using AI to code does not mean your code is more secure"
-
-**Production Mitigation Strategies**:
-```
-Enterprise Best Practices:
-1. Mandatory security review for all AI-generated code
-2. Automated vulnerability scanning in CI/CD
-3. Human-in-the-loop gates for security-critical code
-4. Security-specialized agent for review
-5. Enterprise binary signing (Stripe-Anthropic model)
-```
-
-**Lesson**: Security must be explicitly addressed - it doesn't improve automatically with AI.
-
----
-
-### Code Quality Analysis
-
-#### Task-Stratified Performance (Pinna et al., Feb 2026)
-
-**Study**: 7,156 pull requests, 9 task categories
-
-**Acceptance Rates**:
-```
-By Task Type:
-- Documentation: 82.1% (highest)
-- New features: 66.1%
-- Bug fixes: 71.3%
-- Refactoring: 68.9%
-- Tests: 74.5%
-- Performance: 69.2%
-- Security: 63.4% (lowest)
-- DevOps: 70.8%
-- Migration: 72.6%
-
-Gap: 16 percentage points between documentation and features
-```
-
-**By Agent**:
-```
-- Claude Code: Documentation (92.3%), Features (72.6%)
-- Cursor: Fix tasks (80.4%)
-- OpenAI Codex: Consistent across all (59.6%-88.6%)
-- Devin: +0.77%/week improvement over 32 weeks
-```
-
-**Implication**: No single agent dominates all categories. Agent selection should be task-specific.
-
----
+**7,156 PRs, 9 categories**: Documentation 82.1% acceptance; Features 66.1%; Security 63.4% (lowest). **16-point gap** between best and worst. No single agent dominates all categories — select agent per task type.
 
 ### Lessons from Production
 
-#### What Works
+**What Works**: Zero-config deployment (Stripe), parallel agents (incident.io), domain specialization (Series B SaaS), GitHub Actions integration, human-in-the-loop gates for production.
 
-1. **Zero-Configuration Deployment** (Stripe)
-   - Remove adoption barriers
-   - Let engineers discover value organically
-   - Provide security guardrails
+**What Doesn't**: Comprehensive documentation (ETH Zurich: +20-23% costs), one-size-fits-all agents (16-point task gap), skipping security review (25.1% vuln rate), >8 agents (chaotic).
 
-2. **Multi-Agent Parallel Execution** (incident.io)
-   - 4-5 agents running simultaneously
-   - Sequential pipeline for complex workflows
-   - Human review at critical gates only
+### ROI Framework
 
-3. **Domain Specialization** (Series B SaaS)
-   - Frontend, Backend, DevOps, Testing agents
-   - Higher quality output per domain
-   - Clear ownership and accountability
-
-4. **Automated Integration** (All case studies)
-   - GitHub Actions workflow
-   - CI/CD pipeline integration
-   - Automated code review
-
-5. **Human-in-the-Loop Gates** (All enterprise deployments)
-   - Required for production deploys
-   - Security-critical code review
-   - Architecture decisions
-
-#### What Doesn't Work
-
-1. **Comprehensive Documentation** (ETH Zurich)
-   - 20-23% increased costs
-   - Reduced success rates
-   - Agents respect instructions too literally
-
-2. **One-Size-Fits-All Agent** (Pinna et al.)
-   - No agent dominates all categories
-   - 16-point gap between task types
-   - Task-specific selection required
-
-3. **Skipping Security Review** (AppSec Santa)
-   - 25.1% vulnerability rate
-   - 74 CVEs attributed to AI code
-   - Security doesn't improve automatically
-
-4. **Ignoring Coordination Overhead** (Multi-agent studies)
-   - >8 agents becomes chaotic
-   - Circular dependencies cause deadlocks
-   - Exactly one orchestrator required
-
----
-
-### ROI Calculation Framework
-
-**Based on Series B SaaS case study**:
-
-```
-Inputs:
-- Number of developers: N
-- Average fully-loaded cost: $200k/year
-- AI tool cost: $20/developer/month
-- Time savings: 3.6 hours/week/developer
-
-Calculations:
-Annual time savings per developer:
-  3.6 hours/week × 50 weeks × ($200k / 2000 hours) = $18k
-
-Annual tool cost per developer:
-  $20/month × 12 months = $240
-
-Net benefit per developer:
-  $18k - $240 = $17,760
-
-ROI:
-  ($17,760 / $240) × 100 = 7,400%
-
-Additional Benefits (harder to quantify):
-- Improved code quality: +20% value
-- Reduced bugs: +15% value
-- Faster feature delivery: +25% value
-- Better developer satisfaction: +10% value
-
-Total estimated value: ~$25k/developer/year
-```
-
-**For 10-developer team**:
-- Annual investment: $2,400
-- Annual return: $250,000
-- ROI: 10,400%
-- Payback period: <1 month
-
-**Sensitivity Analysis**:
-- Conservative (50% time savings): ROI still >5,000%
-- Aggressive (2x time savings): ROI >15,000%
-
-**Lesson**: Even conservative estimates show compelling ROI for AI coding tools.
+For 10-dev team: $2,400/year AI tools → $250,000/year return (10,400% ROI). Even conservative estimates (50% time savings) show >5,000% ROI.
 
 ---
 
 ## Emerging Trends & Future Directions
 
-### Trend 1: Automated Prompt Optimization
+### 5 Key Trends (2026)
 
-**Research**: Microsoft Research PromptWizard & UniPrompt (2025-2026)
+1. **Context engineering & budgets** — Primacy/recency placement (MOSAIC, ACL 2026) remains decisive; **ContextBudget** (arXiv:2604.01664) frames long-horizon context as a **budget** (when to compress or drop history). Clean context on a weaker model still beats cluttered context on a stronger one.
+2. **Instruction–tool retrieval (ITR)** (arXiv:2602.17046) — Compose minimal per-step prompts instead of dumping the full manual every turn; reported **~95%** per-step token reduction and **~70%** cost reduction in the paper’s setting.
+3. **Many-tier instruction hierarchies (Many-IH)** (arXiv:2604.09443) — With **12** conflicting instruction levels, accuracy can sit near **~40%**; keep AGENTS.md, rules, and skills intentionally small and non-overlapping.
+4. **Chain of Draft (CoD)** — Very short reasoning steps can match verbose chain-of-thought at **~92%** fewer tokens; use terse agent steps when quality holds.
+5. **Security-first delivery** — **25.1%** of AI-generated code shows vulnerabilities (AppSec Santa); binary signing, mandatory review gates, and security-specialized agents are moving mainstream.
 
-**What's Changing**:
-- Shift from artisanal prompt crafting to systematic optimization
-- LLMs generate, critique, and refine their own prompts
-- Feedback-driven refinement through iterative mutation, scoring, critique, synthesis
-- Integration of chain-of-thought reasoning
-- Generation of synthetic examples (robust, diverse, task-aware)
+**Instruction Following Gap** (OctoBench/MOSAIC): No model >20% on strict constraints. Compliance varies with constraint position (primacy/recency effects). Iterative refinement (4 rounds): 63% → 83% compliance.
 
-**Key Technologies**:
-```
-PromptWizard:
-- Self-evolving mechanism
-- Iterative mutation → scoring → critique → synthesis
-- Chain-of-thought integration
-- Synthetic example generation
-
-UniPrompt:
-- Views optimization as learning multiple task facets
-- Breaks prompts into loosely coupled semantic sections
-- Generates long, complex prompts impossible with manual methods
-- Achieves higher accuracy than human-tuned prompts
-```
-
-**Implication**: Prompt engineering becoming automated - focus shifts to defining objectives and constraints, not crafting prompts manually.
-
----
-
-### Trend 2: Context Engineering as Discipline
-
-**Research**: Popularized by Shopify CEO Tobi Lütke (2025), validated by Stanford/UC Berkeley
-
-**What's Changing**:
-- Shift from "better models" to "better context"
-- **Clean context on weaker model > cluttered context on stronger model**
-- Formal methodologies emerging for context design
-- "Lost in the Middle" mitigation strategies
-- Position-aware context placement
-
-**Best Practices**:
-```
-Context Design Principles:
-1. Position critical info at beginning (0-15%) or end (85-100%)
-2. Use progressive disclosure to avoid "middle-stuffing"
-3. Chunk information with summaries
-4. Query-anchored context placement
-5. Tiered injection (always-on vs on-demand)
-```
-
-**Tools**:
-- Context7 (Upstash): 50,000+ GitHub stars
-- Cody AI (Sourcegraph): Sophisticated RAG pipeline
-- Context+: Tree-sitter AST + spectral clustering
-
-**Implication**: Context engineering becoming core developer skill, as important as prompt engineering.
-
----
-
-### Trend 3: RAG-Enhanced Code Generation
-
-**Research**: Context7, Cody AI, Context+ (2025-2026)
-
-**What's Changing**:
-- Live, version-specific documentation injection
-- Semantic code search with AST analysis
-- Merkle tree synchronization for efficiency
-- Addresses outdated AI-generated code problem
-
-**How It Works**:
-```
-RAG Pipeline for Code:
-1. User query → semantic search
-2. Retrieve relevant docs (version-specific)
-3. Vector database + Code Graph lookups
-4. Context reranking
-5. Inject into prompt before LLM inference
-6. Generate code with current APIs
-
-Advanced Systems:
-- Tree-sitter AST for semantic chunking
-- Spectral clustering for feature grouping
-- Obsidian-style linking for navigation
-- Merkle trees for O(log n) sync
-```
-
-**Benefits**:
-- Reduces hallucinated APIs
-- Ensures version compatibility
-- Improves code accuracy by 30-40%
-- Enables multi-repository understanding
-
-**Implication**: RAG becoming standard for production AI coding systems.
-
----
-
-### Trend 4: Multi-Agent Specialization
-
-**Research**: 40% of enterprise apps will feature task-specific agents by end-2026 (Gartner)
-
-**What's Changing**:
-- Domain-specialized agents (Frontend, Backend, DevOps, Testing)
-- Orchestrator patterns becoming standard
-- Sequential pipelines for complex workflows
-- Self-hosted multi-agent systems
-
-**Market Growth**:
-```
-Multi-Agent AI Systems:
-- 2026: $8.5 billion
-- 2030: $35 billion
-- CAGR: 42%
-
-Enterprise Adoption:
-- 2025: 5% of apps
-- 2026: 40% of apps (projected)
-- 8x growth in 12 months
-```
-
-**Frameworks**:
-- Microsoft Foundry Agent Service: Visual workflow builder
-- Microsoft Conductor: CLI for YAML-based orchestration
-- OpenClaw: Self-hosted multi-agent systems
-- Flow Framework: Dynamic workflow refinement
-
-**Implication**: Multi-agent systems moving from research to production mainstream.
-
----
-
-### Trend 5: Scaffold-Aware Instruction Following
-
-**Research**: OctoBench, CCTU, IFBench, CCR-Bench (2025-2026)
-
-**What's Changing**:
-- Recognition that task-solving ≠ instruction compliance
-- New benchmarks for constraint adherence
-- Focus on heterogeneous, persistent constraints
-- No model currently >20% on strict constraint tasks
-
-**Benchmark Results**:
-```
-CCTU (200 test cases, 7 constraints/case):
-- No model >20% task completion
-- Models violate constraints in >50% of cases
-
-IFBench (58 challenging constraints):
-- Top performer (OpenAI o3): 69.3
-- Most models: <53.7
-
-CCR-Bench (complex instructions):
-- State-of-the-art models show substantial deficiencies
-- Deep entanglement of content and formatting
-- Intricate task decomposition required
-```
-
-**Implication**: Instruction following remains unsolved problem - major opportunity for improvement.
-
----
-
-### Trend 6: Interoperable Configuration Standards
-
-**Research**: Galster et al. analysis of 2,923 GitHub repositories
-
-**What's Changing**:
-- AGENTS.md emerging as cross-tool standard
-- 60,000+ repositories adopted
-- Supported by Anthropic, Google, GitHub, OpenAI
-- Interoperable standard across tools
-
-**Configuration Hierarchy**:
-```
-Priority Order:
-1. AGENTS.md (highest priority) - Repository/directory-level
-2. .github/copilot-instructions.md - Repository-wide
-3. Prompt files (.github/prompts/*.prompt.md) - Per-task
-
-Tool Support:
-- Claude Code: Full support
-- GitHub Copilot: Full support
-- Cursor: Full support
-- Gemini: Full support
-- OpenAI Codex: Full support
-```
-
-**Implication**: AGENTS.md becoming universal standard - invest in quality configuration.
-
----
-
-### Trend 7: Inference Optimization
-
-**Research**: Speculative decoding advances (2025-2026)
-
-**What's Changing**:
-- Speculative decoding mainstream adoption
-- 2-5x speedups in production
-- Training-free approaches
-- N-gram tree speculation for code
-
-**Technologies**:
-```
-Speculative Speculative Decoding (SSD/Saguaro):
-- Parallelizes drafting and verification
-- 30% faster than standard speculative decoding
-- Up to 5x faster than autoregressive decoding
-
-N-gram Tree Speculative Decoding (Mar 2026):
-- Training-free framework
-- Combines n-gram dictionary with tree attention
-- Up to 2x throughput on repetitive code tasks
-- Zero trainable parameters
-
-Production-Scale (Meta, Aug 2025):
-- EAGLE-based speculative decoding
-- 1.4-2.0x speed-ups at large batch sizes
-- ~4ms per token on Llama models
-```
-
-**Implication**: Inference costs decreasing dramatically - more affordable AI coding.
-
----
-
-### Trend 8: Security-First AI Coding
-
-**Research**: AppSec Santa study, 74 CVEs attributed to AI code
-
-**What's Changing**:
-- Vulnerability scanning integrated into AI workflows
-- Enterprise binary signing (Stripe-Anthropic model)
-- Human-in-the-loop for security-critical code
-- Security-specialized agents
-
-**Production Practices**:
-```
-Enterprise Security Workflow:
-1. AI generates code
-2. Automated vulnerability scan (SAST/DAST)
-3. Security-specialized agent review
-4. Human security engineer approval (for critical code)
-5. Binary signing (enterprise deployments)
-6. Continuous monitoring post-deployment
-```
-
-**Tools**:
-- ESLint security plugin
-- npm audit integration
-- SAST/DAST in CI/CD
-- Security agent for automated review
-
-**Implication**: Security becoming first-class concern in AI coding workflows.
-
----
-
-### Trend 9: Quantitative Benchmarking
-
-**Research**: EvoCodeBench, DevBench, AutoCodeBench, ReflexiCoder
-
-**What's Changing**:
-- Move beyond accuracy to efficiency metrics
-- Human-performance calibration
-- Cross-language evaluation
-- Solution correctness + efficiency (time, memory)
-
-**Benchmarks**:
-```
-EvoCodeBench:
-- Evaluates self-evolving LLM coding systems
-- Measures: correctness + solving time + memory + algorithmic design
-- Human-performance comparison
-- Cross-language stability analysis
-
-DevBench:
-- Telemetry-driven (1,800 evaluation instances)
-- 6 languages, 6 task categories
-- Functional correctness + similarity + LLM-judge
-
-ReflexiCoder Performance:
-- HumanEval: 94.51%
-- HumanEval Plus: 87.20%
-- MBPP: 81.80%
-- LiveCodeBench: 52.21%
-```
-
-**Implication**: Benchmarking maturing beyond simple accuracy to real-world performance.
-
----
-
-### Trend 10: Human-AI Collaboration Patterns
-
-**Research**: McKinsey, Forrester, production case studies
-
-**What's Changing**:
-- Plan Mode for complex features
-- Human-in-the-loop gates for production
-- AI for diagnosis, humans for targeted fixes
-- Shift from replacement to augmentation
-
-**Collaboration Models**:
-```
-AI-Native Development (incident.io):
-- AI: 90% of routine coding
-- Human: 10% architecture + review
-- Ratio: 9:1 AI:human
-
-Enterprise Augmentation (Stripe):
-- AI: 50% code generation
-- Human: 50% architecture + security + review
-- Ratio: 1:1 AI:human
-
-Conservative Adoption:
-- AI: 25% boilerplate + tests
-- Human: 75% core logic + review
-- Ratio: 1:3 AI:human
-```
-
-**Time Allocation Shift**:
-```
-Before AI (40-hour week):
-- Coding: 16 hours (40%)
-- Debugging: 8 hours (20%)
-- Review: 6 hours (15%)
-- Other: 10 hours (25%)
-
-After AI:
-- Coding: 10 hours (25%)
-- Debugging: 5 hours (12.5%)
-- Review: 3 hours (7.5%)
-- Architecture: 8 hours (20%)
-- User research: 6 hours (15%)
-- Planning: 5 hours (12.5%)
-- Other: 3 hours (7.5%)
-```
-
-**Implication**: AI shifts time from routine coding to higher-value activities.
-
----
-
-## Research Gaps & Open Questions
-
-### Identified Gaps
-
-**1. Long-Term Maintainability**
-- Most studies limited to short, well-defined tasks
-- No longitudinal studies on codebase maintainability
-- Unknown: Technical debt accumulation with high AI adoption
-- **Open Question**: Does AI-generated code age well?
-
-**2. Organizational Velocity**
-- Individual productivity well-measured (55-100% faster)
-- Team/organizational velocity improvements inconsistent
-- **Open Question**: How to measure end-to-end delivery pipeline improvements?
-
-**3. Multi-Agent Coordination**
-- Architecture patterns emerging
-- Limited research on coordination overhead
-- Unknown: Optimal communication protocols, conflict resolution
-- **Open Question**: What's the coordination cost penalty?
-
-**4. Context File Design**
-- Contradictory findings (Lulla: +28% efficiency, ETH: -20% success)
-- No systematic design principles
-- Unknown: Ideal granularity, update frequency, versioning
-- **Open Question**: What makes context files effective?
-
-**5. Instruction Following Training**
-- Systematic gap identified (OctoBench: <20% compliance)
-- No proven methods for improvement
-- **Open Question**: How to train models for better constraint adherence?
-
-**6. Cross-Language Robustness**
-- Most benchmarks English/Python-centric
-- Long-tail language stability underexplored
-- **Open Question**: Do findings generalize beyond Python/JavaScript?
-
-**7. Security Best Practices**
-- High vulnerability rates documented (25.1%)
-- Few studies on effective mitigation
-- **Open Question**: What security workflows actually work?
-
-**8. Economic Impact**
-- $253k savings case study
-- No macroeconomic analysis
-- **Open Question**: Impact on software development labor markets?
-
----
-
-### Opportunities for Contribution
-
-**For Researchers**:
-1. Longitudinal maintainability studies
-2. Instruction-following training methods
-3. Cross-language benchmarks
-4. Multi-agent coordination cost analysis
-5. Context file design principles
-
-**For Practitioners**:
-1. Share AGENTS.md examples
-2. Document what works/doesn't work
-3. Contribute to open-source command libraries
-4. Report security vulnerabilities responsibly
-5. Measure and publish ROI metrics
-
-**For Tool Builders**:
-1. Better instruction-following training
-2. Automated security scanning integration
-3. Context engineering tools
-4. Multi-agent orchestration platforms
-5. Quantitative benchmarking dashboards
+**AGENTS.md as Universal Standard**: 60,000+ repositories adopted. Supported by Anthropic, Google, GitHub, OpenAI, Cursor. 32 KiB combined character limit across files.
 
 ---
 
 ## Hallucination Prevention & Factuality
 
-**Core Challenge**: Hallucinations remain the primary barrier to production LLM deployment. Research shows modern approaches can achieve **up to 96% hallucination reduction** through multi-layered strategies, though complete elimination remains mathematically impossible.
+**Core Challenge**: 96% hallucination reduction possible through multi-layered strategies, though complete elimination remains impossible.
 
-### Research Findings (2025-2026)
+### Key Findings
 
 | Study | Finding | Implication |
 |-------|---------|-------------|
-| **Zylos Research (Jan 2026)** | Multi-layered strategies achieve 96% hallucination reduction | Combine multiple mitigation techniques |
-| **Meta AI/ETH Zürich (ACL 2024)** | Chain-of-Verification reduces hallucinations across all task types | Implement systematic verification workflows |
-| **AppSec Santa (Mar 2026)** | 25.1% of AI-generated code has vulnerabilities | Security review catches hallucination-induced bugs |
-| **arXiv:2601.19106** | AST-based detection: 100% precision, 87.6% recall, 77% auto-correction | Use deterministic validation for code hallucinations |
-| **arXiv:2603.05863** | ReflexiCoder achieves 94.51% HumanEval with self-correction | Train models to self-reflect and correct |
-| **Nature (2024)** | Semantic entropy detects uncertainty at meaning level, not token level | Monitor semantic consistency, not just probability |
-| **arXiv:2603.24579** | Multi-agent verification breaks confirmation bias cycles | Use independent verification agents |
+| Zylos (Jan 2026) | Multi-layered: 96% reduction | Combine multiple techniques |
+| Meta/ETH (ACL 2024) | Chain-of-Verification (CoVe) reduces across all tasks | Systematic verification workflows |
+| arXiv:2601.19106 | AST detection: 100% precision, 87.6% recall, 77% auto-correction | Use deterministic validation |
+| ReflexiCoder (Mar 2026) | 94.51% HumanEval with self-correction, 40% less compute | RL-based internalization |
+| arXiv:2603.24579 | Multi-agent verification breaks confirmation bias | Independent verification agents |
 
-### Types of Hallucinations in Coding Agents
+### 4 Types of Hallucinations
 
-**1. Factual Hallucinations**
-- Invented API methods or parameters
-- Non-existent library functions
-- Incorrect version requirements
-- Fake documentation references
+1. **Factual**: Invented APIs, non-existent functions, fake docs
+2. **Code**: Syntax errors, type mismatches, logic errors
+3. **Context**: Non-existent files, wrong codebase structure
+4. **Confidence**: "Confidently wrong" regime, overstated certainty
 
-**2. Code Hallucinations**
-- Syntax errors in generated code
-- Type mismatches and undefined variables
-- Incorrect import statements
-- Logic errors in algorithms
+### Detection Methods
 
-**3. Context Hallucinations**
-- References to non-existent files
-- Misunderstanding of codebase structure
-- Incorrect assumptions about dependencies
-- False claims about test coverage
-
-**4. Confidence Hallucinations**
-- Low-entropy but wrong outputs ("confidently wrong regime")
-- Overstated certainty in uncertain predictions
-- Failure to express appropriate uncertainty
-
-### Detection Techniques
-
-#### 1. Semantic Entropy & Uncertainty Quantification
-
-**Semantic Entropy Approach** (Nature 2024):
-- Computes uncertainty at the semantic level rather than token sequences
-- Works across datasets without prior knowledge
-- Identifies when models generate different meanings despite similar token probabilities
-
-**Implementation**:
-```typescript
-// Monitor semantic consistency across multiple generations
-async function detectSemanticHallucination(
-  prompt: string,
-  model: LLM,
-  numSamples: number = 5
-): Promise<HallucinationRisk> {
-  const responses = await Promise.all(
-    Array(numSamples).fill(null).map(() => model.generate(prompt))
-  );
-  
-  // Cluster responses by semantic meaning
-  const semanticClusters = clusterByMeaning(responses);
-  
-  // High entropy across semantic clusters indicates uncertainty
-  const entropy = calculateSemanticEntropy(semanticClusters);
-  
-  return {
-    risk: entropy > THRESHOLD ? 'high' : 'low',
-    confidence: 1 - entropy,
-    clusters: semanticClusters
-  };
-}
-```
-
-**Uncertainty Quantification Methods**:
-- **Logit-based**: Analyze probability distributions and token likelihoods
-- **Sampling-based**: Assess response variability across multiple generations
-- **Verbalized confidence**: Prompt model to express uncertainty explicitly
-
-#### 2. White-Box Detection Methods
-
-**Internal State Analysis**:
-- Analyze token probabilities and attention patterns
-- Use sparse autoencoder activations to detect anomalous patterns
-- Monitor hidden representations for uncertainty signals
-
-**LLM-Check Framework**:
-- Uses internal hidden representations
-- Analyzes attention similarity maps
-- Examines logit outputs for consistency
-
-#### 3. Black-Box Detection Methods
-
-**FINCH-ZK Framework**:
-- Cross-model consistency checking without external knowledge
-- Compare outputs across different models
-- Improves detection F1 scores by 6-39%
-
-**Sampling-Based Consensus** (HalluCodeDetector):
-- Generate multiple code samples
-- Evaluate semantic consistency using MRCM metric
-- Achieves AUROC=0.76 on benchmarks
-
-#### 4. Code-Specific Detection
-
-**AST-Based Detection** (arXiv:2601.19106):
-```typescript
-// Parse code into AST and validate against knowledge base
-function detectCodeHallucination(
-  generatedCode: string,
-  knowledgeBase: KnowledgeBase
-): ValidationResult {
-  const ast = parseAST(generatedCode);
-  const errors: HallucinationError[] = [];
-  
-  // Validate API calls against known signatures
-  traverseAST(ast, (node) => {
-    if (node.type === 'CallExpression') {
-      const functionName = extractFunctionName(node);
-      const expectedSignature = knowledgeBase.getSignature(functionName);
-      
-      if (!expectedSignature) {
-        errors.push({
-          type: 'UNKNOWN_FUNCTION',
-          message: `Function '${functionName}' not found in knowledge base`,
-          location: node.location
-        });
-      } else if (!matchesSignature(node.arguments, expectedSignature)) {
-        errors.push({
-          type: 'SIGNATURE_MISMATCH',
-          message: `Arguments don't match expected signature`,
-          location: node.location
-        });
-      }
-    }
-  });
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    autoCorrectable: errors.every(e => e.autoCorrectable)
-  };
-}
-```
-
-**Knowledge Conflicting Hallucinations (KCHs)**:
-- Subtle semantic errors like non-existent API parameters
-- Detected via deterministic static analysis
-- 100% precision, 87.6% recall achieved
+| Method | Key Finding | Cursor Application |
+|--------|-------------|-------------------|
+| **Semantic Entropy** (LLM-Check) | Analyzes attention similarity maps + logit consistency | Use internally to flag uncertain outputs |
+| **White-Box** | Hidden representations, attention maps | Not directly usable; informs confidence scoring |
+| **Black-Box** (FINCH-ZK) | Cross-model consistency, +6-39% F1 | Compare outputs across models for critical code |
+| **Sampling Consensus** (HalluCodeDetector) | AUROC=0.76 via MRCM metric | Generate 3 samples, check semantic agreement |
+| **AST-Based** (arXiv:2601.19106) | 100% precision, 87.6% recall on KCHs | Run `tsc --noEmit` + ESLint as deterministic gate |
 
 ### Prevention & Mitigation Strategies
 
-#### 1. Chain-of-Verification (CoVe)
+**1. Chain-of-Verification (CoVe)** — Meta AI/ETH Zürich (ACL 2024):
+- **Workflow**: Draft → Plan verification questions → Answer independently → Generate corrected output
+- **Cursor pattern**: Generate code → ask "what APIs are used?" → verify each exists → regenerate if needed
+- **Result**: Reduces hallucinations across all task types
 
-**Meta AI/ETH Zürich Technique** (ACL 2024):
-Systematic four-step process that reduces hallucinations across all task types:
+**2. RAG with Attribution** (arXiv:2601.19927):
+- Ensure responses verifiably supported by retrieved content; abstain if retrieval quality insufficient
+- **Stable-RAG** (arXiv:2601.02993): Cluster hidden states across permutation orders for consistent predictions
+- **Cursor pattern**: `@file` references only, agent finds more via search
 
-```markdown
-## CoVe Workflow
+**3. Self-Correction & Reflection**:
+- **ReflexiCoder** (arXiv:2603.05863): RL internalizes self-reflection → 94.51% HumanEval, 40% less compute
+- **SPOC** (2025): Single-pass self-correction +8.8-11.6% MATH500
+- **Cursor pattern**: After code generation, prompt "Review critically for: logic errors, edge cases, security, performance" → fix issues found
 
-### Step 1: Draft
-Generate initial response to the query
+**4. Multi-Agent Verification (MARCH)** (arXiv:2603.24579):
+- Break confirmation bias via information asymmetry: Solver → Propositions → Checker (blind) → Re-solve if failed
+- **Cursor pattern**: Generate → Review in new context (no prior conversation) → Fix flagged issues
 
-### Step 2: Plan
-Create verification questions to fact-check the draft
-- Break down claims into verifiable facts
-- Generate independent questions for each fact
-- Avoid questions biased by the draft response
+**5. Confidence Calibration & Abstention**:
+- **HALT**: Finetune to generate only when confident: 51% → 87% accuracy, 53% completeness
+- **Cursor pattern**: For critical paths, require >90% confidence; standard >75%; docs >60%
 
-### Step 3: Answer
-Answer verification questions independently
-- Use factored variants to control context
-- Prevent bias from original response
-- Execute answers without reference to draft
+**6. Citation Verification**:
+- **CiteGuard** (arXiv:2510.17853): Retrieval-augmented validation (68.1% accuracy) + LLM judge hybrid
+- **FACTUM**: Mechanistic framework measuring attention/FFN contributions; scale-dependent thresholds
 
-### Step 4: Generate Final Output
-Produce verified response incorporating corrections
-- Integrate verified facts
-- Flag uncertain claims
-- Abstain when verification fails
+### Implementation Patterns
+
+**Layered Verification Pipeline** (Syntax → AST → Type check → Semantic → Tests):
+```
+generated_code → tsc --noEmit → eslint → npm test → human review (if confidence < threshold)
 ```
 
-**Implementation for Coding Agents**:
-```typescript
-async function chainOfVerification(
-  prompt: string,
-  generateFn: (p: string) => Promise<string>
-): Promise<VerifiedResponse> {
-  // Step 1: Draft
-  const draft = await generateFn(prompt);
-  
-  // Step 2: Plan verification
-  const verificationPrompt = `
-    Given this code draft:
-    ${draft}
-    
-    List specific verification questions for:
-    1. API existence and signatures
-    2. Import statement correctness
-    3. Type compatibility
-    4. Logic correctness
-  `;
-  const questions = await generateFn(verificationPrompt);
-  
-  // Step 3: Answer independently
-  const answers = await Promise.all(
-    questions.split('\n').map(q => 
-      generateFn(`Answer factually without reference to previous responses: ${q}`)
-    )
-  );
-  
-  // Step 4: Generate verified output
-  const finalPrompt = `
-    Original request: ${prompt}
-    Draft: ${draft}
-    Verification findings: ${answers.join('\n')}
-    
-    Generate final code incorporating corrections.
-    Flag any remaining uncertainties.
-  `;
-  
-  return {
-    response: await generateFn(finalPrompt),
-    verificationData: { draft, questions, answers },
-    confidence: calculateConfidence(answers)
-  };
-}
-```
+**Confidence-Gated Workflow**:
+- Critical code paths: >90% confidence → proceed; 75-90% → human review; <75% → abstain
+- Standard features: >75% proceed; <75% review
+- Documentation: >60% acceptable
 
-#### 2. Retrieval-Augmented Generation (RAG) with Attribution
+**Iterative Refinement**: Max 4 rounds, evaluate score >0.9 + no hallucinations before accepting.
 
-**Attribution-Based Verification** (arXiv:2601.19927):
-Ensure responses are verifiably supported by retrieved content:
+### Production Monitoring
 
-```typescript
-interface RAGAttributionConfig {
-  // Retrieval quality thresholds
-  minRetrievalScore: number;
-  maxDocuments: number;
-  
-  // Attribution requirements
-  requireCitations: boolean;
-  citationFormat: 'inline' | 'footnote' | 'structured';
-  
-  // Groundedness checking
-  groundednessThreshold: number;
-  contradictionDetection: boolean;
-}
-
-async function generateWithAttribution(
-  query: string,
-  retriever: DocumentRetriever,
-  config: RAGAttributionConfig
-): Promise<AttributedResponse> {
-  // Retrieve relevant documents
-  const documents = await retriever.retrieve(query, config.maxDocuments);
-  
-  // Filter by quality score
-  const qualifiedDocs = documents.filter(d => d.score >= config.minRetrievalScore);
-  
-  if (qualifiedDocs.length === 0) {
-    return {
-      response: null,
-      abstain: true,
-      reason: 'Insufficient retrieval quality'
-    };
-  }
-  
-  // Generate with citation requirements
-  const response = await model.generate({
-    prompt: query,
-    context: qualifiedDocs,
-    instructions: 'Cite specific sources for each claim. Abstain if evidence is insufficient.'
-  });
-  
-  // Verify groundedness
-  const groundedness = await verifyGroundedness(response, qualifiedDocs);
-  
-  if (groundedness.score < config.groundednessThreshold) {
-    return {
-      response: null,
-      abstain: true,
-      reason: 'Response not sufficiently grounded in retrieved documents',
-      groundedness
-    };
-  }
-  
-  return {
-    response,
-    citations: extractCitations(response),
-    sources: qualifiedDocs,
-    groundedness
-  };
-}
-```
-
-**Stable-RAG for Permutation Robustness** (arXiv:2601.02993):
-- Run generator under multiple retrieval orders
-- Cluster hidden states across permutations
-- Decode from cluster-center representation
-- Produces consistent predictions regardless of document order
-
-#### 3. Self-Correction & Reflection
-
-**ReflexiCoder Approach** (arXiv:2603.05863):
-Reinforcement learning to internalize self-reflection:
-
-```typescript
-// RL-based self-correction training
-interface ReflexiCoderConfig {
-  modelSize: '8B' | '14B' | '32B';
-  rewardFunction: 'test_pass' | 'syntax_valid' | 'semantic_correct';
-  trainingData: CodeCorrectionPair[];
-}
-
-// At inference time - self-correction loop
-async function selfCorrect(
-  initialCode: string,
-  maxIterations: number = 3
-): Promise<CorrectedCode> {
-  let currentCode = initialCode;
-  let iteration = 0;
-  
-  while (iteration < maxIterations) {
-    // Self-reflection step
-    const reflection = await model.generate(`
-      Review this code critically:
-      ${currentCode}
-      
-      Identify:
-      1. Logic errors
-      2. Edge cases not handled
-      3. Security vulnerabilities
-      4. Performance issues
-      5. Syntax problems
-      
-      Be specific about issues found.
-    `);
-    
-    // If no issues found, return current code
-    if (reflection.includes('No issues found')) {
-      return { code: currentCode, iterations: iteration };
-    }
-    
-    // Self-correction step
-    currentCode = await model.generate(`
-      Original code:
-      ${currentCode}
-      
-      Issues identified:
-      ${reflection}
-      
-      Provide corrected code addressing all issues.
-    `);
-    
-    iteration++;
-  }
-  
-  return { code: currentCode, iterations: iteration, maxReached: true };
-}
-```
-
-**Reflection Layer Architecture**:
-```typescript
-// Open-source plugin for structured self-assessment
-interface ReflectionConfig {
-  workflowGates: WorkflowGate[];
-  assessmentPrompt: string;
-  maxReflections: number;
-}
-
-interface WorkflowGate {
-  name: string;
-  check: () => Promise<boolean>;
-  feedback: string;
-}
-
-async function reflectionLayer(
-  agentSession: Session,
-  config: ReflectionConfig
-): Promise<ReflectionResult> {
-  // Inspect session history when agent goes idle
-  const history = agentSession.getHistory();
-  
-  // Request self-assessment
-  const selfAssessment = await model.generate(`
-    Review this session:
-    ${formatHistory(history)}
-    
-    Assess:
-    1. Is the task complete?
-    2. What remains to be done?
-    3. Are there any errors or issues?
-    4. Have all requirements been met?
-  `);
-  
-  // Evaluate against workflow gates
-  const gateResults = await Promise.all(
-    config.workflowGates.map(async gate => ({
-      name: gate.name,
-      passed: await gate.check(),
-      feedback: gate.feedback
-    }))
-  );
-  
-  // Provide targeted feedback
-  const failedGates = gateResults.filter(g => !g.passed);
-  
-  if (failedGates.length > 0) {
-    return {
-      complete: false,
-      feedback: failedGates.map(g => g.feedback).join('\n'),
-      nextActions: generateNextActions(failedGates)
-    };
-  }
-  
-  return { complete: true, assessment: selfAssessment };
-}
-```
-
-#### 4. Multi-Agent Verification (MARCH)
-
-**Multi-Agent Reinforced Self-Check** (arXiv:2603.24579):
-Break confirmation bias through information asymmetry:
-
-```typescript
-// MARCH: Multi-Agent Reinforced CHeck
-interface MARCHConfig {
-  solverModel: LLM;
-  proposerModel: LLM;
-  checkerModel: LLM;
-  verificationRounds: number;
-}
-
-async function marchVerification(
-  task: string,
-  config: MARCHConfig
-): Promise<VerifiedSolution> {
-  // Solver generates initial solution
-  const solution = await config.solverModel.generate(task);
-  
-  for (let round = 0; round < config.verificationRounds; round++) {
-    // Proposer extracts verifiable propositions
-    const propositions = await config.proposerModel.generate(`
-      From this solution:
-      ${solution}
-      
-      Extract specific, verifiable claims that can be checked independently.
-      Format: "Claim: [statement] | Verification method: [how to check]"
-    `);
-    
-    // Checker validates without seeing original solution
-    const validation = await config.checkerModel.generate(`
-      Verify these propositions independently:
-      ${propositions}
-      
-      Do not reference any previous solutions.
-      Check each claim against known facts and logic.
-      
-      Format: "Claim: [statement] | Valid: true/false | Reason: [explanation]"
-    `);
-    
-    // If all valid, return solution
-    if (validation.includes('Valid: false')) {
-      // Re-solve with feedback
-      const feedback = extractFailedValidations(validation);
-      solution = await config.solverModel.generate(`
-        Task: ${task}
-        Previous issues: ${feedback}
-        
-        Provide corrected solution addressing all issues.
-      `);
-    } else {
-      return { solution, verified: true, rounds: round + 1 };
-    }
-  }
-  
-  return { solution, verified: false, maxRoundsReached: true };
-}
-```
-
-#### 5. Confidence Calibration & Abstention
-
-**Behaviorally Calibrated RL** (arXiv:2512.19920):
-Train models to abstain when uncertain:
-
-```typescript
-interface CalibrationConfig {
-  // Proper scoring rules for calibration
-  scoringRule: 'brier' | 'logarithmic' | 'spherical';
-  
-  // Abstention thresholds
-  abstentionThreshold: number;
-  minConfidence: number;
-  
-  // Risk control
-  maxFalsePositiveRate: number;
-  coverageTarget: number;
-}
-
-async function calibratedGeneration(
-  prompt: string,
-  model: CalibratedModel,
-  config: CalibrationConfig
-): Promise<CalibratedResponse> {
-  // Generate with confidence estimate
-  const response = await model.generate(prompt, {
-    returnConfidence: true,
-    calibrationMethod: 'temperature_scaling'
-  });
-  
-  // Calibrate confidence using temperature scaling
-  const calibratedConfidence = applyTemperatureScaling(
-    response.rawConfidence,
-    model.calibrationParams
-  );
-  
-  // Decision based on calibrated confidence
-  if (calibratedConfidence < config.abstentionThreshold) {
-    return {
-      abstain: true,
-      reason: 'Confidence below threshold',
-      confidence: calibratedConfidence,
-      alternative: 'Requesting human review'
-    };
-  }
-  
-  return {
-    response: response.text,
-    confidence: calibratedConfidence,
-    abstain: false
-  };
-}
-```
-
-**HALT (High Accuracy, Less Talk)**:
-- Post-training approach that finetunes models to generate only when confident
-- Increases mean correctness by 15% on average
-- When optimized for highest correctness: 51% → 87% accuracy
-- Maintains 53% response completeness
-
-#### 6. Citation & Attribution Verification
-
-**CiteGuard Framework** (arXiv:2510.17853):
-Retrieval-augmented validation for citations:
-
-```typescript
-interface CiteGuardConfig {
-  academicDatabases: Database[];
-  verificationMethod: 'retrieval' | 'llm_judge' | 'hybrid';
-  accuracyThreshold: number;
-}
-
-async function verifyCitations(
-  text: string,
-  config: CiteGuardConfig
-): Promise<CitationVerificationResult> {
-  // Extract citations from text
-  const citations = extractCitations(text);
-  
-  const verificationResults = await Promise.all(
-    citations.map(async citation => {
-      // Retrieval-based verification (68.1% accuracy)
-      const retrievalResult = await searchAcademicDatabases(
-        citation,
-        config.academicDatabases
-      );
-      
-      if (config.verificationMethod === 'retrieval') {
-        return {
-          citation,
-          valid: retrievalResult.found,
-          confidence: retrievalResult.confidence,
-          source: retrievalResult.source
-        };
-      }
-      
-      // Hybrid: retrieval + LLM judge
-      const llmVerification = await model.generate(`
-        Citation: ${citation}
-        Retrieved source: ${retrievalResult.source}
-        
-        Does this citation accurately represent the source?
-        Provide confidence score and reasoning.
-      `);
-      
-      return {
-        citation,
-        valid: retrievalResult.found && parseConfidence(llmVerification) > 0.7,
-        confidence: combineConfidences(retrievalResult, llmVerification),
-        retrievalResult,
-        llmAssessment: llmVerification
-      };
-    })
-  );
-  
-  return {
-    overallAccuracy: calculateAccuracy(verificationResults),
-    verifiedCitations: verificationResults.filter(r => r.valid),
-    failedCitations: verificationResults.filter(r => !r.valid),
-    recommendations: generateRecommendations(verificationResults)
-  };
-}
-```
-
-**FACTUM Framework**:
-- Mechanistic framework for detecting citation hallucinations
-- Measures contributions from attention and FFN pathways
-- Scale-dependent: smaller models need higher pathway alignment, larger models need lower
-
-### Implementation Patterns for Coding Agents
-
-#### Pattern 1: Layered Verification Pipeline
-
-```typescript
-async function layeredVerificationPipeline(
-  code: string,
-  context: CodeContext
-): Promise<VerifiedCode> {
-  // Layer 1: Syntax validation (fast, deterministic)
-  const syntaxCheck = validateSyntax(code);
-  if (!syntaxCheck.valid) {
-    return { code: null, errors: syntaxCheck.errors, layer: 'syntax' };
-  }
-  
-  // Layer 2: Static analysis (AST-based)
-  const astCheck = validateAST(code, context.knowledgeBase);
-  if (!astCheck.valid) {
-    return { code: null, errors: astCheck.errors, layer: 'ast' };
-  }
-  
-  // Layer 3: Type checking
-  const typeCheck = await typeCheckCode(code, context.typeDefinitions);
-  if (!typeCheck.valid) {
-    return { code: null, errors: typeCheck.errors, layer: 'type' };
-  }
-  
-  // Layer 4: Semantic verification (LLM-based)
-  const semanticCheck = await verifySemantics(code, context);
-  if (!semanticCheck.valid) {
-    return { code: null, errors: semanticCheck.errors, layer: 'semantic' };
-  }
-  
-  // Layer 5: Test execution
-  const testResult = await runTests(code, context.testSuite);
-  if (!testResult.passed) {
-    return { code: null, errors: testResult.errors, layer: 'test' };
-  }
-  
-  return { code, verified: true, layersPassed: 5 };
-}
-```
-
-#### Pattern 2: Confidence-Gated Workflow
-
-```typescript
-interface ConfidenceGate {
-  threshold: number;
-  action: 'proceed' | 'review' | 'abstain';
-  fallback?: () => Promise<string>;
-}
-
-async function confidenceGatedGeneration(
-  prompt: string,
-  gates: ConfidenceGate[]
-): Promise<GatedResponse> {
-  // Generate with uncertainty quantification
-  const generation = await generateWithUncertainty(prompt);
-  
-  for (const gate of gates) {
-    if (generation.confidence < gate.threshold) {
-      switch (gate.action) {
-        case 'proceed':
-          continue;
-        case 'review':
-          const review = await requestHumanReview(generation);
-          if (review.approved) continue;
-          return { abstain: true, reason: 'Human review rejected' };
-        case 'abstain':
-          return { 
-            abstain: true, 
-            reason: `Confidence ${generation.confidence} below threshold ${gate.threshold}`,
-            confidence: generation.confidence
-          };
-      }
-    }
-  }
-  
-  return { response: generation.text, confidence: generation.confidence };
-}
-```
-
-#### Pattern 3: Iterative Refinement with Feedback
-
-```typescript
-async function iterativeRefinement(
-  initialPrompt: string,
-  maxIterations: number = 4
-): Promise<RefinedOutput> {
-  let currentOutput = await generate(initialPrompt);
-  let iteration = 0;
-  
-  while (iteration < maxIterations) {
-    // Self-evaluation
-    const evaluation = await evaluateOutput(currentOutput, initialPrompt);
-    
-    // Check if satisfactory
-    if (evaluation.score > 0.9 && !evaluation.hallucinationsDetected) {
-      return {
-        output: currentOutput,
-        iterations: iteration,
-        finalScore: evaluation.score
-      };
-    }
-    
-    // Generate feedback for improvement
-    const feedback = generateFeedback(evaluation);
-    
-    // Refine based on feedback
-    currentOutput = await generate(`
-      Original request: ${initialPrompt}
-      Current output: ${currentOutput}
-      Issues identified: ${feedback}
-      
-      Provide improved version addressing all issues.
-    `);
-    
-    iteration++;
-  }
-  
-  return {
-    output: currentOutput,
-    iterations: maxIterations,
-    maxReached: true,
-    warning: 'Maximum iterations reached without meeting quality threshold'
-  };
-}
-```
-
-### Practical Recommendations
-
-#### For High-Stakes Code Generation
-
-1. **Always use multi-layer verification**:
-   - Syntax check → AST validation → Type check → Semantic verification → Test execution
-   - Each layer catches different classes of hallucinations
-
-2. **Implement confidence thresholds**:
-   - Critical code paths: >90% confidence required
-   - Standard features: >75% confidence
-   - Documentation: >60% confidence acceptable
-
-3. **Use Chain-of-Verification for complex tasks**:
-   - Break down into verifiable sub-tasks
-   - Verify each component independently
-   - Reject outputs that fail verification
-
-4. **Maintain updated knowledge bases**:
-   - Index your codebase for RAG
-   - Keep API documentation current
-   - Version-control knowledge bases with code
-
-#### For Production Systems
-
-1. **Monitor hallucination metrics**:
-   ```typescript
-   interface HallucinationMetrics {
-     hallucinationRate: number;        // Target: <5%
-     falsePositiveRate: number;        // Target: <2%
-     abstentionRate: number;           // Target: 10-20%
-     meanConfidence: number;           // Target: >0.8
-     calibrationError: number;         // Target: <0.1
-   }
-   ```
-
-2. **Implement feedback loops**:
-   - Track which outputs required corrections
-   - Use corrections to improve detection
-   - Retrain models on error patterns
-
-3. **Use appropriate model for task**:
-   - High-stakes: GPT-5.2 (19.1% vulnerability rate vs 29.2% for Claude)
-   - Standard tasks: Any frontier model
-   - Always include verification layer
-
-4. **Human-in-the-loop for edge cases**:
-   - Flag uncertain outputs for review
-   - Build escalation paths
-   - Document resolution patterns
+Track these metrics: `hallucinationRate` (<5%), `falsePositiveRate` (<2%), `abstentionRate` (10-20%), `meanConfidence` (>0.8), `calibrationError` (<0.1).
 
 ### Key Takeaways
 
-1. **Hallucinations are inevitable but manageable**: 96% reduction possible with layered strategies
-2. **Detection > Prevention**: It's easier to catch hallucinations than prevent them entirely
-3. **Multi-modal verification works best**: Combine syntax, semantic, and execution checks
-4. **Confidence calibration is critical**: Models must know when they don't know
-5. **Context engineering reduces hallucinations**: Better context → fewer hallucinations
-6. **Self-correction improves over time**: RL-based approaches show 40% inference reduction
-7. **Multi-agent verification breaks bias**: Independent agents catch confirmation errors
+1. **Detection > Prevention**: Catch hallucinations easier than preventing entirely
+2. **Multi-modal verification**: Combine syntax, semantic, and execution checks
+3. **Context engineering reduces hallucinations**: Better context → fewer errors
+4. **Self-correction improves over time**: RL approaches show 40% inference reduction
+5. **Multi-agent verification breaks bias**: Independent agents catch confirmation errors
 
 ---
 
 ## Implementation Roadmap
 
-### Week 1: Foundation
+Use this as a **sequence**, not a fixed calendar—linger on a phase until it feels solid.
 
-**Goals**: Establish minimal instruction files, practice core patterns.
+| Phase | Focus | Done when |
+|-------|-------|-----------|
+| **1. Foundation** | Minimal [AGENTS.md](#agentsmd), one general rules file, Plan Mode on real tasks | Small tasks finish without giant file dumps |
+| **2. Automation** | Commands (`/pr`, `/review`, `/fix-issue`, optional `/tdd`) + one domain skill | Repeatable flows are one invocation |
+| **3. Advanced** | One hook (iteration cap / guardrail), parallel agents + worktrees, richer SKILL.md | Parallel work merges cleanly |
+| **4. Optimize** | Cut instructions if cost rises or success drops (ETH Zurich warning signs); short team doc | Token use stable or down; onboarding is obvious |
 
-#### Day 1-2: Create AGENTS.md
+**Weekly metrics**: time-to-done, first-attempt success, lint/typecheck/test pass rate, subjective tool/token use.
 
-```markdown
-☐ Create AGENTS.md in repository root
-☐ Include only:
-  - Tech stack (1-2 lines)
-  - Essential commands (build, test, lint)
-  - Critical constraints (truly necessary)
-  - 3-5 canonical example references
-☐ Keep under 100 lines
-☐ Test with simple task
-```
+**Pitfalls** (still the usual): over-long AGENTS.md, negative-only rules, attaching dozens of files, 50-message threads—trim, reframe positively, attach 2–3 canonical paths, reset chats when switching work.
 
-**Template**:
-```markdown
-# Project Context
-
-## Stack
-- [Runtime, Framework, Database]
-
-## Essential Commands
-```bash
-npm run build      # Build before committing
-npm run test       # Run test suite
-npm run lint       # Run linter
-```
-
-## Critical Constraints
-- [Only truly necessary requirements]
-
-## Canonical Examples
-- [Feature]: @[file path]
-- [Feature]: @[file path]
-```
+All copy-paste templates: [Appendix: Templates](#appendix-templates).
 
 ---
-
-#### Day 3-4: Create General Rules
-
-```markdown
-☐ Create .cursor/rules/general.md
-☐ Include:
-  - 3-5 essential commands
-  - Code style basics
-  - Workflow requirements
-  - Canonical example references
-☐ Keep under 20 lines
-☐ Test with agent
-```
-
-**Template**:
-```markdown
-# General Rules
-
-## Commands
-- `[command]`: [When to run]
-
-## Code Style
-- [Style rule 1]
-- [Style rule 2]
-
-## Workflow
-- [Workflow rule 1]
-- [Workflow rule 2]
-
-## Examples
-- [Pattern]: @[file]
-```
-
----
-
-#### Day 5-7: Practice Plan Mode
-
-```markdown
-☐ Use Plan Mode for all substantive tasks
-☐ Review and edit plans before execution
-☐ Save plans to .cursor/plans/
-☐ Note time savings and quality improvements
-```
-
-**Practice Tasks**:
-- Small feature addition
-- Bug fix
-- Refactoring task
-
-**Metrics to Track**:
-- Time to completion
-- Number of revisions
-- Clarifying questions needed
-
----
-
-### Week 2: Workflow Automation
-
-**Goals**: Create reusable commands, establish TDD workflow.
-
-#### Day 8-9: Create First Commands
-
-```markdown
-☐ Create .cursor/commands/pr.md
-☐ Create .cursor/commands/review.md
-☐ Test each command 3-5 times
-☐ Refine based on results
-```
-
-**Priority Commands**:
-1. `/pr` - Pull request creation
-2. `/review` - Code review
-3. `/fix-issue [n]` - Issue fixing
-
----
-
-#### Day 10-11: Create TDD Command
-
-```markdown
-☐ Create .cursor/commands/tdd.md
-☐ Practice TDD on new feature
-☐ Note improvement in code quality
-☐ Track test coverage
-```
-
-**TDD Command Template**:
-```markdown
-# /tdd [feature]
-
-1. Write tests first (no implementation)
-2. Run tests, confirm all fail
-3. Commit tests only
-4. Implement minimal code to pass
-5. Iterate until all pass
-6. Refactor
-7. Run full suite
-```
-
----
-
-#### Day 12-14: Enable Nightly Channel
-
-```markdown
-☐ Settings → Beta → Update Channel: Nightly
-☐ Restart Cursor
-☐ Test Skills feature
-☐ Create first simple skill
-```
-
-**First Skill**: Domain-specific knowledge for your project.
-
----
-
-### Week 3: Advanced Patterns
-
-**Goals**: Implement hooks, practice parallel agents.
-
-#### Day 15-16: Create Long-Running Hook
-
-```markdown
-☐ Create .cursor/hooks/grind.ts
-☐ Configure .cursor/hooks.json
-☐ Test with /grind command
-☐ Monitor iteration behavior
-```
-
-**Hook Features**:
-- Max 5 iterations
-- Scratchpad tracking
-- DONE/BLOCKED signals
-
----
-
-#### Day 17-18: Practice Parallel Agents
-
-```markdown
-☐ Run 2 agents in parallel on separate tasks
-☐ Use worktrees for isolation
-☐ Apply changes sequentially
-☐ Note time savings
-```
-
-**Practice Scenario**:
-- Agent 1: Backend API
-- Agent 2: Frontend component
-
----
-
-#### Day 19-21: Create Domain-Specific Skill
-
-```markdown
-☐ Identify domain-specific knowledge
-☐ Create .cursor/skills/[domain]/SKILL.md
-☐ Include patterns, examples, commands
-☐ Test with relevant tasks
-```
-
-**Examples**:
-- E-commerce: products, carts, orders
-- SaaS: subscriptions, billing, trials
-- Content: CMS, publishing, workflows
-
----
-
-### Week 4: Optimization
-
-**Goals**: Refine based on metrics, establish team practices.
-
-#### Day 22-23: Review Metrics
-
-```markdown
-☐ Track task completion time
-☐ Monitor token consumption
-☐ Measure success rate
-☐ Count iterations needed
-☐ Review agent effectiveness
-```
-
-**Warning Signs** (per ETH Zurich):
-- ❌ Inference costs increased >20%
-- ❌ Task success rate decreased
-- ❌ Agent respects unnecessary constraints
-- ❌ Over-exploration due to excessive requirements
-
-**Action**: Remove or simplify instructions showing warning signs.
-
----
-
-#### Day 24-25: Refine Instructions
-
-```markdown
-☐ Remove unused rules
-☐ Simplify overly complex instructions
-☐ Update canonical examples
-☐ Add missing patterns
-☐ Test refined instructions
-```
-
-**Refinement Process**:
-1. Identify underperforming instructions
-2. Simplify or remove
-3. Test with same task
-4. Compare results
-
----
-
-#### Day 26-27: Team Documentation
-
-```markdown
-☐ Document best practices for team
-☐ Create onboarding guide
-☐ Share command library
-☐ Train team on Plan Mode
-☐ Establish review process
-```
-
-**Team Guide Sections**:
-- How to use AGENTS.md
-- Available commands
-- When to use Plan Mode
-- Code review process
-- Parallel agent workflows
-
----
-
-#### Day 28: Retrospective
-
-```markdown
-☐ Review 4-week journey
-☐ Document lessons learned
-☐ Identify next improvements
-☐ Plan Q2 optimizations
-```
-
-**Questions**:
-- What saved the most time?
-- What caused the most friction?
-- What would you do differently?
-- What's the next bottleneck?
-
----
-
-### Success Metrics
-
-**Track Weekly**:
-
-| Metric | Baseline | Week 1 | Week 2 | Week 3 | Week 4 | Target |
-|--------|----------|--------|--------|--------|--------|--------|
-| Task completion time | - | - | - | - | - | ↓ 30% |
-| Token consumption | - | - | - | - | - | ↓ 20% |
-| Success rate (first attempt) | - | - | - | - | - | ↑ 40% |
-| Revisions per task | - | - | - | - | - | ↓ 50% |
-| Clarifying questions | - | - | - | - | - | ↓ 60% |
-
----
-
-### Common Pitfalls & Solutions
-
-#### Pitfall 1: Over-Documentation
-
-**Symptom**: AGENTS.md > 200 lines, multiple complex rules.
-
-**Solution**:
-```markdown
-Before:
-- 500-line AGENTS.md with complete style guide
-- 20 rules files
-- Agent confused, slow
-
-After:
-- 50-line AGENTS.md with essentials only
-- 2 rules files (general, testing)
-- Agent fast, accurate
-```
-
-**Action**: Cut 80% of content, keep only critical items.
-
----
-
-#### Pitfall 2: Premature Optimization
-
-**Symptom**: Elaborate hooks, skills, commands before understanding basic patterns.
-
-**Solution**:
-```markdown
-Week 1-2: Master basics
-- AGENTS.md
-- General rules
-- Plan Mode
-
-Week 3-4: Add automation
-- Commands for repeated workflows
-- Simple hooks
-
-Month 2+: Advanced patterns
-- Complex skills
-- Parallel agents
-- Custom integrations
-```
-
-**Action**: Don't add complexity until you feel pain from manual work.
-
----
-
-#### Pitfall 3: Negative Constraints
-
-**Symptom**: Rules full of "don't do X", agent still does X.
-
-**Solution**: Reframe positively.
-
-```markdown
-Before:
-- "Don't use var"
-- "Don't use CommonJS"
-- "Don't forget tests"
-
-After:
-- "Use let or const"
-- "Use ES modules"
-- "Write tests for all new code"
-```
-
-**Action**: Search for "don't", "never", "avoid" in rules, reframe positively.
-
----
-
-#### Pitfall 4: Context Hoarding
-
-**Symptom**: Attaching 20+ files to every prompt.
-
-**Solution**: Trust agent's search abilities.
-
-```markdown
-Before:
-"Here are all files: @file1 @file2 ... @file20
-Now add authentication"
-
-After:
-"Add authentication following pattern in @src/auth.ts
-Agent can find related files via search"
-```
-
-**Action**: Challenge yourself: "Does the agent REALLY need this file, or can it find it?"
-
----
-
-#### Pitfall 5: Conversation Accumulation
-
-**Symptom**: Single conversation with 50+ messages, agent confused.
-
-**Solution**: Strategic conversation resets.
-
-```markdown
-Start New Conversation When:
-- Different task/feature
-- Agent seems confused
-- 15+ messages exchanged
-- Finished logical unit of work
-
-Continue When:
-- Iterating on same feature
-- Agent needs earlier context
-- Mid-task with progress
-```
-
-**Action**: Set personal rule: max 15 messages per conversation.
-
----
-
 ## Appendix: Templates
 
-### Template 1: AGENTS.md
+> **Canonical examples** for repository and rules live in [AGENTS.md](#agentsmd) and [Cursor Rules](#cursor-rules). Below: task rules, commands, skills, hooks, and **prompt templates** only.
 
-```markdown
-# Project Context
-
-## Stack
-- Runtime: [e.g., Node.js 20, TypeScript 5.3]
-- Framework: [e.g., Next.js 14, Express 4]
-- Database: [e.g., PostgreSQL with Prisma ORM]
-- Testing: [e.g., Vitest, Playwright]
-
-## Essential Commands
-```bash
-npm run build      # Build before committing
-npm run test       # Run full test suite
-npm run test:unit  # Run unit tests only
-npm run lint       # Run ESLint
-npm run typecheck  # Run TypeScript checker
-```
-
-## Critical Constraints
-- [Constraint 1: e.g., All API routes in app/api/]
-- [Constraint 2: e.g., Database migrations required for schema changes]
-- [Constraint 3: e.g., All user input validated with Zod]
-
-## Canonical Examples
-- [Feature 1]: @[file path]
-- [Feature 2]: @[file path]
-- [Feature 3]: @[file path]
-- [Test Pattern]: @[file path]
-```
-
----
-
-### Template 2: General Rules
-
-```markdown
-# General Rules
-
-## Commands
-- `[command 1]`: [When to run]
-- `[command 2]`: [When to run]
-- `[command 3]`: [When to run]
-
-## Code Style
-- [Style rule 1: e.g., Use ES modules]
-- [Style rule 2: e.g., Destructure imports]
-- [Style rule 3: e.g., No any types]
-
-## Workflow
-- [Workflow 1: e.g., API routes in app/api/]
-- [Workflow 2: e.g., Database changes need migration]
-- [Workflow 3: e.g., User input validated with Zod]
-
-## Canonical Examples
-- [Pattern 1]: @[file path]
-- [Pattern 2]: @[file path]
-- [Pattern 3]: @[file path]
-```
-
----
-
-### Template 3: Task-Specific Rules
+### Template: Task-Specific Rules
 
 ```markdown
 # [Task Type] Rules
@@ -4826,7 +1926,7 @@ npm run typecheck  # Run TypeScript checker
 
 ---
 
-### Template 4: Command
+### Template: Command
 
 ```markdown
 # /command-name [parameters]
@@ -4855,7 +1955,7 @@ npm run typecheck  # Run TypeScript checker
 
 ---
 
-### Template 5: Skill
+### Template: Skill
 
 ```markdown
 # SKILL.md: [Skill Name]
@@ -4889,7 +1989,7 @@ npm run typecheck  # Run TypeScript checker
 
 ---
 
-### Template 6: Hook
+### Template: Hook
 
 ```typescript
 // .cursor/hooks/[name].ts
@@ -4925,7 +2025,7 @@ if (/* condition to continue */) {
 
 ---
 
-### Template 7: Prompt Templates
+### Prompt Templates
 
 #### Feature Implementation
 
@@ -4986,6 +2086,75 @@ Fix bug: [bug description]
 - Reproduce original bug (should be fixed)
 - Run tests: `[test command]`
 - Check [edge case] still works
+```
+
+#### Code Review
+
+```markdown
+Review code for [purpose]:
+
+## Focus Areas
+- [ ] Bugs or logic errors
+- [ ] Security vulnerabilities
+- [ ] Performance issues
+- [ ] Code quality and maintainability
+- [ ] Test coverage
+- [ ] Error handling
+
+## Changed Files
+@[file 1]
+@[file 2]
+
+## Context
+- Related issue: #[issue number]
+- Affected users: [user group]
+- Risk level: [low/medium/high]
+
+## Output Format
+### Good
+[Positive observations]
+
+### Concerns
+[Potential issues]
+
+### Blockers
+[Critical issues]
+
+### Suggestions
+[Optional improvements]
+```
+
+#### Test-Driven Development
+
+```markdown
+Implement [feature] using TDD:
+
+## Test Cases to Write
+1. [Happy path scenario]
+2. [Edge case 1]
+3. [Edge case 2]
+4. [Error condition]
+5. [Boundary condition]
+
+## Test Requirements
+- Use [testing framework]
+- Follow pattern in @[test file]
+- Minimum [X]% coverage
+- Include [specific assertions]
+
+## Process
+1. Write all tests first (DO NOT implement)
+2. Run tests, confirm ALL fail
+3. Commit tests only
+4. Implement minimal code to pass
+5. Iterate until all pass
+6. Refactor
+7. Run full test suite
+
+## Commands
+- `[test command]` - after each change
+- `[lint command]` - after implementation
+- `[typecheck command]` - before commit
 ```
 
 ---
@@ -5201,6 +2370,10 @@ Fix bug: [bug description]
 - Zylos Research: Tool-use optimization (5 axes, 64% parallel speedup, $14,600/year waste)
 - ReflexiCoder: RL-based self-correction (94.51% HumanEval, 40% less compute)
 
+**April–May 2026**:
+- ContextBudget (arXiv:2604.01664): budget-aware context management for long-horizon agents
+- Many-tier instruction conflicts (Many-IH, arXiv:2604.09443): accuracy collapses when many instruction layers disagree
+
 **September 2025**:
 - Explore-Execute Chain: 58.1% AIME'2024 with <10% tokens
 - Chain of Execution: +7.1% with TracePile corpus
@@ -5220,161 +2393,10 @@ Fix bug: [bug description]
 
 ## Changelog
 
-### v2.2 (April 6, 2026) - Hallucination Prevention & Factuality Edition
+**v1.0 (Mar 2026) → v1.1 (Mar) → v2.0 (Mar) → v2.1 (Mar) → v2.2 (Apr) → v3.0 (May 2026)**  
+Major themes across releases: AGENTS.md + tiered rules, tool-use and parallel execution, self-correction and structured reasoning, hallucination stacks, security (AppSec Santa), context / “lost in the middle,” production case studies.
 
-**New Section**:
-- **Hallucination Prevention & Factuality** (after Context Management): Comprehensive 900+ line section covering detection, prevention, and mitigation strategies
-
-**Key Additions**:
-- **Detection Techniques**: Semantic entropy, white-box/black-box methods, AST-based detection, sampling-based consensus
-- **Prevention Strategies**: Chain-of-Verification (CoVe), RAG with attribution, self-correction (ReflexiCoder), multi-agent verification (MARCH)
-- **Implementation Patterns**: Layered verification pipeline, confidence-gated workflows, iterative refinement
-- **Research Findings**: 96% hallucination reduction achievable, 100% precision AST detection, 94.51% HumanEval with self-correction
-
-**New Studies Added** (10+ papers from arXiv 2025-2026):
-- Meta AI/ETH Zürich Chain-of-Verification (ACL 2024)
-- Zylos Research hallucination mitigation (Jan 2026)
-- ReflexiCoder self-correction (Mar 2026)
-- MARCH multi-agent verification (Mar 2026)
-- AST-based code hallucination detection (Jan 2026)
-- CiteGuard citation verification (Jan 2026)
-- FACTUM mechanistic citation detection (Jan 2026)
-- HALT confidence calibration (Dec 2025)
-- Stable-RAG permutation robustness (Jan 2026)
-- ThinknCheck compact verifier models (Apr 2026)
-
-**Practical Impact**:
-- 3 implementation patterns with TypeScript code examples
-- 6 prevention strategies with detailed workflows
-- 4 types of hallucinations categorized for coding agents
-- Confidence calibration and abstention frameworks
-- Production monitoring metrics and thresholds
-
----
-
-### v2.1 (March 31, 2026) - Tool Use, Self-Correction, and Reasoning Patterns
-
-**New Sections**:
-- **Tool Use Optimization** (after Prompt Engineering): Five optimization axes from 2025-2026 research
-  - Tool RAG (96.8% recall with vector search)
-  - Alignment techniques (when NOT to call tools)
-  - Parallel execution (64% latency reduction)
-  - Trajectory reduction (pruning tool-result context)
-  - Tool design discipline (making optimal choices obvious)
-  - ToolRM reward modeling (25% Best-of-n improvement)
-  - Cost analysis ($14,600/year waste from over-tool-reliance)
-
-- **Self-Correction and Verification Patterns** (after Tool Use): Five patterns for autonomous refinement
-  - Reflection Pattern architecture (generate-evaluate-refine loop)
-  - ReflexiCoder (RL-based, 94.51% HumanEval, 40% less compute)
-  - ReVISE (intrinsic self-verification, test-time scaling)
-  - SPOC (spontaneous self-correction, single pass, +8.8-11.6% MATH500)
-  - Multi-turn feedback with structured refinement (63.0% → 83.4% over 4 rounds)
-
-- **Structured Reasoning Patterns** (after Self-Correction): Four patterns for complex tasks
-  - Explore-Execute Chain (58.1% AIME'2024, <10% tokens)
-  - Chain of Execution (+7.1% with TracePile corpus)
-  - Execution Trace CoT (70.0% CruxEval-O)
-  - Deep Agents Runtime (LangChain, Mar 2026 release)
-
-- **Enhanced Multi-Agent Section**: Production orchestration patterns
-  - Six core patterns (Sequential, Router, Hierarchical, Parallel, Event-Driven, Orchestrator-Specialist)
-  - Failure analysis (coordination 37%, verification 21%, cascading 18%)
-  - Recovery mechanisms (bulkheads, circuit breakers, timeouts)
-  - State management patterns (shared vs message-based)
-  - Framework comparison (LangGraph, CrewAI, Claude Agents SDK, Deep Agents)
-
-- **Enhanced Context Management**: Full context stack and position bias
-  - Eight-layer context stack (Faros AI)
-  - "Lost in the Middle" mathematical basis (arXiv:2603.10123)
-  - Factorial dead zone O(1/(H-1)!)
-  - Mitigation strategies (position-aware injection, chunking, calibration)
-
-- **Enhanced Security Section**: Comprehensive AppSec Santa findings
-  - Model-by-model vulnerability rates (19.1-29.2%)
-  - Vulnerability type breakdown (SSRF, injection, misconfiguration)
-  - Enhanced security checklist (pre-commit mandatory review)
-  - Automated scanning integration (CI/CD pipeline)
-  - Model selection recommendations
-
-- **Enhanced Scaffold-Aware Instruction Following**: Detailed OctoBench analysis
-  - 34 environments, 217 tasks, 7,098 checklist items
-  - Checklist compliance (79.75-85.64%) vs end-to-end success (9.66-28.11%)
-  - Scaffold sensitivity (11.78-point gap between scaffolds)
-  - Constraint type performance (memory 65-70% vs Skill.md 15-25%)
-  - MultiCodeIF complementary findings (63.0% → 83.4% over 4 rounds)
-
-**Updated Executive Summary**:
-- Added 5 new research findings to key findings table
-- Updated with latest statistics from all new sections
-
-**Updated References**:
-- Added 15+ new academic papers (arXiv 2025-2026)
-- Added 12+ new industry research sources
-- Updated research timeline with monthly breakdown
-
-**Key Statistics Added**:
-| Finding | Value | Source |
-|---------|-------|--------|
-| Parallel execution latency reduction | 64% | AAIA (Jan 2026) |
-| Tool RAG recall (vector) | 96.8% | ToolScope (2026) |
-| Graph RAG-Tool Fusion improvement | 71.7% | arXiv:2502.07223 |
-| Over-tool-reliance annual cost | $14,600 | Zylos Research |
-| ReflexiCoder HumanEval score | 94.51% | arXiv:2603.05863 |
-| Self-correction inference reduction | 40% | ReflexiCoder |
-| AI code vulnerability rate | 25.1% | AppSec Santa (Mar 2026) |
-| Multi-agent enterprise adoption | 72% | Industry Report 2026 |
-| End-to-end instruction following | 9.66-28.11% | OctoBench |
-| Structured feedback improvement | +20.4% | MultiCodeIF |
-
-**Total Additions**:
-- 4 major new sections (Tool Use, Self-Correction, Reasoning, Enhanced Multi-Agent)
-- 25+ new research citations
-- 40+ new quantitative metrics
-- 15+ new implementation patterns
-- 800+ lines of new content
-
----
-
-### v2.0 (March 30, 2026) - Major Expansion
-
-**New Sections**:
-- **Production Deployments & Case Studies**: Stripe (1,370 engineers), incident.io (4-5 agents), Series B SaaS ($253k savings)
-- **Emerging Trends & Future Directions**: 10 major trends shaping AI coding 2025-2026
-- **Research Gaps & Open Questions**: 8 critical gaps in current research
-- **Enhanced Research Findings**: 6 major studies with detailed methodology and statistics
-
-**Key Additions**:
-- **Security Research**: AppSec Santa study (25.1% vulnerability rate), 74 CVEs attributed to AI code
-- **Multi-Agent Workflows**: Orchestrator-specialist patterns, sequential pipelines, market growth ($8.5B → $35B)
-- **Context Engineering**: "Lost in the Middle" phenomenon, position-aware context placement
-- **Instruction Following**: OctoBench findings (<20% compliance), CCTU, IFBench benchmarks
-- **ROI Framework**: Quantitative calculation based on production deployments
-- **Task-Stratified Performance**: 16-point gap between documentation and features
-
-**Updated Principles**:
-- Added Principle 6: Context Engineering
-- Added Principle 7: Security-First Mindset
-- Expanded all existing principles with research backing
-
-**Enhanced Statistics**:
-- 15+ peer-reviewed studies cited
-- 25+ quantitative metrics
-- 3 detailed enterprise case studies
-- 10 emerging trends identified
-
-**Research Timeline**:
-- January 2026: Efficiency benefits (Lulla), instruction following gap (OctoBench)
-- February 2026: Effectiveness concerns (Gloaguen), task performance (Pinna), configuration patterns (Galster)
-- March 2026: Security implications (AppSec Santa), inference optimization
-
----
-
-### v1.0 (March 2026)
-- Initial compilation of research findings
-- Practical implementations for Cursor ecosystem
-- Templates and examples for all features
-- Implementation roadmap with metrics
+**v3.0 (May 11, 2026)** — Condensed edition: removed duplicate sections and long sample code; merged roadmap; prompt templates only in appendix (with review + TDD); expanded trends with **ContextBudget** (arXiv:2604.01664) and **Many-IH** labeling; TOC aligned to real section order; same evidentiary claims, shorter surface area.
 
 ---
 
@@ -5392,8 +2414,8 @@ This guide evolves with new research and production experience.
 
 ---
 
-**Last Updated**: April 6, 2026
+**Last Updated**: May 11, 2026
 
 **License**: CC BY 4.0 (Share and adapt with attribution)
 
-**Version**: 2.2 - Hallucination Prevention Edition (3,500+ lines, 40+ studies, 5 new major sections)
+**Version**: 3.0 — Condensed edition (shorter doc; same core citations; full prompt templates in appendix)

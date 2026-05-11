@@ -112,8 +112,21 @@ export const AskState = Annotation.Root({
     default: () => "general",
   }),
   desktopActions: Annotation<DesktopAction[]>({
-    reducer: replaceArray<DesktopAction>(),
+    // Append reducer: actions accumulate during the ReAct loop for HITL
+    reducer: (a, b) => [...(a ?? []), ...b],
     default: () => [],
+  }),
+  desktopConfirmationState: Annotation<Record<string, unknown>>({
+    reducer: (_a, b) => b,
+    default: () => ({}),
+  }),
+  desktopSessionId: Annotation<string>({
+    reducer: (_a, b) => b,
+    default: () => "",
+  }),
+  desktopVerificationScore: Annotation<number>({
+    reducer: (_a, b) => b,
+    default: () => 0,
   }),
 });
 
