@@ -1,14 +1,15 @@
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { readdir, readFile, writeFile } from 'fs/promises';
+import { readdir, readFile, writeFile, copyFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 // Post-build patch: replace Vite/rolldown-injected `import.meta.dirname`
 // (Node.js 23+ feature) with safe fallback (Electron 42 uses Node 22)
+// Also copies sql-wasm.wasm to output dir for runtime loading
 const __dirnameFixPlugin = () => ({
-  name: 'dirname-fix',
+  name: 'dirname-fix-and-wasm',
   async writeBundle(this: any) {
     const outDir = 'out/main';
     const files = await readdir(outDir);
@@ -17,13 +18,32 @@ const __dirnameFixPlugin = () => ({
       const filePath = resolve(outDir, file);
       let content = await readFile(filePath, 'utf-8');
       // Use safe fallback: `import.meta.dirname` is undefined in Node <23
+      // Use __filename-based approach for accuracy (bindings relies on __dirname)
       const patched = content.replace(
         /const __dirname = import\.meta\.dirname;/g,
-        'const __dirname = typeof import.meta.dirname !== "undefined" ? import.meta.dirname : ".";'
+        'const __dirname = typeof import.meta.dirname !== "undefined" ? import.meta.dirname : (typeof __filename !== "undefined" ? require("path").dirname(__filename) : ".");'
       );
       if (patched !== content) {
         await writeFile(filePath, patched);
       }
+    }
+
+    // Copy sql-wasm.wasm to output dir so runtime can load it
+    const wasmSrc = resolve('node_modules/sql.js/dist/sql-wasm.wasm');
+    const wasmDst = resolve(outDir, 'sql-wasm.wasm');
+    try {
+      await copyFile(wasmSrc, wasmDst);
+    } catch {
+      // WASM file already copied or not available
+    }
+
+    // Copy native Automation.node from node-winautomation to output dir
+    const nodeSrc = resolve('node_modules/node-winautomation/build/Release/Automation.node');
+    const nodeDst = resolve(outDir, 'Automation.node');
+    try {
+      await copyFile(nodeSrc, nodeDst);
+    } catch {
+      // Automation.node not built yet or already copied
     }
   },
 });
@@ -38,7 +58,7 @@ export default defineConfig({
         formats: ['es'],
       },
       rollupOptions: {
-        external: ['electron', 'better-sqlite3', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core'],
+        external: ['electron', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core', 'node-winautomation'],
         output: {
           format: 'es',
         },

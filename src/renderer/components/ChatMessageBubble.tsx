@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { TaskMetrics } from '../utils/costCalculator';
 import { CheckCircle } from '@phosphor-icons/react';
 import { logInfo } from '../utils/debugLogger';
+import { AgentIndicator } from './ask-mode/AgentIndicator';
 
 export interface UIPayload {
   type: GenerativeUIType;
@@ -64,6 +65,7 @@ export interface ChatMessage {
   uiPayloadType?: GenerativeUIType;
   uiGenerationProgress?: number;
   uiProgressMessage?: string;
+  agent?: { label: string } | null;
 }
 
 interface ChatMessageBubbleProps {
@@ -330,6 +332,11 @@ export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExp
                 </div>
               )}
 
+              {/* Agent indicator for multi-agent routing */}
+              {message.agent && !message.isStreaming && (
+                <AgentIndicator agent={message.agent} />
+              )}
+
               {/* Confidence badge for confidence-based routing */}
               {message.confidence !== undefined && message.confidence > 0 && !message.isStreaming && (
                 <ConfidenceBadge
@@ -398,6 +405,7 @@ export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExp
     prevProps.message.uiGenerationProgress === nextProps.message.uiGenerationProgress &&
     prevProps.message.uiProgressMessage === nextProps.message.uiProgressMessage &&
     prevProps.message.uiPayloads?.length === nextProps.message.uiPayloads?.length &&
+    prevProps.message.agent?.label === nextProps.message.agent?.label &&
     prevProps.className === nextProps.className
   );
 });

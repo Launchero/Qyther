@@ -232,69 +232,71 @@ export function App() {
   }, []);
 
   return (
-    <div className="w-full h-full max-w-full flex flex-col relative overflow-hidden m-0 p-0">
+    <>
+      <div className="w-full h-full max-w-full flex flex-col relative overflow-hidden m-0 p-0">
 
-      {/* Background overlay - MUST be behind CommandPalette (z-0) */}
-      <div className="fixed inset-0 bg-transparent z-0" />
-      
-      {/* CommandPalette - MUST be above overlay (z-10) */}
-      <div className="relative z-10 h-full flex flex-col">
-        <CommandPalette
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          results={isLoading ? [] : results}
-          selectedIndex={selectedIndex}
-          onSelect={setSelectedIndex}
-          onExecute={execute}
-          currentMode={windowMode}
-          executingId={executingId}
-          searchMode={searchMode}
-          onSearchModeChange={setSearchMode}
-          mcpCount={mcpCount}
-          attachedFiles={attachedFiles}
-          onRemoveFile={removeAttachedFile}
-          onAttachFile={openFilePicker}
-          onAttachFolder={openFolderPicker}
-          onAddFile={addAttachedFile}
-          onClearAttachments={clearAttachedFiles}
-          isFileSearchLoading={isFileSearchLoading}
-          fileSearchError={fileSearchError}
-          recentFiles={recentFiles}
-          onQuickAction={(action) => {
-            switch (action) {
-              case 'find-in-folder':
-                window.electronAPI.dialog.openFolder().then((result) => {
-                  if (result.path) {
-                    setSearchQuery(result.path);
-                  }
-                }).catch((e) => logError('[App] openFolder failed:', e));
-                break;
-              case 'recent-files':
-                // Recent files already shown in SearchEmptyState
-                break;
-              case 'open-terminal':
-                logInfo('[App] Quick action "open-terminal" - requires new IPC handler');
-                break;
-              case 'git-status':
-                logInfo('[App] Quick action "git-status" - requires new IPC handler');
-                break;
-            }
-          }}
-          onAskAboutFile={handleAskAbout}
-          showShortcuts={showShortcuts}
-          onToggleShortcuts={() => setShowShortcuts(prev => !prev)}
-          isCollapsing={isCollapsing}
-        />
-      </div>
-      
-      {/* Initial app loading overlay - only blocks during first render */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-20">
-          <p className="text-muted-foreground">Loading applications...</p>
+        {/* Background overlay - MUST be behind CommandPalette (z-0) */}
+        <div className="fixed inset-0 bg-transparent z-0" />
+        
+        {/* CommandPalette - MUST be above overlay (z-10) */}
+        <div className="relative z-10 h-full flex flex-col">
+          <CommandPalette
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            results={isLoading ? [] : results}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedIndex}
+            onExecute={execute}
+            currentMode={windowMode}
+            executingId={executingId}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
+            mcpCount={mcpCount}
+            attachedFiles={attachedFiles}
+            onRemoveFile={removeAttachedFile}
+            onAttachFile={openFilePicker}
+            onAttachFolder={openFolderPicker}
+            onAddFile={addAttachedFile}
+            onClearAttachments={clearAttachedFiles}
+            isFileSearchLoading={isFileSearchLoading}
+            fileSearchError={fileSearchError}
+            recentFiles={recentFiles}
+            onQuickAction={(action) => {
+              switch (action) {
+                case 'find-in-folder':
+                  window.electronAPI.dialog.openFolder().then((result) => {
+                    if (result.path) {
+                      setSearchQuery(result.path);
+                    }
+                  }).catch((e) => logError('[App] openFolder failed:', e));
+                  break;
+                case 'recent-files':
+                  // Recent files already shown in SearchEmptyState
+                  break;
+                case 'open-terminal':
+                  logInfo('[App] Quick action "open-terminal" - requires new IPC handler');
+                  break;
+                case 'git-status':
+                  logInfo('[App] Quick action "git-status" - requires new IPC handler');
+                  break;
+              }
+            }}
+            onAskAboutFile={handleAskAbout}
+            showShortcuts={showShortcuts}
+            onToggleShortcuts={() => setShowShortcuts(prev => !prev)}
+            isCollapsing={isCollapsing}
+          />
         </div>
-      )}
+        
+        {/* Initial app loading overlay - only blocks during first render */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-20">
+            <p className="text-muted-foreground">Loading applications...</p>
+          </div>
+        )}
+      </div>
 
-      {/* Window Resize Handle - at App level to avoid being clipped by CommandPalette's rounded corners */}
+      {/* Window Resize Handle - rendered outside overflow-hidden container so it receives mouse events */}
       {windowMode === 'expanded' && (
         <div
           className="window-resize-handle"
@@ -309,6 +311,6 @@ export function App() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -438,7 +438,7 @@ export function createGetWindowListTool() {
 
         const summary = windows.slice(0, 20).map(w => {
           const dims = w.width > 0 ? ` (${w.width}x${w.height})` : '';
-          return `"${w.title}"${dims}`;
+          return `[${w.handle}] "${w.title}"${dims}`;
         });
 
         return `Found ${windows.length} windows:\n${summary.join('\n')}`;
@@ -448,7 +448,7 @@ export function createGetWindowListTool() {
     },
     {
       name: 'get_window_list',
-      description: 'List all visible windows on desktop with titles and dimensions.',
+      description: 'List all visible windows on desktop with titles, dimensions, and numeric handles. Handles are shown in brackets (e.g. "[1]", "[2]", "[3]") and are used by window management tools (focus_window, minimize_window, etc.).',
       schema: z.object({}),
     },
   );
@@ -522,7 +522,8 @@ export function createSearchElementsTool(accessibilityAdapter: AccessibilityTree
           return `  - "${el.name}" [${el.controlType}]${bboxStr}${el.isEnabled ? '' : ' (disabled)'}`;
         });
 
-        return `Found ${results.length} element(s) matching "${query || controlType}":\n${summary.join('\n')}${results.length > 15 ? '\n  ... and ' + (results.length - 15) + ' more' : ''}`;
+        const searchLabel = query || controlType || 'all elements';
+        return `Found ${results.length} element(s) matching "${searchLabel}":\n${summary.join('\n')}${results.length > 15 ? '\n  ... and ' + (results.length - 15) + ' more' : ''}`;
       } catch (error) {
         return `Search elements failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
@@ -554,9 +555,9 @@ export function createFocusWindowTool(adapter: DesktopAdapter) {
     },
     {
       name: 'focus_window',
-      description: 'Bring a window to the foreground by its handle. Use get_window_list to find window handles. Required before interacting with elements in a background window.',
+      description: 'Bring a window to the foreground by its handle. Use get_window_list to find window handles (e.g. "1", "2", "3"). Required before interacting with elements in a background window.',
       schema: z.object({
-        windowHandle: z.string().describe('Window handle from get_window_list'),
+        windowHandle: z.string().describe('Numeric handle from get_window_list (e.g. "1", "2", "3")'),
       }),
     },
   );
@@ -696,6 +697,340 @@ export function createGetSelectedTextTool() {
       name: 'get_selected_text',
       description: 'Copy and read the currently selected text from any application. Uses Ctrl+C to capture the selection, reads it, then restores the clipboard. Works in any focused application with selectable text.',
       schema: z.object({}),
+    },
+  );
+}
+
+export function createMinimizeWindowTool(adapter: DesktopAdapter) {
+  return tool(
+    async ({ windowHandle }) => {
+      try {
+        const success = await adapter.minimizeWindow(windowHandle);
+        if (success) {
+          return `Window minimized successfully.`;
+        }
+        return `Failed to minimize window (handle ${windowHandle}). The window may be protected/sandboxed (like Edge browser), elevated (admin), or no longer exist. Try getting a fresh window list first.`;
+      } catch (error) {
+        return `Minimize window failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'minimize_window',
+      description: 'Minimize a window by its handle. Use get_window_list to find window handles (e.g. "1", "2", "3"). This is far more reliable than clicking title bar minimize buttons.',
+      schema: z.object({
+        windowHandle: z.string().describe('Numeric handle from get_window_list (e.g. "1", "2", "3")'),
+      }),
+    },
+  );
+}
+
+export function createMaximizeWindowTool(adapter: DesktopAdapter) {
+  return tool(
+    async ({ windowHandle }) => {
+      try {
+        const success = await adapter.maximizeWindow(windowHandle);
+        if (success) {
+          return `Window maximized successfully.`;
+        }
+        return `Failed to maximize window. The handle may be invalid or the window may not exist.`;
+      } catch (error) {
+        return `Maximize window failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'maximize_window',
+      description: 'Maximize a window by its handle. Use get_window_list to find window handles (e.g. "1", "2", "3"). This is far more reliable than clicking title bar maximize buttons.',
+      schema: z.object({
+        windowHandle: z.string().describe('Numeric handle from get_window_list (e.g. "1", "2", "3")'),
+      }),
+    },
+  );
+}
+
+export function createRestoreWindowTool(adapter: DesktopAdapter) {
+  return tool(
+    async ({ windowHandle }) => {
+      try {
+        const success = await adapter.restoreWindow(windowHandle);
+        if (success) {
+          return `Window restored to normal size successfully.`;
+        }
+        return `Failed to restore window. The handle may be invalid or the window may not exist.`;
+      } catch (error) {
+        return `Restore window failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'restore_window',
+      description: 'Restore a minimized or maximized window to its normal size. Use get_window_list to find window handles (e.g. "1", "2", "3").',
+      schema: z.object({
+        windowHandle: z.string().describe('Numeric handle from get_window_list (e.g. "1", "2", "3")'),
+      }),
+    },
+  );
+}
+
+export function createCloseWindowTool(adapter: DesktopAdapter) {
+  return tool(
+    async ({ windowHandle }) => {
+      try {
+        const success = await adapter.closeWindow(windowHandle);
+        if (success) {
+          return `Window closed successfully. Sent WM_CLOSE to the window.`;
+        }
+        return `Failed to close window. The handle may be invalid or the window may be unresponsive.`;
+      } catch (error) {
+        return `Close window failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'close_window',
+      description: 'Close a window gracefully by its handle via WM_CLOSE. Use get_window_list to find window handles (e.g. "1", "2", "3"). Use with caution — this may close applications with unsaved work.',
+      schema: z.object({
+        windowHandle: z.string().describe('Numeric handle from get_window_list (e.g. "1", "2", "3")'),
+      }),
+    },
+  );
+}
+
+// ── New Tools (Phase 3) ──
+
+export function createExecuteCommandTool() {
+  return tool(
+    async ({ command, workingDir, timeout }) => {
+      try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
+        const actualTimeout = timeout ?? 30000;
+        const actualWorkingDir = workingDir || process.cwd();
+
+        const { stdout, stderr } = await execAsync(command, {
+          timeout: actualTimeout,
+          cwd: actualWorkingDir,
+          maxBuffer: 1024 * 1024 * 10,
+          shell: 'powershell.exe',
+        });
+
+        const output = stdout.trim();
+        const errorOutput = stderr.trim();
+        const truncatedOutput = output.length > 5000 ? output.slice(0, 5000) + '\n...(truncated)' : output;
+
+        if (errorOutput && !output) {
+          return `Command executed. Stderr:\n${errorOutput.slice(0, 2000)}`;
+        }
+
+        return `Command executed successfully.\nOutput:\n${truncatedOutput || '(no output)'}`;
+      } catch (error) {
+        if (error instanceof Error) {
+          const isTimeout = error.message.includes('timed out');
+          return `Command ${isTimeout ? 'timed out' : 'failed'}: ${error.message}`;
+        }
+        return `Command failed: Unknown error`;
+      }
+    },
+    {
+      name: 'execute_command',
+      description: 'Execute a PowerShell command and capture stdout/stderr. Use for file operations, git, package management, system queries, etc. Output is truncated at 5000 chars.',
+      schema: z.object({
+        command: z.string().describe('PowerShell command to execute'),
+        workingDir: z.string().optional().describe('Working directory (default: current)'),
+        timeout: z.number().optional().describe('Timeout in ms (default: 30000)'),
+      }),
+    },
+  );
+}
+
+export function createInvokeElementTool(accessibilityAdapter: AccessibilityTreeAdapter) {
+  return tool(
+    async ({ elementHandle }) => {
+      try {
+        const success = await accessibilityAdapter.invokeElement(elementHandle);
+        if (success) {
+          return `Invoked element (handle: ${elementHandle}) directly via UI Automation InvokePattern.`;
+        }
+        return `Could not invoke element (handle: ${elementHandle}). The element may not support InvokePattern. Try clicking by coordinates instead.`;
+      } catch (error) {
+        return `Invoke element failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'invoke_element',
+      description: 'Invoke a UI element directly via its native automation handle using UI Automation InvokePattern. More reliable than coordinate-based clicks. Use handles returned by search_elements or get_element_info.',
+      schema: z.object({
+        elementHandle: z.string().describe('Native element handle from search_elements or get_element_info'),
+      }),
+    },
+  );
+}
+
+export function createSetElementValueTool(accessibilityAdapter: AccessibilityTreeAdapter) {
+  return tool(
+    async ({ elementHandle, value }) => {
+      try {
+        const success = await accessibilityAdapter.setElementValue(elementHandle, value);
+        if (success) {
+          return `Set element (handle: ${elementHandle}) value to "${value.slice(0, 100)}${value.length > 100 ? '...' : ''}" via UI Automation ValuePattern.`;
+        }
+        return `Could not set element value (handle: ${elementHandle}). The element may be read-only or not support ValuePattern. Try typing with type_text instead.`;
+      } catch (error) {
+        return `Set element value failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'set_element_value',
+      description: 'Set the value of a text field directly via UI Automation ValuePattern. Faster and more reliable than typing character-by-character. Use handles from search_elements or get_element_info.',
+      schema: z.object({
+        elementHandle: z.string().describe('Native element handle for the text field'),
+        value: z.string().describe('Text value to set'),
+      }),
+    },
+  );
+}
+
+export function createGetElementTextTool(accessibilityAdapter: AccessibilityTreeAdapter) {
+  return tool(
+    async ({ elementHandle }) => {
+      try {
+        const text = await accessibilityAdapter.getElementText(elementHandle);
+        if (text !== null) {
+          const truncated = text.length > 2000 ? text.slice(0, 2000) + '\n...(truncated)' : text;
+          return `Element text (handle: ${elementHandle}):\n${truncated || '(empty)'}`;
+        }
+        return `Could not extract text from element (handle: ${elementHandle}). Try get_selected_text or OCR instead.`;
+      } catch (error) {
+        return `Get element text failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'get_element_text',
+      description: 'Extract text from a UI element directly via UI Automation TextPattern or ValuePattern. More reliable than OCR for standard UI elements. Use handles from search_elements or get_element_info.',
+      schema: z.object({
+        elementHandle: z.string().describe('Native element handle for the element'),
+      }),
+    },
+  );
+}
+
+export function createHoldKeyTool(adapter: DesktopAdapter) {
+  return tool(
+    async ({ key, action }) => {
+      try {
+        const { pressKeys, sleep } = await import('./input-simulation');
+        const keyMap: Record<string, string[]> = {
+          ctrl: ['ctrl'],
+          alt: ['alt'],
+          shift: ['shift'],
+          win: ['win'],
+          left: ['left'],
+          right: ['right'],
+          up: ['up'],
+          down: ['down'],
+          space: ['space'],
+          tab: ['tab'],
+          enter: ['enter'],
+          escape: ['escape'],
+        };
+
+        if (action === 'down') {
+          // Press and hold: keydown without keyup
+          const keys = keyMap[key.toLowerCase()] || [key];
+          for (const k of keys) {
+            const vkCode = await (async () => {
+              const VK = {
+                ctrl: 0x11, alt: 0x12, shift: 0x10, win: 0x5b,
+                left: 0x25, right: 0x27, up: 0x26, down: 0x28,
+                space: 0x20, tab: 0x09, enter: 0x0d, escape: 0x1b,
+              };
+              return VK[k.toLowerCase() as keyof typeof VK] ?? null;
+            })();
+            if (vkCode) {
+              await (async () => {
+                const { pressKeyRaw } = await import('./input-simulation');
+                await pressKeyRaw(vkCode, 'down');
+              })().catch(() => {
+                // Fallback: use pressKeys for individual key
+                pressKeys([k]);
+              });
+            }
+          }
+          return `Holding key "${key}" down.`;
+        }
+
+        if (action === 'up') {
+          const keys = keyMap[key.toLowerCase()] || [key];
+          for (const k of keys) {
+            const vkCode = await (async () => {
+              const VK = {
+                ctrl: 0x11, alt: 0x12, shift: 0x10, win: 0x5b,
+                left: 0x25, right: 0x27, up: 0x26, down: 0x28,
+                space: 0x20, tab: 0x09, enter: 0x0d, escape: 0x1b,
+              };
+              return VK[k.toLowerCase() as keyof typeof VK] ?? null;
+            })();
+            if (vkCode) {
+              await (async () => {
+                const { pressKeyRaw } = await import('./input-simulation');
+                await pressKeyRaw(vkCode, 'up');
+              })().catch(() => {
+                pressKeys([k]);
+              });
+            }
+          }
+          return `Released key "${key}".`;
+        }
+
+        return `Error: unknown action "${action}". Use: down or up.`;
+      } catch (error) {
+        return `Hold key failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'hold_key',
+      description: 'Press and hold or release a key. Use "down" to press and hold, "up" to release. Useful for drag operations with modifiers (e.g., holding shift while dragging).',
+      schema: z.object({
+        key: z.string().describe('Key name (ctrl, alt, shift, win, left, right, up, down, space, tab, enter, escape)'),
+        action: z.enum(['down', 'up']).describe('Press down or release the key'),
+      }),
+    },
+  );
+}
+
+export function createNavigateToPathTool() {
+  return tool(
+    async ({ path }) => {
+      try {
+        const { spawn } = await import('child_process');
+        const normalizedPath = path
+          .replace(/^%USERPROFILE%/i, process.env.USERPROFILE || '')
+          .replace(/^%TEMP%/i, process.env.TEMP || '')
+          .replace(/^%APPDATA%/i, process.env.APPDATA || '')
+          .replace(/^%LOCALAPPDATA%/i, process.env.LOCALAPPDATA || '');
+
+        const normalized = normalizedPath.replace(/\//g, '\\');
+
+        const child = spawn('explorer.exe', [normalized], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        child.unref();
+
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 1500);
+        });
+
+        return `Opened File Explorer to "${normalizedPath}". Wait 1-2 seconds for the window to fully load before interacting.`;
+      } catch (error) {
+        return `Navigate failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+    {
+      name: 'navigate_to_path',
+      description: 'Open File Explorer to a specific folder path in one step. Use absolute paths (e.g. "C:\\Users\\name\\Desktop"), shell folders (e.g. "shell:Desktop", "shell:Downloads"), or environment variables (e.g. "%USERPROFILE%\\Desktop"). Much more reliable than visual navigation.',
+      schema: z.object({
+        path: z.string().describe('Folder path to navigate to (supports shell: prefixes and %ENV% variables)'),
+      }),
     },
   );
 }

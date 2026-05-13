@@ -176,6 +176,7 @@ export interface ElectronAPI {
       pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
       planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
     }) => void) => () => void;
+    onAgentChange: (callback: (data: { label: string }) => void) => () => void;
   };
 
   // MCP API

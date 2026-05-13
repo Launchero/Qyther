@@ -73,6 +73,14 @@ const SUBSYSTEM_ENV_VARS: Record<string, string> = {
   ESDownloader: 'LOG_SEARCH',
   ESRunner: 'LOG_SEARCH',
   DocLoader: 'LOG_SEARCH',
+  DesktopAgent: 'LOG_DESKTOP',
+  DesktopTools: 'LOG_DESKTOP',
+  DesktopVerifier: 'LOG_DESKTOP',
+  DesktopPlanner: 'LOG_DESKTOP',
+  DesktopMemory: 'LOG_DESKTOP',
+  DesktopRecovery: 'LOG_DESKTOP',
+  DesktopSubgraph: 'LOG_DESKTOP',
+  DB: 'LOG_DB',
 };
 
 /**
@@ -162,7 +170,14 @@ export async function withTiming<T>(
     logger.debug(`${label} completed in ${Date.now() - start}ms`);
     return result;
   } catch (err) {
-    logger.debug(`${label} failed after ${Date.now() - start}ms:`, err);
+    // GraphInterrupt/NodeInterrupt are LangGraph's HITL mechanism, not failures
+    const isInterrupt = err instanceof Error &&
+      (err.name === 'GraphInterrupt' || err.name === 'NodeInterrupt');
+    if (isInterrupt) {
+      logger.debug(`${label} interrupted after ${Date.now() - start}ms (HITL pause)`);
+    } else {
+      logger.debug(`${label} failed after ${Date.now() - start}ms:`, err);
+    }
     throw err;
   }
 }

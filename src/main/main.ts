@@ -10,6 +10,7 @@ import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts'
 import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
 import { initializeEs } from './utils/esDownloader';
+import { initializeDatabaseManager } from './services/database/database-manager';
 import { logSystemInfo, getPlatformName, isWindows, isMacOS } from './utils/platform';
 import { mcpService } from './services/mcp/client';
 import { registerBrowserHandlers } from './ipc/browser-handlers';
@@ -72,6 +73,16 @@ app.whenReady().then(async () => {
 
   initializePreferences();
   
+  // Initialize SQLite database for desktop agent memory and persistence
+  try {
+    log.info('Initializing desktop agent database...');
+    const dbManager = await initializeDatabaseManager();
+    const stats = dbManager.stats();
+    log.info(`Database ready: ${stats.trajectoryCount} trajectories, ${stats.failureCount} failures`);
+  } catch (err) {
+    log.warn('Desktop agent database initialization failed, continuing without persistence:', err instanceof Error ? err.message : err);
+  }
+  
   if (isWindows()) {
     log.info('Initializing file search...');
     const esInitialized = await initializeEs();
@@ -83,7 +94,15 @@ app.whenReady().then(async () => {
   } else {
     log.info('File search not available on', getPlatformName());
   }
-  
+
+  // Initialize MCP service — loads tools from mcp-config.json for LangGraph nodes
+  try {
+    await mcpService.initializeWithRetry();
+    log.info('MCP service initialized');
+  } catch (err) {
+    log.warn('MCP service initialization failed (will retry via IPC):', err instanceof Error ? err.message : err);
+  }
+
   // Remove default menu bar
   Menu.setApplicationMenu(null);
   
@@ -112,7 +131,15 @@ app.whenReady().then(async () => {
   
   registerGlobalShortcuts();
   log.info('Global shortcuts registered');
-  
+
+  // Run desktop agent integration test in dev mode
+  if (isWindows() && process.env.TEST_DESKTOP_TOOLS === '1') {
+    log.info('TEST_DESKTOP_TOOLS=1 detected — running desktop agent tools integration test');
+    import('./utils/desktop-tools-test')
+      .then(({ runDesktopToolsTest }) => runDesktopToolsTest())
+      .catch((err) => log.error('Desktop tools test failed:', err));
+  }
+
   // Create system tray
   createTray();
   log.info('System tray created');

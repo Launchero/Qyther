@@ -7,6 +7,7 @@ import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
 import { createLogger } from '../../utils/logger';
+import { mcpService } from '../mcp/client';
 
 const log = createLogger('BrowserAgent');
 
@@ -33,7 +34,9 @@ export class StatefulBrowserAgent extends EventEmitter {
   private agentExecutor: any = null;
   private checkpointer: MemorySaver;
   private headedMode: boolean = false;
-  private mcpClient: MultiServerMCPClient | null = null;
+  private browserTools: any[] = [];
+  private fallbackClient: MultiServerMCPClient | null = null;
+  private usingFallback = false;
   private isInitialized: boolean = false;
   private readonly maxSteps: number = 10;
   private readonly stepTimeout: number = 30000; // 30 seconds
@@ -50,28 +53,39 @@ export class StatefulBrowserAgent extends EventEmitter {
 
     try {
       this.headedMode = config?.headed ?? false;
-      
-      this.mcpClient = new MultiServerMCPClient({
-        playwright: {
-          command: 'npx',
-          args: ['@playwright/mcp@latest'],
-          transport: 'stdio' as const,
-        },
-      });
 
-      // Get tools from MCP client
-      const allTools = await this.mcpClient.getTools();
-      
-      // Filter to only browser tools
-      const browserTools = allTools.filter((tool: any) => 
-        tool.name?.startsWith('browser_')
-      );
+      // Try to get browser tools from shared mcpService first
+      if (mcpService.isInitialized() && mcpService.getTools().length > 0) {
+        const allTools = mcpService.getTools();
+        this.browserTools = allTools.filter((tool: any) =>
+          tool.name?.startsWith('browser_')
+        );
+        this.usingFallback = false;
+        log.info(`Loaded ${this.browserTools.length} browser tools from shared mcpService`);
+      } else {
+        // Fallback: create own Playwright client if mcpService not initialized
+        log.warn('mcpService not initialized, creating fallback Playwright client');
+        this.fallbackClient = new MultiServerMCPClient({
+          playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            transport: 'stdio' as const,
+          },
+        });
 
-      if (browserTools.length === 0) {
+        const allTools = await this.fallbackClient.getTools();
+        this.browserTools = allTools.filter((tool: any) =>
+          tool.name?.startsWith('browser_')
+        );
+        this.usingFallback = true;
+        log.info(`Loaded ${this.browserTools.length} browser tools from fallback client`);
+      }
+
+      if (this.browserTools.length === 0) {
         throw new Error('No browser tools found from Playwright MCP server');
       }
 
-      log.info(`Loaded ${browserTools.length} browser tools`);
+      log.info(`Loaded ${this.browserTools.length} browser tools`);
 
       const apiKey = process.env.API_KEY;
       const baseURL = process.env.BASE_URL;
@@ -93,7 +107,7 @@ export class StatefulBrowserAgent extends EventEmitter {
       // Create ReAct agent with tools
       this.agentExecutor = createReactAgent({
         llm: chatModel,
-        tools: browserTools as any,
+        tools: this.browserTools as any,
         checkpointSaver: this.checkpointer,
       });
 
@@ -147,11 +161,20 @@ Current session: ${sessionId}`),
   async *executeTaskStream(
     task: string,
     sessionId: string,
+    skillContextOrOnProgress?: string | ((progress: BrowserTaskProgress) => void),
     onProgress?: (progress: BrowserTaskProgress) => void
   ): AsyncGenerator<string> {
     if (!this.isInitialized) {
       throw new Error('Browser agent not initialized');
     }
+
+    // Support both old signature (task, sessionId, onProgress) and new (task, sessionId, skillContext, onProgress)
+    const skillContext = typeof skillContextOrOnProgress === 'string' ? skillContextOrOnProgress : '';
+    const progressCallback = typeof skillContextOrOnProgress === 'function' ? skillContextOrOnProgress : onProgress;
+
+    const skillInstructions = skillContext
+      ? `\n\nSKILL INSTRUCTIONS:\n${skillContext}\n\nFollow the skill instructions above for this task.`
+      : '';
 
     const messages: BaseMessage[] = [
       new SystemMessage(`You are a browser automation assistant. You can navigate web pages, click elements, fill forms, and extract information.
@@ -163,7 +186,7 @@ Important guidelines:
 - Use browser_type to fill in text fields
 - Be concise and efficient
 - Complete the task in as few steps as possible
-- Report progress clearly to the user
+- Report progress clearly to the user${skillInstructions}
 
 Current session: ${sessionId}`),
       new HumanMessage(task),
@@ -174,7 +197,14 @@ Current session: ${sessionId}`),
       { version: "v2", configurable: { thread_id: sessionId } }
     );
 
-    yield* this.createStreamFromEvents(stream, sessionId, onProgress);
+    yield* this.createStreamFromEvents(stream, sessionId, progressCallback);
+  }
+
+  /**
+   * Get all MCP browser tools for use by verifier and other components.
+   */
+  async getMcpTools(): Promise<any[]> {
+    return this.browserTools;
   }
 
   private async *createStreamFromEvents(
@@ -299,17 +329,19 @@ Current session: ${sessionId}`),
 
   async cleanup(): Promise<void> {
     log.info('Cleaning up resources');
-    
-    if (this.mcpClient) {
+
+    if (this.usingFallback && this.fallbackClient) {
       try {
-        await this.mcpClient.close();
-        this.mcpClient = null;
+        await this.fallbackClient.close();
+        this.fallbackClient = null;
       } catch (error) {
-        log.error('Error closing MCP client:', error);
+        log.error('Error closing fallback MCP client:', error);
       }
     }
-    
+
     this.agentExecutor = null;
+    this.browserTools = [];
+    this.usingFallback = false;
     this.isInitialized = false;
   }
 
@@ -334,14 +366,8 @@ Current session: ${sessionId}`),
   }
   
   async extractAllLinks(_sessionId: string): Promise<string[]> {
-    if (!this.mcpClient) {
-      throw new Error('MCP client not initialized');
-    }
-    
     try {
-      // Get all browser tools
-      const allTools = await this.mcpClient.getTools();
-      const evaluateTool = allTools.find((t: any) => t.name === 'browser_evaluate');
+      const evaluateTool = this.browserTools.find((t: any) => t.name === 'browser_evaluate');
       
       if (!evaluateTool) {
         log.warn('browser_evaluate tool not found, using alternative method');

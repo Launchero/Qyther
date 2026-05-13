@@ -3,14 +3,32 @@ import type { RunnableToolLike } from "@langchain/core/runnables";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import { loadPreferences } from "../../preferences";
 import { createLogger } from "../../utils/logger";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 const log = createLogger('MCP');
+
+interface MCPServerConfig {
+  command: string;
+  args: string[];
+  disabled?: boolean;
+  env?: Record<string, string>;
+}
+
+interface MCPConfigFile {
+  mcpServers: Record<string, MCPServerConfig>;
+}
+
+// Resolve project root (parent of src/main/services/mcp)
+const PROJECT_ROOT = join(__dirname, "../../../../..");
+const MCP_CONFIG_PATH = join(PROJECT_ROOT, "mcp-config.json");
 
 export class MCPService {
   private client: MultiServerMCPClient | null = null;
   private tools: (RunnableToolLike | DynamicStructuredTool)[] = [];
   private isInitializedFlag = false;
   private serverToolCounts: Map<string, number> = new Map();
+  private serverNames: string[] = [];
 
   async initialize(): Promise<void> {
     if (this.isInitializedFlag) return;
@@ -23,14 +41,40 @@ export class MCPService {
       return;
     }
 
+    // Load server definitions from mcp-config.json, merge with preferences for enabled status
+    const configServers = this.loadFromConfigFile();
+
     try {
       const mcpServers: Record<string, Connection> = {};
       const enabledServers: string[] = [];
-      
-      for (const server of mcpConfig.servers || []) {
-        if (!server.enabled) continue;
 
-        enabledServers.push(server.name);
+      // Build enabled server names from preferences
+      const prefEnabledNames = new Set(
+        (mcpConfig.servers || [])
+          .filter(s => s.enabled)
+          .map(s => s.name)
+      );
+
+      // Process config file servers
+      for (const [name, cfg] of Object.entries(configServers)) {
+        const isDisabledByConfig = cfg.disabled ?? false;
+        const isDisabledByPref = prefEnabledNames.size > 0 && !prefEnabledNames.has(name);
+        if (isDisabledByConfig || isDisabledByPref) continue;
+
+        enabledServers.push(name);
+
+        mcpServers[name] = {
+          transport: "stdio",
+          command: cfg.command,
+          args: cfg.args,
+          env: cfg.env,
+        };
+      }
+
+      // Also include any http-type servers from preferences that aren't in config file
+      for (const server of mcpConfig.servers || []) {
+        if (!server.enabled || enabledServers.includes(server.name)) continue;
+        if (configServers[server.name]) continue; // already handled
 
         if (server.type === 'stdio' && server.command && server.args) {
           mcpServers[server.name] = {
@@ -39,12 +83,19 @@ export class MCPService {
             args: server.args,
             env: server.env,
           };
+          enabledServers.push(server.name);
         } else if (server.type === 'http' && server.url) {
           mcpServers[server.name] = {
             transport: "http",
             url: server.url,
           };
+          enabledServers.push(server.name);
         }
+      }
+
+      if (enabledServers.length === 0) {
+        log.info('No MCP servers enabled');
+        return;
       }
 
       this.client = new MultiServerMCPClient({
@@ -54,30 +105,42 @@ export class MCPService {
 
       this.tools = await this.client.getTools();
       this.isInitializedFlag = true;
-      
+      this.serverNames = enabledServers;
+
       // Track tool counts per server
-      // MultiServerMCPClient doesn't expose per-server counts, so we use a heuristic:
-      // iterate enabled servers and check if they have tools by filtering tool names
-      // that typically include server prefixes
       this.serverToolCounts.clear();
       const toolNames = this.tools.map(t => t.name ?? '');
       for (const serverName of enabledServers) {
-        // Tools from a server often have names that include the server name as prefix
-        const serverTools = toolNames.filter(name => 
+        const serverTools = toolNames.filter(name =>
           name.startsWith(`${serverName}-`) || name === serverName
         );
         this.serverToolCounts.set(serverName, serverTools.length);
-        
-        // If no tools matched by prefix, assign total tools if only one server
+
         if (serverTools.length === 0 && enabledServers.length === 1) {
           this.serverToolCounts.set(serverName, this.tools.length);
         }
       }
-      
-      log.info(`Initialized with ${this.tools.length} tools across ${enabledServers.length} servers`);
+
+      log.info(`Initialized with ${this.tools.length} tools across ${enabledServers.length} servers: ${enabledServers.join(", ")}`);
     } catch (error) {
       log.error('Initialization failed:', error);
       throw error;
+    }
+  }
+
+  private loadFromConfigFile(): Record<string, MCPServerConfig> {
+    if (!existsSync(MCP_CONFIG_PATH)) {
+      log.warn(`MCP config not found at ${MCP_CONFIG_PATH}`);
+      return {};
+    }
+    try {
+      const raw = readFileSync(MCP_CONFIG_PATH, "utf-8");
+      const parsed: MCPConfigFile = JSON.parse(raw);
+      log.info(`Loaded ${Object.keys(parsed.mcpServers).length} server(s) from mcp-config.json`);
+      return parsed.mcpServers;
+    } catch (error) {
+      log.warn('Failed to parse mcp-config.json:', error);
+      return {};
     }
   }
 
@@ -100,8 +163,16 @@ export class MCPService {
     return this.tools;
   }
 
+  getToolsByPrefix(prefix: string): (RunnableToolLike | DynamicStructuredTool)[] {
+    return this.tools.filter(t => t.name?.startsWith(prefix) ?? false);
+  }
+
   isInitialized(): boolean {
     return this.isInitializedFlag;
+  }
+
+  getServerNames(): string[] {
+    return [...this.serverNames];
   }
 
   getServerToolCounts(): Map<string, number> {
@@ -115,6 +186,7 @@ export class MCPService {
       this.tools = [];
       this.isInitializedFlag = false;
       this.serverToolCounts.clear();
+      this.serverNames = [];
       log.info('Cleanup complete');
     }
   }

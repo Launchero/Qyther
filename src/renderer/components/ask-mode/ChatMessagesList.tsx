@@ -5,6 +5,7 @@ import { ChatMessageBubble, ChatMessage } from '../ChatMessageBubble';
 import { ChatErrorBanner } from './ChatErrorBanner';
 import { ChatWelcomeState } from './ChatWelcomeState';
 import { DesktopConfirmationDialog } from './DesktopConfirmationDialog';
+import { AgentIndicator } from './AgentIndicator';
 import type { InlineChatSession } from './RecentChatsInline';
 
 interface ChatMessagesListProps {
@@ -13,6 +14,7 @@ interface ChatMessagesListProps {
   welcomeState: boolean;
   browserModeEnabled: boolean;
   desktopModeEnabled?: boolean;
+  activeAgent?: { label: string } | null;
   desktopConfirmation?: { threadId: string; action: string; description: string; planActions: Array<{ type: string; description: string; success: boolean; result?: string }> } | null;
   onConfirmDesktopAction?: (confirmed: boolean) => void;
   onSendExample: (query: string) => void;
@@ -38,6 +40,7 @@ export function ChatMessagesList({
   welcomeState,
   browserModeEnabled,
   desktopModeEnabled: _desktopModeEnabled = false,
+  activeAgent = null,
   desktopConfirmation = null,
   onConfirmDesktopAction = () => {},
   onSendExample,
@@ -133,8 +136,11 @@ export function ChatMessagesList({
                 />
               </div>
             )}
+            {isLoading && activeAgent && (
+              <AgentIndicator agent={activeAgent} isStreaming className="mx-[var(--spacing-6)] mb-[var(--spacing-2)] self-start" />
+            )}
             {isLoading && (
-              <div className="flex gap-[var(--spacing-1)] p-3 self-start" role="status" aria-live="polite" aria-label="AI is typing">
+              <div className="flex gap-[var(--spacing-1)] p-3 self-start ml-[var(--spacing-6)]" role="status" aria-live="polite" aria-label="AI is typing">
                 <span className="typing-dot" />
                 <span className="typing-dot" />
                 <span className="typing-dot" />

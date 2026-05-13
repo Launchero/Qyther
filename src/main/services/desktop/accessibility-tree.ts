@@ -1,80 +1,6 @@
-import koffi from 'koffi';
 import { createLogger } from '../../utils/logger';
 
 const log = createLogger('AccessibilityTree');
-
-// UI Automation control type IDs (partial set for common controls)
-const UIA_BUTTON_CONTROLTYPE = 50000;
-const UIA_EDIT_CONTROLTYPE = 50004;
-const UIA_LISTITEM_CONTROLTYPE = 50007;
-const UIA_MENUITEM_CONTROLTYPE = 50008;
-const UIA_WINDOW_CONTROLTYPE = 50032;
-const UIA_DOCUMENT_CONTROLTYPE = 50030;
-const UIA_PANE_CONTROLTYPE = 50033;
-const UIA_TABITEM_CONTROLTYPE = 50019;
-const UIA_TREEITEM_CONTROLTYPE = 50020;
-const UIA_DATAITEM_CONTROLTYPE = 50002;
-
-// UI Automation pattern IDs
-const UIA_INVOKE_PATTERN_ID = 10000;
-const UIA_TOGGLE_PATTERN_ID = 10001;
-const UIA_EXPAND_COLLAPSE_PATTERN_ID = 10005;
-const UIA_VALUE_PATTERN_ID = 10009;
-const UIA_SCROLL_PATTERN_ID = 10004;
-const UIA_SELECTION_PATTERN_ID = 10010;
-const UIA_TEXT_PATTERN_ID = 10014;
-const UIA_WINDOW_PATTERN_ID = 10009;
-
-// Tree scope
-const TreeScope_Children = 4;
-const TreeScope_Subtree = 5;
-const TreeScope_Element = 1;
-
-// COM GUIDs
-const CLSID_CUIAutomation = 'ff48dba4-60ef-4201-aa87-54103eef594e';
-const IID_IUIAutomation = '30cbe57d-d9d0-452a-ab13-7ac5ac4825ee';
-
-interface ControlTypeMap {
-  [key: number]: string;
-}
-
-const CONTROL_TYPE_NAMES: ControlTypeMap = {
-  50000: 'Button',
-  50001: 'Calendar',
-  50002: 'CheckBox',
-  50003: 'ComboBox',
-  50004: 'Edit',
-  50005: 'Hyperlink',
-  50006: 'Image',
-  50007: 'ListItem',
-  50008: 'List',
-  50009: 'Menu',
-  50010: 'MenuBar',
-  50011: 'MenuItem',
-  50012: 'RadioButton',
-  50013: 'ScrollBar',
-  50014: 'Slider',
-  50015: 'Spinner',
-  50016: 'StatusBar',
-  50017: 'Tab',
-  50018: 'TabItem',
-  50019: 'Text',
-  50020: 'ToolBar',
-  50021: 'ToolTip',
-  50022: 'Menu',
-  50023: 'Window',
-  50024: 'Pane',
-  50025: 'TitleBar',
-  50026: 'Group',
-  50027: 'Thumb',
-  50028: 'DataItem',
-  50029: 'Header',
-  50030: 'HeaderItem',
-  50031: 'Tree',
-  50032: 'Document',
-  50033: 'ListItem',
-  50034: 'Table',
-};
 
 export interface AccessibilityElementInfo {
   name: string;
@@ -104,242 +30,122 @@ export interface TreeSnapshotNode {
 }
 
 export class AccessibilityTreeAdapter {
-  private uiautomation: unknown = null;
   private isInitialized = false;
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    // uia-native initializes lazily on first call
     this.isInitialized = true;
-    log.info('UI Automation adapter initialized');
+    log.info('UI Automation adapter initialized (native, no PowerShell)');
   }
 
-  /**
-   * Get info about the currently focused UI Automation element.
-   * Returns null if no element has keyboard focus.
-   */
   async getFocusedElement(): Promise<AccessibilityElementInfo | null> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      // Use Windows UI Automation COM to get focused element
-      const { getFocusedElementViaAutomation } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { getFocusedElementViaAutomation } = await import('./uia-native');
       const element = await getFocusedElementViaAutomation();
-
       if (!element) return null;
-
-      return {
-        name: element.name || '',
-        controlType: element.controlType || 'Unknown',
-        controlTypeId: element.controlTypeId || 0,
-        boundingBox: element.boundingBox || { x: 0, y: 0, width: 0, height: 0 },
-        isFocused: element.isFocused ?? false,
-        isEnabled: element.isEnabled ?? true,
-        hasKeyboardFocus: element.hasKeyboardFocus ?? false,
-        automationId: element.automationId || '',
-        className: element.className || '',
-        helpText: element.helpText || '',
-        value: element.value || '',
-        patternsAvailable: element.patternsAvailable || [],
-        childrenCount: element.childrenCount || 0,
-        nativeHandle: element.nativeHandle,
-      };
+      return this.mapElement(element);
     } catch (error) {
       log.warn('getFocusedElement failed:', error);
       return null;
     }
   }
 
-  /**
-   * Get child elements of a given parent element.
-   * Falls back to PowerShell UIA for the actual enumeration.
-   */
   async getChildren(_elementHandle: string): Promise<AccessibilityElementInfo[]> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const { findChildrenOfRoot } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { findChildrenOfRoot } = await import('./uia-native');
       const elements = await findChildrenOfRoot(100);
-
-      return elements.map(el => ({
-        name: el.name || '',
-        controlType: el.controlType || 'Unknown',
-        controlTypeId: el.controlTypeId || 0,
-        boundingBox: el.boundingBox || { x: 0, y: 0, width: 0, height: 0 },
-        isFocused: el.isFocused ?? false,
-        isEnabled: el.isEnabled ?? true,
-        hasKeyboardFocus: el.hasKeyboardFocus ?? false,
-        automationId: el.automationId || '',
-        className: el.className || '',
-        helpText: el.helpText || '',
-        value: el.value || '',
-        patternsAvailable: el.patternsAvailable || [],
-        childrenCount: el.childrenCount || 0,
-        nativeHandle: el.nativeHandle,
-      }));
+      return elements.map(el => this.mapElement(el));
     } catch (error) {
       log.warn('getChildren failed:', error);
       return [];
     }
   }
 
-  /**
-   * Get child elements of the desktop root.
-   */
   async getChildrenOfRoot(): Promise<AccessibilityElementInfo[]> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const { findChildrenOfRoot } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { findChildrenOfRoot } = await import('./uia-native');
       const elements = await findChildrenOfRoot(50);
-
-      return elements.map(el => ({
-        name: el.name || '',
-        controlType: el.controlType || 'Unknown',
-        controlTypeId: el.controlTypeId || 0,
-        boundingBox: el.boundingBox || { x: 0, y: 0, width: 0, height: 0 },
-        isFocused: el.isFocused ?? false,
-        isEnabled: el.isEnabled ?? true,
-        hasKeyboardFocus: el.hasKeyboardFocus ?? false,
-        automationId: el.automationId || '',
-        className: el.className || '',
-        helpText: el.helpText || '',
-        value: el.value || '',
-        patternsAvailable: el.patternsAvailable || [],
-        childrenCount: el.childrenCount || 0,
-        nativeHandle: el.nativeHandle,
-      }));
+      return elements.map(el => this.mapElement(el));
     } catch (error) {
       log.warn('getChildrenOfRoot failed:', error);
       return [];
     }
   }
 
-  /**
-   * Get the element at the given screen coordinates.
-   */
   async getElementAtPoint(x: number, y: number): Promise<AccessibilityElementInfo | null> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const { getElementFromPoint } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { getElementFromPoint } = await import('./uia-native');
       const element = await getElementFromPoint(x, y);
-
       if (!element) return null;
-
-      return {
-        name: element.name || '',
-        controlType: element.controlType || 'Unknown',
-        controlTypeId: element.controlTypeId || 0,
-        boundingBox: element.boundingBox || { x: 0, y: 0, width: 0, height: 0 },
-        isFocused: element.isFocused ?? false,
-        isEnabled: element.isEnabled ?? true,
-        hasKeyboardFocus: element.hasKeyboardFocus ?? false,
-        automationId: element.automationId || '',
-        className: element.className || '',
-        helpText: element.helpText || '',
-        value: element.value || '',
-        patternsAvailable: element.patternsAvailable || [],
-        childrenCount: element.childrenCount || 0,
-        nativeHandle: element.nativeHandle,
-      };
+      return this.mapElement(element);
     } catch (error) {
       log.warn('getElementAtPoint failed:', error);
       return null;
     }
   }
 
-  /**
-   * Recursively search the accessibility tree for elements matching the query.
-   * Supports partial name matching, control type filtering, and automation ID lookup.
-   */
   async searchElements(
     query: { name?: string; controlType?: string; automationId?: string },
     maxResults: number = 20,
   ): Promise<AccessibilityElementInfo[]> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const { findChildrenOfRoot } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { findChildrenOfRoot, getChildrenOfElementViaAutomation } = await import('./uia-native');
       const rootElements = await findChildrenOfRoot(100);
 
       const results: AccessibilityElementInfo[] = [];
-      const searchInChildren = async (elements: Array<Record<string, unknown>>, depth: number = 0) => {
+      const visitedHandles = new Set<string>();
+
+      const matchesQuery = (el: Record<string, unknown>): boolean => {
+        const name = (el.name as string) || '';
+        const controlType = (el.controlType as string) || 'Unknown';
+        const automationId = (el.automationId as string) || '';
+
+        if (query.name && !name.toLowerCase().includes(query.name.toLowerCase())) return false;
+        if (query.controlType && controlType.toLowerCase() !== query.controlType.toLowerCase()) return false;
+        if (query.automationId && automationId.toLowerCase() !== query.automationId.toLowerCase()) return false;
+        return true;
+      };
+
+      const pushResult = (el: Record<string, unknown>) => {
+        const name = (el.name as string) || '';
+        if (!name) return;
+        results.push(this.mapElement(el as unknown as { name: string; controlType: string; controlTypeId: number; boundingBox: { x: number; y: number; width: number; height: number }; isFocused: boolean; isEnabled: boolean; hasKeyboardFocus: boolean; automationId: string; className: string; helpText: string; value: string; patternsAvailable: string[]; childrenCount: number; nativeHandle: string }));
+      };
+
+      const searchInElement = async (el: Record<string, unknown>, depth: number) => {
         if (results.length >= maxResults || depth > 5) return;
 
-        for (const el of elements) {
-          if (results.length >= maxResults) break;
+        const name = (el.name as string) || '';
+        const handle = (el.nativeHandle as string) || '';
 
-          const name = (el.name as string) || '';
-          const controlType = (el.controlType as string) || 'Unknown';
-          const automationId = (el.automationId as string) || '';
+        if (name && matchesQuery(el) && !visitedHandles.has(handle)) {
+          pushResult(el);
+          visitedHandles.add(handle);
+        }
 
-          let matches = true;
-          if (query.name) {
-            const queryLower = query.name.toLowerCase();
-            const nameLower = name.toLowerCase();
-            if (!nameLower.includes(queryLower)) {
-              matches = false;
+        if (depth < 5 && handle) {
+          try {
+            const childElements = await getChildrenOfElementViaAutomation(handle, 50);
+            for (const child of childElements) {
+              if (results.length >= maxResults) break;
+              await searchInElement(child as unknown as Record<string, unknown>, depth + 1);
             }
-          }
-          if (query.controlType && controlType.toLowerCase() !== query.controlType.toLowerCase()) {
-            matches = false;
-          }
-          if (query.automationId && automationId.toLowerCase() !== query.automationId.toLowerCase()) {
-            matches = false;
-          }
-
-          if (matches && name) {
-            results.push({
-              name,
-              controlType,
-              controlTypeId: (el.controlTypeId as number) || 0,
-              boundingBox: (el.boundingBox as AccessibilityElementInfo['boundingBox']) || { x: 0, y: 0, width: 0, height: 0 },
-              isFocused: (el.isFocused as boolean) ?? false,
-              isEnabled: (el.isEnabled as boolean) ?? true,
-              hasKeyboardFocus: (el.hasKeyboardFocus as boolean) ?? false,
-              automationId,
-              className: (el.className as string) || '',
-              helpText: (el.helpText as string) || '',
-              value: (el.value as string) || '',
-              patternsAvailable: (el.patternsAvailable as string[]) || [],
-              childrenCount: (el.childrenCount as number) || 0,
-              nativeHandle: el.nativeHandle,
-            });
-          }
-
-          if (el.children && Array.isArray(el.children) && depth < 5) {
-            await searchInChildren(el.children as Array<Record<string, unknown>>, depth + 1);
+          } catch {
+            // Some elements don't support child enumeration; skip
           }
         }
       };
 
-      await searchInChildren(rootElements.map(el => ({
-        name: el.name,
-        controlType: el.controlType,
-        controlTypeId: el.controlTypeId,
-        boundingBox: el.boundingBox,
-        isFocused: el.isFocused,
-        isEnabled: el.isEnabled,
-        hasKeyboardFocus: el.hasKeyboardFocus,
-        automationId: el.automationId,
-        className: el.className,
-        helpText: el.helpText,
-        value: el.value,
-        patternsAvailable: el.patternsAvailable,
-        childrenCount: el.childrenCount,
-        nativeHandle: el.nativeHandle,
-        children: [],
-      }) as Record<string, unknown>));
+      for (const rootEl of rootElements) {
+        if (results.length >= maxResults) break;
+        await searchInElement(rootEl as unknown as Record<string, unknown>, 0);
+      }
 
       return results;
     } catch (error) {
@@ -348,28 +154,30 @@ export class AccessibilityTreeAdapter {
     }
   }
 
-  /**
-   * Click/invoke a UI Automation element by name.
-   * Searches the accessibility tree recursively for a matching element, finds its bounding box,
-   * and clicks its center coordinate. Falls back to PowerShell-based invocation.
-   */
   async clickElement(elementName: string): Promise<boolean> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
+      if (!this.isInitialized) await this.initialize();
 
-      // Recursive search for matching element
       const results = await this.searchElements({ name: elementName }, 1);
       if (results.length > 0) {
         const match = results[0];
+        const handle = match.nativeHandle as string;
+        if (handle) {
+          // Try native InvokePattern first
+          const { invokeElementByHandle } = await import('./uia-native');
+          const invoked = await invokeElementByHandle(handle);
+          if (invoked) {
+            log.debug(`Invoked element "${elementName}" via native InvokePattern`);
+            return true;
+          }
+        }
+        // Fallback: coordinate-based click
         if (match.boundingBox.width > 0 && match.boundingBox.height > 0) {
-          // Click the center of the element's bounding box
           const centerX = match.boundingBox.x + match.boundingBox.width / 2;
           const centerY = match.boundingBox.y + match.boundingBox.height / 2;
           const { click } = await import('./input-simulation');
           await click(centerX, centerY, 'left');
-          log.debug(`Clicked element "${elementName}" at (${centerX}, ${centerY})`);
+          log.debug(`Clicked element "${elementName}" at (${centerX}, ${centerY}) via fallback`);
           return true;
         }
       }
@@ -382,17 +190,10 @@ export class AccessibilityTreeAdapter {
     }
   }
 
-  /**
-   * Get a pruned snapshot of the accessibility tree.
-   * Limits depth to avoid excessive token usage.
-   */
   async getTreeSnapshot(maxDepth: number = 3): Promise<TreeSnapshotNode[]> {
     try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const { findChildrenOfRoot } = await import('./uia-wrapper');
+      if (!this.isInitialized) await this.initialize();
+      const { findChildrenOfRoot } = await import('./uia-native');
       const elements = await findChildrenOfRoot(100);
 
       const buildNode = (el: Record<string, unknown>, depth: number): TreeSnapshotNode => {
@@ -422,8 +223,106 @@ export class AccessibilityTreeAdapter {
     }
   }
 
+  // ── Native UIA Pattern Methods (NEW) ──
+
+  /**
+   * Invoke a UI element directly via InvokePattern (no coordinate clicking).
+   */
+  async invokeElement(elementHandle: string): Promise<boolean> {
+    try {
+      if (!this.isInitialized) await this.initialize();
+      const { invokeElementByHandle } = await import('./uia-native');
+      return invokeElementByHandle(elementHandle);
+    } catch (error) {
+      log.warn('invokeElement failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set the value of a text field directly via ValuePattern.
+   */
+  async setElementValue(elementHandle: string, value: string): Promise<boolean> {
+    try {
+      if (!this.isInitialized) await this.initialize();
+      const { setElementValueByHandle } = await import('./uia-native');
+      return setElementValueByHandle(elementHandle, value);
+    } catch (error) {
+      log.warn('setElementValue failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Extract text from a UI element via TextPattern or ValuePattern.
+   */
+  async getElementText(elementHandle: string): Promise<string | null> {
+    try {
+      if (!this.isInitialized) await this.initialize();
+      const { getElementTextByHandle } = await import('./uia-native');
+      return getElementTextByHandle(elementHandle);
+    } catch (error) {
+      log.warn('getElementText failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get detailed element state for verification (toggle state, value, window state, etc.).
+   */
+  async getElementState(elementHandle: string): Promise<Record<string, unknown> | null> {
+    try {
+      if (!this.isInitialized) await this.initialize();
+      const { getElementStateByHandle } = await import('./uia-native');
+      return getElementStateByHandle(elementHandle);
+    } catch (error) {
+      log.warn('getElementState failed:', error);
+      return null;
+    }
+  }
+
+  // ── Private ──
+
+  private mapElement(el: {
+    name: string;
+    controlType: string;
+    controlTypeId: number;
+    boundingBox: { x: number; y: number; width: number; height: number };
+    isFocused: boolean;
+    isEnabled: boolean;
+    hasKeyboardFocus: boolean;
+    automationId: string;
+    className: string;
+    helpText: string;
+    value: string;
+    patternsAvailable: string[];
+    childrenCount: number;
+    nativeHandle: string;
+  }): AccessibilityElementInfo {
+    return {
+      name: el.name || '',
+      controlType: el.controlType || 'Unknown',
+      controlTypeId: el.controlTypeId || 0,
+      boundingBox: el.boundingBox || { x: 0, y: 0, width: 0, height: 0 },
+      isFocused: el.isFocused ?? false,
+      isEnabled: el.isEnabled ?? true,
+      hasKeyboardFocus: el.hasKeyboardFocus ?? false,
+      automationId: el.automationId || '',
+      className: el.className || '',
+      helpText: el.helpText || '',
+      value: el.value || '',
+      patternsAvailable: el.patternsAvailable || [],
+      childrenCount: el.childrenCount || 0,
+      nativeHandle: el.nativeHandle,
+    };
+  }
+
   cleanup(): void {
-    this.uiautomation = null;
+    try {
+      import('./uia-native').then(({ cleanupNativeUIA }) => cleanupNativeUIA());
+    } catch {
+      // Ignore cleanup errors
+    }
     this.isInitialized = false;
   }
 }

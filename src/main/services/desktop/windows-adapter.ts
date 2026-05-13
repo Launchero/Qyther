@@ -3,6 +3,7 @@ import type { DesktopAdapter, ScreenshotResult, Coordinates } from './types';
 import * as inputSim from './input-simulation';
 import { captureAllScreens, captureSingleMonitor } from './screenshot-capture';
 import { createWorker, Worker } from 'tesseract.js';
+import { screen } from 'electron';
 
 const log = createLogger('WindowsDesktopAdapter');
 
@@ -13,6 +14,17 @@ async function ensureOcrWorker(): Promise<Worker> {
   ocrWorker = await createWorker('eng');
   log.info('Tesseract OCR worker initialized');
   return ocrWorker;
+}
+
+function clampToScreen(x: number, y: number): { x: number; y: number } {
+  // Get the primary display bounds; this covers most single-monitor setups.
+  // For multi-monitor, we still clamp to prevent negative or extremely large coords.
+  const primary = screen.getPrimaryDisplay();
+  const { width, height } = primary.workAreaSize;
+  return {
+    x: Math.max(0, Math.min(x, width - 1)),
+    y: Math.max(0, Math.min(y, height - 1)),
+  };
 }
 
 export class WindowsDesktopAdapter implements DesktopAdapter {
@@ -34,15 +46,19 @@ export class WindowsDesktopAdapter implements DesktopAdapter {
   }
 
   async click(x: number, y: number, button: 'left' | 'right' = 'left'): Promise<void> {
-    await inputSim.click(x, y, button);
+    const clamped = clampToScreen(x, y);
+    await inputSim.click(clamped.x, clamped.y, button);
   }
 
   async doubleClick(x: number, y: number): Promise<void> {
-    await inputSim.doubleClick(x, y);
+    const clamped = clampToScreen(x, y);
+    await inputSim.doubleClick(clamped.x, clamped.y);
   }
 
   async drag(from: Coordinates, to: Coordinates): Promise<void> {
-    await inputSim.drag(from.x, from.y, to.x, to.y);
+    const fromClamped = clampToScreen(from.x, from.y);
+    const toClamped = clampToScreen(to.x, to.y);
+    await inputSim.drag(fromClamped.x, fromClamped.y, toClamped.x, toClamped.y);
   }
 
   async typeText(text: string): Promise<void> {
@@ -54,7 +70,8 @@ export class WindowsDesktopAdapter implements DesktopAdapter {
   }
 
   async scroll(x: number, y: number, delta: number): Promise<void> {
-    await inputSim.scroll(x, y, delta);
+    const clamped = clampToScreen(x, y);
+    await inputSim.scroll(clamped.x, clamped.y, delta);
   }
 
   async getScreenText(): Promise<string> {
@@ -109,18 +126,37 @@ export class WindowsDesktopAdapter implements DesktopAdapter {
   }
 
   async setCursorPosition(x: number, y: number): Promise<void> {
-    await inputSim.setCursorPosition(x, y);
+    const clamped = clampToScreen(x, y);
+    await inputSim.setCursorPosition(clamped.x, clamped.y);
   }
 
   async rightClick(x: number, y: number): Promise<void> {
-    await inputSim.rightClick(x, y);
+    const clamped = clampToScreen(x, y);
+    await inputSim.rightClick(clamped.x, clamped.y);
   }
 
   async hover(x: number, y: number): Promise<void> {
-    await inputSim.hover(x, y);
+    const clamped = clampToScreen(x, y);
+    await inputSim.hover(clamped.x, clamped.y);
   }
 
   async focusWindow(handle: string): Promise<boolean> {
-    return inputSim.focusWindow(handle);
+    return inputSim.focusWindowByHandle(handle);
+  }
+
+  async minimizeWindow(handle: string): Promise<boolean> {
+    return inputSim.minimizeWindowByHandle(handle);
+  }
+
+  async maximizeWindow(handle: string): Promise<boolean> {
+    return inputSim.maximizeWindowByHandle(handle);
+  }
+
+  async restoreWindow(handle: string): Promise<boolean> {
+    return inputSim.restoreWindowByHandle(handle);
+  }
+
+  async closeWindow(handle: string): Promise<boolean> {
+    return inputSim.closeWindowByHandle(handle);
   }
 }

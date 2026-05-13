@@ -1,13 +1,15 @@
 import { StateGraph, END, MemorySaver } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
-import { AskState, AskStateType, Source, ReasoningStep, UIPayload, DesktopAction } from "./state";
+import { AskState, AskStateType, Source, ReasoningStep, UIPayload } from "./state";
 import { webSearchTool } from "./tools";
 import { z } from "zod";
-import { statefulBrowserAgent } from "../browser/stateful-browser-agent";
-import { browserSessionManager } from "../browser/browser-session-manager";
-import { desktopAgent } from "../desktop/desktop-agent";
+import { executeBrowserSubgraph } from "../browser/browser-subgraph";
+import { executeDesktopSubgraph } from "../desktop/desktop-subgraph";
+import { executeDocumentSubgraph } from "../document/document-subgraph";
 import { createLogger, withTiming } from "../../utils/logger";
+import { mcpService } from "../mcp/client";
+import { getMCPToolsForIntent, detectRelevantTools } from "../mcp/tool-router";
 
 const log = createLogger("Graph");
 
@@ -28,15 +30,6 @@ const routerModel = new ChatOpenAI({
   configuration: { baseURL: process.env.BASE_URL },
   temperature: 0,
   maxTokens: 10,
-  streaming: false,
-});
-
-// Separate model for verification — lower temperature for analytical, critical evaluation
-const verifierModel = new ChatOpenAI({
-  model: process.env.FAST_MODEL || process.env.MODEL || "qwen3.6-plus",
-  apiKey: process.env.API_KEY,
-  configuration: { baseURL: process.env.BASE_URL },
-  temperature: 0.1,
   streaming: false,
 });
 
@@ -177,7 +170,7 @@ const chartOutputSchema = z.object({
   yKey: z.string().optional().default("value"),
 });
 
-// LangGraph compiled graph - types are highly dynamic due to StateGraph complexity
+// LangGraph compiled graph
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedGraph: any = null;
 let cachedGraphEnvKey: string | null = null;
@@ -196,6 +189,37 @@ export function clearGraphCache(): void {
   cachedGraphEnvKey = null;
 }
 
+// === MCP TOOL INTEGRATION ===
+
+function getMCPModelForIntent(intent: string, query: string) {
+  if (!mcpService.isInitialized() || mcpService.getTools().length === 0) {
+    return chatModel;
+  }
+
+  // Get tools by intent
+  const intentTools = getMCPToolsForIntent(intent, mcpService.getTools());
+
+  // Also get tools by query keyword detection
+  const keywordPrefixes = detectRelevantTools(query);
+  const keywordTools = mcpService.getTools().filter(tool => {
+    const name = tool.name ?? "";
+    return keywordPrefixes.some(p =>
+      name.startsWith(p) || name.includes(p.replace("_", "-")) || name.includes(p.replace("-", "_"))
+    );
+  });
+
+  // Merge and deduplicate tools
+  const allTools = [...intentTools, ...keywordTools].filter(
+    (tool, i, arr) => arr.findIndex(t => t.name === tool.name) === i
+  );
+
+  if (allTools.length === 0) {
+    return chatModel;
+  }
+
+  return chatModel.bindTools(allTools as any);
+}
+
 export async function getAskGraph() {
   const envKey = getGraphEnvCacheKey();
   if (cachedGraph && cachedGraphEnvKey === envKey) return cachedGraph;
@@ -211,60 +235,20 @@ export async function getAskGraph() {
 
   const workflow = new StateGraph(AskState)
     .addNode("classify", classifyNode)
-    .addNode("fastPath", fastPathNode)
-    .addNode("internalKnowledge", internalKnowledgeNode)
-    .addNode("externalSearchFanOut", externalSearchFanOutNode)
-    .addNode("synthesizeWithSelfCheck", synthesizeWithSelfCheckNode)
-    .addNode("quickVerify", quickVerifyNode)
-    .addNode("replan", replanNode)
-    .addNode("fallbackSearch", fallbackSearchNode)
-    .addNode("generalChat", generalChatNode)
-    .addNode("comparisonNode", comparisonNode)
-    .addNode("formNode", formNode)
-    .addNode("chartNode", chartNode)
-    .addNode("browserAgent", browserAgentNode)
-    .addNode("desktopAgent", desktopAgentNode)
-    .addNode("desktopConfirmation", desktopConfirmationNode)
+    .addNode("browserSubgraph", browserSubgraphNode)
+    .addNode("desktopSubgraph", desktopSubgraphNode)
+    .addNode("documentSubgraph", documentSubgraphNode)
+    .addNode("postProcessNode", postProcessNode)
     .addEdge("__start__", "classify")
     .addConditionalEdges("classify", routeAfterClassify, {
-      fast: "fastPath",
-      internal: "internalKnowledge",
-      external: "externalSearchFanOut",
-      general: "generalChat",
-      browser: "browserAgent",
-      desktop: "desktopAgent",
-      comparison: "comparisonNode",
-      form: "formNode",
-      chart: "chartNode",
+      browser: "browserSubgraph",
+      desktop: "desktopSubgraph",
+      document: "documentSubgraph",
     })
-    .addEdge("fastPath", END)
-    .addConditionalEdges("internalKnowledge", routeAfterInternalKnowledge, {
-      high: END,
-      medium: "quickVerify",
-      low: "externalSearchFanOut",
-    })
-    .addConditionalEdges("externalSearchFanOut", routeAfterFanOut, {
-      has_results: "synthesizeWithSelfCheck",
-      no_results: "fallbackSearch",
-    })
-    .addConditionalEdges("synthesizeWithSelfCheck", routeAfterSynthesis, {
-      high: END,
-      medium: "quickVerify",
-      low: "replan",
-    })
-    .addConditionalEdges("quickVerify", routeAfterQuickVerify, {
-      pass: END,
-      fail: "replan",
-    })
-    .addEdge("replan", "externalSearchFanOut")
-    .addEdge("fallbackSearch", "synthesizeWithSelfCheck")
-    .addEdge("generalChat", END)
-    .addEdge("comparisonNode", END)
-    .addEdge("formNode", END)
-    .addEdge("chartNode", END)
-    .addEdge("browserAgent", "desktopConfirmation")
-    .addEdge("desktopAgent", "desktopConfirmation")
-    .addEdge("desktopConfirmation", END);
+    .addEdge("browserSubgraph", "postProcessNode")
+    .addEdge("desktopSubgraph", "postProcessNode")
+    .addEdge("documentSubgraph", "postProcessNode")
+    .addEdge("postProcessNode", END);
 
   cachedGraph = workflow.compile({ checkpointer });
 
@@ -275,10 +259,6 @@ export async function getAskGraph() {
   }
 
   log.debug("Compiled workflow with nodes:", Object.keys(workflow.nodes).join(", "));
-  log.debug("Edge structure:", JSON.stringify(Array.from(workflow.edges).map((e: [string, string]) => ({
-    source: e[0],
-    target: e[1],
-  })), null, 2));
 
   return cachedGraph;
 }
@@ -309,7 +289,6 @@ async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>>
   const fastPath = detectFastPath(state.userQuery);
   if (fastPath) {
     log.debug("Fast-path detected:", fastPath);
-    // Still compute actual complexity for accuracy (routing uses detectFastPath directly)
     const complexity = assessComplexity(state.userQuery);
     const reasoningStep: ReasoningStep = {
       step: "classify",
@@ -341,13 +320,14 @@ async function classifyNode(state: AskStateType): Promise<Partial<AskStateType>>
 This is a CONTEXTUAL FOLLOWUP — the user is referring to previous conversation content. Use the conversation history to understand what "this/that/it/them" refers to, then classify the intent based on the original topic.
 
 CRITICAL: If this is a followup to a chart/visualization request, classify as "research" (the chart node will be reached via keyword detection in routing).
-If this is a followup to a comparison, form, browser, or desktop request, preserve the previous intent.
+If this is a followup to a comparison, form, browser, desktop, or document request, preserve the previous intent.
 
 Intents:
 - research: Requires current facts, news, or information not reliably in training data
 - general: Conversational, creative writing, or training-data knowledge
 - browser: Requires interactive web page navigation
 - desktop: Requires interaction with the desktop, opening applications, clicking/typing on screen, or system operations
+- document: Requires creating, editing, or managing documents (Word, PowerPoint, Excel, PDF) — reports, presentations, spreadsheets, proposals
 
 Complexity:
 - simple: Short, single-concept queries (<30 chars, no question marks)
@@ -368,6 +348,7 @@ Intents:
 - general: Conversational, creative writing, or training-data knowledge
 - browser: Requires interactive web page navigation
 - desktop: Requires interaction with the desktop, opening applications, clicking/typing on screen, or system operations
+- document: Requires creating, editing, or managing documents (Word, PowerPoint, Excel, PDF) — reports, presentations, spreadsheets, proposals
 
 Complexity:
 - simple: Short, single-concept queries (<30 chars, no question marks)
@@ -393,7 +374,7 @@ Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
 
     const [rawIntent, rawComplexity] = content.split("/");
 
-    const validIntents = ["research", "general", "browser", "desktop"];
+    const validIntents = ["research", "general", "browser", "desktop", "document"];
     const intent = validIntents.includes(rawIntent) ? rawIntent : "general";
     const validComplexity = ["simple", "medium", "complex"];
     const complexityScore = validComplexity.includes(rawComplexity) ? rawComplexity : assessComplexity(state.userQuery);
@@ -424,146 +405,19 @@ Return ONLY: intent/complexity (e.g., "research/complex" or "general/simple")`);
 
 // === ROUTER: classify → next node ===
 
-function routeAfterClassify(state: AskStateType): string {
-  const { intent, complexityScore, attachments, userQuery } = state;
-  const route = (() => {
-    // Always use the LLM when files are attached — never fast-path
-    if (attachments && attachments.length > 0) {
-      return "general"; // generalChatNode uses state.messages which includes file context
-    }
-    // Detect comparison queries EARLY — before other routing
-    if (/\b(compare|vs\.?|versus|difference\s+between)\b/i.test(userQuery)) {
-      return "comparison";
-    }
-    // Detect form generation queries
-    if (/\b(generate\s+(a|the)?\s*(form|config|configuration|settings)|create\s+(a|the)?\s*(form|config|configuration|settings))\b/i.test(userQuery)) {
-      return "form";
-    }
-    // Detect chart/visualization queries
-    if (/\b(chart|graph|visuali[sz]e|plot|show.*data|show.*graph|bar chart|line chart|pie chart)\b/i.test(userQuery)) {
-      return "chart";
-    }
-    // Only fast-path when the query actually matches a known fast pattern.
-    // This prevents incomplete queries like "what can you" from getting a canned greeting.
-    if (complexityScore === "simple" && intent === "general" && detectFastPath(userQuery)) {
-      return "fast";
-    }
-    if (intent === "research" && complexityScore === "simple") {
-      return "internal";
-    }
-    if (intent === "research" && (complexityScore === "medium" || complexityScore === "complex")) {
-      return "external";
-    }
-    if (intent === "general" && complexityScore !== "simple") {
-      return "internal";
-    }
-    if (intent === "browser") {
-      return "browser";
-    }
-    if (intent === "desktop") {
-      return "desktop";
-    }
-    return "internal";
-  })();
+function routeAfterClassify(state: AskStateType): "browser" | "desktop" | "document" {
+  const { intent } = state;
 
-  log.debug("classify →", route, `(intent=${intent}, complexity=${complexityScore})`);
-  return route;
-}
-
-// === FAST PATH NODE ===
-
-async function fastPathNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const fastPath = detectFastPath(state.userQuery);
-
-  // Guard: if somehow called without a matching pattern, provide a graceful fallback
-  if (!fastPath) {
-    const reasoningStep: ReasoningStep = {
-      step: "fastPath",
-      status: "error",
-      detail: "No fast-path pattern matched — falling back to general chat",
-    };
-
-    return {
-      finalResponse: "I'm not sure how to respond to that. Let me think about it for a moment.",
-      confidence: 0.5,
-      reasoningSteps: [reasoningStep],
-    };
+  // Route ALL queries through 3 subgraphs only
+  if (intent === "desktop") {
+    return "desktop";
   }
-
-  const response = getFastPathResponse(fastPath);
-
-  const reasoningStep: ReasoningStep = {
-    step: "fastPath",
-    status: "completed",
-    detail: `Heuristic match: ${fastPath}`,
-  };
-
-  return {
-    finalResponse: response,
-    confidence: 1.0,
-    reasoningSteps: [reasoningStep],
-  };
+  if (intent === "document") {
+    return "document";
+  }
+  // All other intents (research, general, browser) go through browserSubgraph
+  return "browser";
 }
-
-// === INTERNAL KNOWLEDGE NODE ===
-
-async function internalKnowledgeNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const reasoningStep: ReasoningStep = {
-    step: "internalKnowledge",
-    status: "in_progress",
-    detail: "Answering from training knowledge",
-  };
-
-  return withTiming(log, "internalKnowledge", async () => {
-    const messages = safeMessages(state);
-    const attachmentContext = state.attachments.length > 0
-      ? `\n\nThe user has attached the following files as reference:\n${state.attachments.map(a => `\n--- ${a.name} ---\n${a.content}\n--- End: ${a.name} ---`).join('')}\n\nReference the attached file contents above when answering. The files are provided as context, not something you need to read from your training data.`
-      : '';
-
-    const recentHistory = messages
-      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
-      .slice(-6)
-      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
-      .join("\n");
-
-    const contextInstruction = messages.length > 1
-      ? `\n\nCONVERSATION CONTEXT: The current query may reference earlier messages. Use the conversation history below to resolve pronouns and references.\n\nConversation History:\n${recentHistory}`
-      : "";
-
-    const response = await chatModel.invoke([
-      new SystemMessage(`Answer the user's question from your training knowledge.${contextInstruction}${attachmentContext}
-
-At the END of your response, on a new line, add: Confidence: <0.0-1.0>
-
-Use 0.9+ for well-established facts, 0.7-0.8 for nuanced topics, below 0.5 if you're uncertain.`),
-      new HumanMessage(state.userQuery),
-    ]);
-
-    const content = response.content as string;
-    const confidenceMatch = content.match(/Confidence:\s*([0-9.]+)/i);
-    const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.7;
-    const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
-
-    log.debug("Confidence extracted:", confidence);
-    if (!confidenceMatch) {
-      log.warn("No confidence found in response, using default 0.7");
-    }
-
-    const completedStep: ReasoningStep = {
-      step: "internalKnowledge",
-      status: "completed",
-      detail: `Answer from knowledge (confidence: ${(confidence * 100).toFixed(0)}%)`,
-    };
-
-    return {
-      finalResponse: cleanContent,
-      confidence,
-      reasoningSteps: [reasoningStep, completedStep],
-    };
-  });
-}
-
-// === EXTERNAL SEARCH FAN-OUT NODE ===
 
 // Resolve anaphora in followup queries by rewriting against conversation history
 async function rewriteQueryWithContext(state: AskStateType): Promise<string> {
@@ -602,394 +456,113 @@ Rewritten query:`);
   }
 }
 
-async function externalSearchFanOutNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const effectiveQuery = await rewriteQueryWithContext(state);
-  const queries = [effectiveQuery];
+// === BROWSER SUBGRAPH NODE ===
+// Smart wrapper: handles fast-path, comparison, form, chart, external search, internal knowledge, general chat inline.
+// Only delegates to executeBrowserSubgraph for actual browser intent.
 
-  if (state.intent === "research") {
-    queries.push(`${effectiveQuery} 2025 2026`);
-  }
-
-  log.debug("Fan-out queries:", queries);
-
-  const reasoningStep: ReasoningStep = {
-    step: "externalSearchFanOut",
-    status: "completed",
-    detail: `Searching with ${queries.length} queries: ${queries.join(", ")}`,
-  };
-
-  let allSources: Source[] = [];
-  let allResults: string[] = [];
-
-  for (const query of queries) {
-    try {
-      log.debug("Executing:", query);
-      const searchResult = await webSearchTool.invoke({
-        query,
-        maxResults: 5,
-      });
-
-      const parsed = JSON.parse(searchResult);
-      const sources: Source[] = parsed.results?.map((r: { url: string; title: string; snippet: string }) => ({
-        url: r.url,
-        title: r.title,
-        excerpt: r.snippet,
-      })) || [];
-
-      log.debug("Results for", query, ":", sources.length, "sources");
-
-      allResults.push(searchResult);
-      allSources.push(...sources);
-    } catch (error) {
-      log.error("Search failed for query:", query, error);
-      allResults.push(JSON.stringify({ error: "Search failed for query", query, details: String(error) }));
+async function browserSubgraphNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  return withTiming(log, "browserSubgraph", async () => {
+    // 1. Fast-path (greeting/date/time)
+    const fastPath = detectFastPath(state.userQuery);
+    if (fastPath) {
+      const response = getFastPathResponse(fastPath);
+      log.debug("Fast-path:", fastPath);
+      return {
+        finalResponse: response,
+        confidence: 1.0,
+        reasoningSteps: [{ step: "browserSubgraph", status: "completed", detail: `Fast-path: ${fastPath}` }],
+        uiPayloads: [],
+      };
     }
-  }
 
-  const deduplicatedSources = allSources.filter(
-    (s, i, arr) => arr.findIndex((other) => other.url === s.url) === i
-  );
+    // 2. Comparison queries
+    if (/\b(compare|vs\.?|versus|difference\s+between)\b/i.test(state.userQuery)) {
+      return comparisonNode(state);
+    }
 
-  log.debug("Deduplicated:", allSources.length, "→", deduplicatedSources.length, "unique sources");
+    // 3. Form queries
+    if (/\b(generate\s+(a|the)?\s*(form|config|configuration|settings)|create\s+(a|the)?\s*(form|config|configuration|settings))\b/i.test(state.userQuery)) {
+      return formNode(state);
+    }
 
-  const completedStep: ReasoningStep = {
-    step: "externalSearchFanOut",
-    status: "completed",
-    detail: `Found ${deduplicatedSources.length} unique sources across ${queries.length} searches`,
-  };
+    // 4. Chart queries
+    if (/\b(chart|graph|visuali[sz]e|plot|show.*data|show.*graph|bar chart|line chart|pie chart)\b/i.test(state.userQuery)) {
+      return chartNode(state);
+    }
 
-  return {
-    researchResults: allResults,
-    sources: deduplicatedSources,
-    searchQueries: queries,
-    reasoningSteps: [reasoningStep, completedStep],
-  };
-}
+    // 5. External search (research intent with medium/complex complexity)
+    if (state.intent === "research" && (state.complexityScore === "medium" || state.complexityScore === "complex")) {
+      return externalSearchNode(state);
+    }
 
-// === ROUTER: after fan-out ===
+    // 6. Internal knowledge (research intent, simple complexity)
+    if (state.intent === "research" && state.complexityScore === "simple") {
+      return internalKnowledgeNode(state);
+    }
 
-function routeAfterFanOut(state: AskStateType): "has_results" | "no_results" {
-  const result = state.sources.length > 0 ? "has_results" : "no_results";
-  log.debug("fanOut →", result, `(sources=${state.sources.length})`);
-  return result;
-}
+    // 7. General/internal queries (fallback)
+    if (state.intent === "general") {
+      return generalChatNode(state);
+    }
 
-// === SYNTHESIZE WITH SELF-CHECK NODE ===
+    // 8. Browser automation (actual browser intent)
+    log.info(`[BrowserSubgraph] Starting browser automation: "${state.userQuery.substring(0, 120)}${state.userQuery.length > 120 ? '...' : ''}"`);
 
-async function synthesizeWithSelfCheckNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const isRetry = state.retryCount > 0;
-  log.debug(isRetry ? `Retry attempt ${state.retryCount + 1}` : "Initial synthesis",
-    "sources:", state.sources.length, "results:", state.researchResults.length);
-
-  return withTiming(log, "synthesize", async () => {
-    const reasoningStep: ReasoningStep = {
-      step: "synthesizeWithSelfCheck",
+    const inProgressStep: ReasoningStep = {
+      step: "browserSubgraph",
       status: "in_progress",
-      detail: isRetry
-        ? `Re-synthesizing (attempt ${state.retryCount + 1}/${MAX_RETRIES + 1})`
-        : "Synthesizing research results",
+      detail: "Initializing hierarchical browser subgraph (memory -> skillRouter -> planner -> executor -> verifier -> store)",
     };
 
-    const sourcesText = state.sources
-      .map((s, i) => `[${i + 1}] ${s.title} - ${s.url}\n${s.excerpt}`)
-      .join("\n\n");
+    const nodeStart = Date.now();
+    const sessionId = `browser-${Date.now()}`;
 
-    const attachmentContext = state.attachments.length > 0
-      ? `\n\nAttached Files:\n${state.attachments.map(a => `--- ${a.name} ---\n${a.content}\n--- End: ${a.name} ---`).join('\n')}`
-      : '';
-
-    let synthesizePrompt: SystemMessage;
-
-    if (isRetry && state.validationCritique) {
-      synthesizePrompt = new SystemMessage(`You are a research synthesizer. Your previous attempt had quality issues. Improve the response based on the validation feedback.
-
-Validation Feedback: ${state.validationCritique}
-Previous Response: ${state.finalResponse}
-
-Guidelines:
-- Address ALL issues mentioned in the validation feedback
-- Use clear, concise language
-- Cite sources using [1], [2], etc. format
-- If results conflict, note the discrepancy
-- Structure the answer with headers and bullet points where appropriate
-- Be factual and cite specific sources
-
-At the END of your response, on a new line, add: Confidence: <0.0-1.0>
-
-Research Results:
-${state.researchResults.join("\n\n---\n\n")}
-
-Sources:
-${sourcesText}
-
-User Query: ${state.userQuery}${attachmentContext}`);
-    } else {
-      synthesizePrompt = new SystemMessage(`You are a research synthesizer. Create a comprehensive, well-structured answer based on the provided research results.
-
-Guidelines:
-- Use clear, concise language
-- Cite sources using [1], [2], etc. format
-- If results conflict, note the discrepancy
-- Structure the answer with headers and bullet points where appropriate
-- Be factual and cite specific sources
-
-At the END of your response, on a new line, add: Confidence: <0.0-1.0>
-
-Use 0.9+ when sources strongly support the answer, 0.7-0.8 when sources are good but partial, below 0.5 when sources are weak or conflicting.
-
-Research Results:
-${state.researchResults.join("\n\n---\n\n")}
-
-Sources:
-${sourcesText}
-
-User Query: ${state.userQuery}${attachmentContext}`);
-    }
-
-    const response = await chatModel.invoke([
-      synthesizePrompt,
-      ...safeMessages(state).filter(m => m instanceof HumanMessage || m instanceof AIMessage).slice(-4),
-    ]);
-
-    const content = response.content as string;
-    const confidenceMatch = content.match(/Confidence:\s*([0-9.]+)/i);
-    const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.7;
-    const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
-
-    if (!confidenceMatch) {
-      log.warn("No confidence found in response, using default 0.7");
-    }
-    log.debug("Confidence:", confidence, "content length:", cleanContent.length);
-
-    const completedStep: ReasoningStep = {
-      step: "synthesizeWithSelfCheck",
-      status: "completed",
-      detail: isRetry
-        ? `Answer re-synthesized (attempt ${state.retryCount + 1}), confidence: ${(confidence * 100).toFixed(0)}%`
-        : `Answer synthesized, confidence: ${(confidence * 100).toFixed(0)}%`,
-    };
-
-    // Detect markdown tables in content for Generative UI
-    const uiPayloads: UIPayload[] = [];
-    const tableRegex = /\|(.+)\|[\s\S]*?\n\|[-\s|:]+\|[\s\S]*?\n((?:\|.+\|\n?)+)/g;
-    const tableMatch = tableRegex.exec(cleanContent);
-    if (tableMatch) {
-      const columns = tableMatch[1].split('|').filter(Boolean).map(c => c.trim());
-      const rows = tableMatch[2].trim().split('\n').map(row => {
-        const cells = row.split('|').filter(Boolean).map(c => c.trim());
-        const obj: Record<string, string> = {};
-        columns.forEach((col, i) => { obj[col] = cells[i] || ''; });
-        return obj;
-      });
-      uiPayloads.push({
-        type: 'table',
-        title: 'Extracted Data',
-        data: { columns: columns.map(c => ({ key: c, label: c })), rows },
-        node: 'synthesizeWithSelfCheck',
-      });
-    }
-
-    return {
-      finalResponse: cleanContent,
-      confidence,
-      sources: state.sources,
-      uiPayloads,
-      qualityScore: 0,
-      validationScore: 0,
-      // Preserve validationCritique on retries so the model can reference previous feedback
-      validationCritique: state.retryCount === 0 ? "" : state.validationCritique,
-      reasoningSteps: [reasoningStep, completedStep],
-    };
-  });
-}
-
-// === ROUTER: after synthesis ===
-
-function routeAfterSynthesis(state: AskStateType): "high" | "medium" | "low" {
-  const { confidence, qualityScore, retryCount } = state;
-  const effectiveScore = qualityScore > 0
-    ? (confidence * 0.3 + qualityScore * 0.7)
-    : confidence;
-
-  const route = (() => {
-    if (effectiveScore >= CONFIDENCE_HIGH) {
-      return "high";
-    }
-    if (retryCount >= MAX_RETRIES) {
-      return "medium";
-    }
-    if (effectiveScore >= CONFIDENCE_MEDIUM) {
-      return "medium";
-    }
-    return "low";
-  })();
-
-  log.debug("synthesize →", route, `(confidence=${confidence}, qualityScore=${qualityScore}, effective=${effectiveScore.toFixed(2)}, retries=${retryCount})`);
-  return route;
-}
-
-// === QUICK VERIFY NODE ===
-
-async function quickVerifyNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  if (!state.finalResponse) {
-    log.warn("No finalResponse to verify");
-    return { verified: false, confidence: 0, qualityScore: 0 };
-  }
-
-  log.debug("Verifying response length:", state.finalResponse.length, "sources:", state.sources.length);
-
-  return withTiming(log, "quickVerify", async () => {
-    const reasoningStep: ReasoningStep = {
-      step: "quickVerify",
-      status: "in_progress",
-      detail: "Quality verification check",
-    };
-
-    const messages = safeMessages(state);
-    const recentHistory = messages
+    const recentHistory = state.messages
       .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
       .slice(-4)
-      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 300)}`)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
       .join("\n");
 
-    const contextHint = messages.length > 1
-      ? `\n\nConversation History (for reference resolution):\n${recentHistory}`
-      : "";
+    const taskWithHistory = state.messages.length > 1
+      ? `CONVERSATION CONTEXT (for reference):\n${recentHistory}\n\nTASK: ${state.userQuery}`
+      : state.userQuery;
 
-    const verificationPrompt = new SystemMessage(`You are a quality verifier. Score this response 0.0-1.0.
+    let fullResponse = "";
+    let actions: Array<{ type: string; description: string; success: boolean }> = [];
+    let executionTrace: Array<{ node: string; durationMs: number; inputSummary: string; outputSummary: string }> = [];
+    let browserResult: Awaited<ReturnType<typeof executeBrowserSubgraph>> | null = null;
 
-Respond with ONLY a number followed by a brief reason.
-Examples: "0.9 - Directly answers the query with clear, factual information"
-          "0.3 - Vague and does not address the core question"
+    try {
+      browserResult = await executeBrowserSubgraph(taskWithHistory, sessionId);
+      fullResponse = browserResult.finalResponse;
+      actions = browserResult.actions;
+      executionTrace = browserResult.executionTrace;
+    } catch (err) {
+      log.error(`[BrowserSubgraph] [${sessionId}] Subgraph error after ${Date.now() - nodeStart}ms:`, err instanceof Error ? err.message : 'Unknown error');
+      fullResponse = `Browser automation failed: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
 
-User Query: ${state.userQuery}
-Response: ${state.finalResponse}
-${state.sources.length > 0 ? `Sources: ${state.sources.length} sources available` : "No sources available"}${contextHint}`);
-
-    const response = await verifierModel.invoke([verificationPrompt]);
-    const content = (response.content as string).trim();
-    const scoreMatch = content.match(/^([0-9]*\.?[0-9]+)/);
-    const qualityScore = scoreMatch ? Math.min(1, Math.max(0, parseFloat(scoreMatch[1]))) : 0.5;
-    const passed = qualityScore >= 0.6;
-
-    log.debug("Quality score:", qualityScore, "passed:", passed, "model output:", content.slice(0, 100));
+    if (executionTrace.length > 0) {
+      const traceLine = executionTrace.map(e => `${e.node}(${e.durationMs}ms)`).join(' -> ');
+      log.info(`[BrowserSubgraph] Trace: ${traceLine} -> END`);
+    }
 
     const completedStep: ReasoningStep = {
-      step: "quickVerify",
+      step: "browserSubgraph",
       status: "completed",
-      detail: passed ? `Quality score: ${(qualityScore * 100).toFixed(0)}% — passed` : `Quality score: ${(qualityScore * 100).toFixed(0)}% — failed: ${content.slice(0, 200)}`,
+      detail: `Browser subgraph complete: ${actions.length} action(s), ${executionTrace.length} nodes traced`,
     };
 
     return {
-      verified: passed,
-      qualityScore,
-      validationScore: qualityScore,
-      // Pass the full verifier output as critique when quality is low, so retry can improve
-      validationCritique: passed ? "" : content.slice(0, 500),
-      reasoningSteps: [reasoningStep, completedStep],
+      finalResponse: fullResponse,
+      confidence: 0.85,
+      uiPayloads: browserResult?.uiPayloads ?? [],
+      reasoningSteps: [inProgressStep, completedStep],
     };
   });
 }
 
-// === ROUTER: after quick verify ===
-
-function routeAfterQuickVerify(state: AskStateType): "pass" | "fail" {
-  return state.qualityScore >= 0.6 ? "pass" : "fail";
-}
-
-// === ROUTER: after internal knowledge ===
-
-function routeAfterInternalKnowledge(state: AskStateType): "high" | "medium" | "low" {
-  const { confidence, qualityScore } = state;
-  const effectiveScore = qualityScore > 0
-    ? (confidence * 0.3 + qualityScore * 0.7)
-    : confidence;
-
-  if (effectiveScore >= CONFIDENCE_HIGH) {
-    return "high";
-  }
-  if (effectiveScore >= CONFIDENCE_MEDIUM) {
-    return "medium";
-  }
-  return "low";
-}
-
-// === FALLBACK SEARCH NODE ===
-
-async function fallbackSearchNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const reasoningStep: ReasoningStep = {
-    step: "fallbackSearch",
-    status: "in_progress",
-    detail: "Trying alternative search approach",
-  };
-
-  const refinedQuery = state.userQuery.replace(/\b(latest|recent|current|new)\b/gi, "").trim() || state.userQuery;
-
-  const contextAwareQuery = state.messages.length > 1
-    ? await rewriteQueryWithContext(state)
-    : refinedQuery;
-
-  try {
-    const searchResult = await webSearchTool.invoke({
-      query: contextAwareQuery,
-      maxResults: 5,
-    });
-
-    const parsed = JSON.parse(searchResult);
-    const sources: Source[] = parsed.results?.map((r: { url: string; title: string; snippet: string }) => ({
-      url: r.url,
-      title: r.title,
-      excerpt: r.snippet,
-    })) || [];
-
-    const completedStep: ReasoningStep = {
-      step: "fallbackSearch",
-      status: "completed",
-      detail: `Fallback search found ${sources.length} sources`,
-    };
-
-    return {
-      researchResults: [searchResult],
-      sources,
-      reasoningSteps: [reasoningStep, completedStep],
-    };
-  } catch (error) {
-    const errorStep: ReasoningStep = {
-      step: "fallbackSearch",
-      status: "error",
-      detail: error instanceof Error ? error.message : "Fallback search failed",
-    };
-    return {
-      researchResults: [JSON.stringify({ error: "Fallback search failed", details: String(error) })],
-      reasoningSteps: [reasoningStep, errorStep],
-    };
-  }
-}
-
-async function generalChatNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const reasoningStep: ReasoningStep = {
-    step: "General Response",
-    status: "in_progress",
-    detail: "Generating response",
-  };
-
-  let fullContent = "";
-  const stream = await chatModel.stream(safeMessages(state));
-  for await (const chunk of stream) {
-    fullContent += chunk.content as string;
-  }
-
-  const completedStep: ReasoningStep = {
-    step: "General Response",
-    status: "completed",
-    detail: "Response generated",
-  };
-
-  return {
-    finalResponse: fullContent,
-    reasoningSteps: [reasoningStep, completedStep],
-  };
-}
+// === INLINE COMPARISON NODE ===
 
 async function comparisonNode(state: AskStateType): Promise<Partial<AskStateType>> {
   log.debug("Generating structured comparison for:", state.userQuery);
@@ -1058,8 +631,6 @@ ${contextSection}${followupHint}`),
       new HumanMessage(state.userQuery),
     ]);
 
-    // withStructuredOutput already guarantees correct schema; convert attributes array
-    // to Record<string, string> for the frontend ComparisonTable component
     const criteriaWithKeys = parsed.criteria.map((c) => ({
       key: c.key.toLowerCase().replace(/[\s+/]+/g, '_'),
       label: c.label,
@@ -1090,7 +661,7 @@ ${contextSection}${followupHint}`),
       type: "comparison",
       title: normalizedResponse.title,
       data: normalizedResponse,
-      node: "comparisonNode",
+      node: "browserSubgraph",
     };
 
     const textSummary = itemsAsRecord
@@ -1100,8 +671,6 @@ ${contextSection}${followupHint}`),
       })
       .join("\n\n");
 
-    log.debug("Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
-
     return {
       finalResponse: `Here's a comparison of ${itemsAsRecord.map((i) => i.name).join(", ")}:\n\n${textSummary}`,
       uiPayloads: [uiPayload],
@@ -1110,6 +679,8 @@ ${contextSection}${followupHint}`),
     };
   });
 }
+
+// === INLINE FORM NODE ===
 
 async function formNode(state: AskStateType): Promise<Partial<AskStateType>> {
   log.debug("Generating structured form for:", state.userQuery);
@@ -1180,7 +751,6 @@ ${contextSection}${followupHint}`),
       new HumanMessage(state.userQuery),
     ]);
 
-    // Normalize field names to camelCase
     const normalizedFields = parsed.fields.map((f) => ({
       name: f.name.toLowerCase().replace(/[\s-]+/g, "_").replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
       label: f.label,
@@ -1206,12 +776,10 @@ ${contextSection}${followupHint}`),
       type: "form",
       title: normalizedResponse.title,
       data: normalizedResponse,
-      node: "formNode",
+      node: "browserSubgraph",
     };
 
     const fieldSummary = normalizedFields.map((f) => `${f.label}: ${JSON.stringify(f.value)}`).join(", ");
-
-    log.debug("Normalized output:", JSON.stringify(normalizedResponse).slice(0, 300));
 
     return {
       finalResponse: `Here's a configuration form with ${normalizedFields.length} fields:\n\n${fieldSummary}`,
@@ -1221,6 +789,8 @@ ${contextSection}${followupHint}`),
     };
   });
 }
+
+// === INLINE CHART NODE ===
 
 async function chartNode(state: AskStateType): Promise<Partial<AskStateType>> {
   log.debug("Generating chart visualization for:", state.userQuery);
@@ -1289,7 +859,6 @@ ${contextSection}${followupHint}`),
       new HumanMessage(state.userQuery),
     ]);
 
-    // Validate data values are finite numbers
     const validData = parsed.data.filter(
       (d) => typeof d.value === "number" && isFinite(d.value)
     );
@@ -1313,14 +882,12 @@ ${contextSection}${followupHint}`),
       type: "chart",
       title: normalizedResponse.title,
       data: normalizedResponse,
-      node: "chartNode",
+      node: "browserSubgraph",
     };
 
     const dataSummary = validData
       .map((d) => `${d.name}: ${d.value}`)
       .join(", ");
-
-    log.debug("Normalized chart output:", JSON.stringify(normalizedResponse).slice(0, 300));
 
     return {
       finalResponse: `Here's a ${parsed.chartType} chart showing ${validData.length} data points:\n\n${dataSummary}`,
@@ -1331,111 +898,177 @@ ${contextSection}${followupHint}`),
   });
 }
 
-async function browserAgentNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  log.debug("Starting browser automation for:", state.userQuery);
+// === INLINE EXTERNAL SEARCH NODE ===
 
-  const inProgressStep: ReasoningStep = {
-    step: "browserAgent",
-    status: "in_progress",
-    detail: "Initializing browser automation",
-  };
+async function externalSearchNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  log.debug("External search", "queries for:", state.userQuery);
 
-  return withTiming(log, "browserAgent", async () => {
-    if (!statefulBrowserAgent.isReady()) {
-      log.debug("Initializing browser agent...");
-      await statefulBrowserAgent.initialize();
-    }
-
-    const sessionId = await browserSessionManager.createSession();
-    log.debug("Created browser session:", sessionId);
-
-    const recentHistory = state.messages
-      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
-      .slice(-4)
-      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
-      .join("\n");
-
-    const taskWithHistory = state.messages.length > 1
-      ? `CONVERSATION CONTEXT (for reference):\n${recentHistory}\n\nTASK: ${state.userQuery}`
+  return withTiming(log, "externalSearch", async () => {
+    const effectiveQuery = state.messages.length > 1
+      ? await rewriteQueryWithContext(state)
       : state.userQuery;
 
-    let fullResponse = "";
-    let error: unknown = null;
+    const queries = [effectiveQuery];
+    if (state.intent === "research") {
+      queries.push(`${effectiveQuery} 2025 2026`);
+    }
 
-    try {
-      const stream = statefulBrowserAgent.executeTaskStream(taskWithHistory, sessionId);
+    let allSources: Source[] = [];
+    let allResults: string[] = [];
 
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-      }
-    } catch (err) {
-      error = err;
-    } finally {
+    for (const query of queries) {
       try {
-        await statefulBrowserAgent.closeSession(sessionId);
-        await browserSessionManager.closeSession();
-        log.debug("Browser session cleaned up:", sessionId);
-      } catch (cleanupError) {
-        log.warn('Browser session cleanup error:', cleanupError);
+        const searchResult = await webSearchTool.invoke({
+          query,
+          maxResults: 5,
+        });
+        const parsed = JSON.parse(searchResult);
+        const sources: Source[] = parsed.results?.map((r: { url: string; title: string; snippet: string }) => ({
+          url: r.url,
+          title: r.title,
+          excerpt: r.snippet,
+        })) || [];
+        allResults.push(searchResult);
+        allSources.push(...sources);
+      } catch (error) {
+        log.error("Search failed for query:", query, error);
+        allResults.push(JSON.stringify({ error: "Search failed", query, details: String(error) }));
       }
     }
 
-    if (error) {
-      const errorStep: ReasoningStep = {
-        step: "browserAgent",
-        status: "error",
-        detail: error instanceof Error ? error.message : "Browser automation failed",
-      };
+    const deduplicatedSources = allSources.filter(
+      (s, i, arr) => arr.findIndex((other) => other.url === s.url) === i
+    );
 
-      log.error("Browser agent error:", { sessionId, error });
+    const sourcesText = deduplicatedSources
+      .map((s, i) => `[${i + 1}] ${s.title} - ${s.url}\n${s.excerpt}`)
+      .join("\n\n");
 
-      return {
-        finalResponse: fullResponse || `Browser automation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        confidence: 0,
-        reasoningSteps: [inProgressStep, errorStep],
-      };
-    }
+    const attachmentContext = state.attachments.length > 0
+      ? `\n\nAttached Files:\n${state.attachments.map(a => `--- ${a.name} ---\n${a.content}\n--- End: ${a.name} ---`).join('\n')}`
+      : '';
 
-    const completedStep: ReasoningStep = {
-      step: "browserAgent",
-      status: "completed",
-      detail: "Browser automation complete",
-    };
+    const synthesizePrompt = new SystemMessage(`You are a research synthesizer. Create a comprehensive, well-structured answer based on the provided research results.
 
-    log.debug("Browser task complete, response length:", fullResponse.length);
+Guidelines:
+- Use clear, concise language
+- Cite sources using [1], [2], etc. format
+- If results conflict, note the discrepancy
+- Structure the answer with headers and bullet points where appropriate
+- Be factual and cite specific sources
+
+At the END of your response, on a new line, add: Confidence: <0.0-1.0>
+
+Use 0.9+ when sources strongly support the answer, 0.7-0.8 when sources are good but partial, below 0.5 when sources are weak or conflicting.
+
+Research Results:
+${allResults.join("\n\n---\n\n")}
+
+Sources:
+${sourcesText}
+
+User Query: ${state.userQuery}${attachmentContext}`);
+
+    const response = await getMCPModelForIntent(state.intent, state.userQuery).invoke([
+      synthesizePrompt,
+      ...safeMessages(state).filter(m => m instanceof HumanMessage || m instanceof AIMessage).slice(-4),
+    ]);
+
+    const content = response.content as string;
+    const confidenceMatch = content.match(/Confidence:\s*([0-9.]+)/i);
+    const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.7;
+    const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
 
     return {
-      finalResponse: fullResponse,
-      confidence: 0.85,
-      reasoningSteps: [inProgressStep, completedStep],
+      finalResponse: cleanContent,
+      confidence,
+      sources: deduplicatedSources,
+      searchQueries: queries,
+      uiPayloads: [],
+      reasoningSteps: [{ step: "externalSearch", status: "completed", detail: `Found ${deduplicatedSources.length} sources, confidence: ${(confidence * 100).toFixed(0)}%` }],
     };
   });
 }
 
-// === DESKTOP AGENT NODE ===
-// HITL is handled by LangGraph's native interrupt() inside the ReAct loop (desktop-agent.ts).
+// === INLINE INTERNAL KNOWLEDGE NODE ===
 
-async function desktopAgentNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  log.info("[DesktopAgent] Starting desktop automation for query:", state.userQuery.substring(0, 100));
+async function internalKnowledgeNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  return withTiming(log, "internalKnowledge", async () => {
+    const messages = safeMessages(state);
+    const attachmentContext = state.attachments.length > 0
+      ? `\n\nThe user has attached the following files as reference:\n${state.attachments.map(a => `\n--- ${a.name} ---\n${a.content}\n--- End: ${a.name} ---`).join('')}\n\nReference the attached file contents above when answering.`
+      : '';
+
+    const recentHistory = messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-6)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+      .join("\n");
+
+    const contextInstruction = messages.length > 1
+      ? `\n\nCONVERSATION CONTEXT: The current query may reference earlier messages. Use the conversation history below to resolve pronouns and references.\n\nConversation History:\n${recentHistory}`
+      : "";
+
+    const response = await getMCPModelForIntent(state.intent, state.userQuery).invoke([
+      new SystemMessage(`Answer the user's question from your training knowledge.${contextInstruction}${attachmentContext}
+
+At the END of your response, on a new line, add: Confidence: <0.0-1.0>
+
+Use 0.9+ for well-established facts, 0.7-0.8 for nuanced topics, below 0.5 if you're uncertain.`),
+      new HumanMessage(state.userQuery),
+    ]);
+
+    const content = response.content as string;
+    const confidenceMatch = content.match(/Confidence:\s*([0-9.]+)/i);
+    const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.7;
+    const cleanContent = content.replace(/Confidence:\s*[0-9.]+\s*$/i, "").trim();
+
+    return {
+      finalResponse: cleanContent,
+      confidence,
+      uiPayloads: [],
+      reasoningSteps: [{ step: "internalKnowledge", status: "completed", detail: `Answer from knowledge (confidence: ${(confidence * 100).toFixed(0)}%)` }],
+    };
+  });
+}
+
+// === INLINE GENERAL CHAT NODE ===
+
+async function generalChatNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  let fullContent = "";
+  const model = getMCPModelForIntent(state.intent, state.userQuery);
+  const stream = await model.stream(safeMessages(state));
+  for await (const chunk of stream) {
+    fullContent += chunk.content as string;
+  }
+
+  return {
+    finalResponse: fullContent,
+    uiPayloads: [],
+    reasoningSteps: [{ step: "generalChat", status: "completed", detail: "Response generated" }],
+  };
+}
+
+// === DESKTOP SUBGRAPH NODE ===
+// If intent is NOT desktop, handles via inline LLM. Otherwise executes desktop subgraph.
+
+async function desktopSubgraphNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  // If intent is not desktop, handle via inline LLM
+  if (state.intent !== "desktop") {
+    return generalChatNode(state);
+  }
+
+  log.info(`[DesktopSubgraph] Starting desktop automation: "${state.userQuery.substring(0, 120)}${state.userQuery.length > 120 ? '...' : ''}"`);
 
   const inProgressStep: ReasoningStep = {
-    step: "desktopAgent",
+    step: "desktopSubgraph",
     status: "in_progress",
-    detail: "Initializing desktop automation",
+    detail: "Initializing hierarchical desktop subgraph (memory -> planner -> executor -> verifier -> store)",
   };
 
-  return withTiming(log, "desktopAgent", async () => {
-    log.debug("[DesktopAgent] Checking if desktop agent is ready:", desktopAgent.isReady());
-    if (!desktopAgent.isReady()) {
-      log.info("[DesktopAgent] Initializing desktop agent...");
-      await desktopAgent.initialize();
-      log.info("[DesktopAgent] Desktop agent initialized successfully");
-    } else {
-      log.debug("[DesktopAgent] Desktop agent already initialized");
-    }
-
+  return withTiming(log, "desktopSubgraph", async () => {
+    const nodeStart = Date.now();
     const sessionId = `desktop-${Date.now()}`;
-    log.info("[DesktopAgent] Created desktop session:", sessionId);
 
     const recentHistory = state.messages
       .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
@@ -1448,127 +1081,296 @@ async function desktopAgentNode(state: AskStateType): Promise<Partial<AskStateTy
       : state.userQuery;
 
     let fullResponse = "";
-    let error: unknown = null;
-    const desktopActions: DesktopAction[] = [];
+    let actions: Array<{ type: string; description: string; success: boolean }> = [];
+    let executionTrace: Array<{ node: string; durationMs: number; inputSummary: string; outputSummary: string }> = [];
+    let desktopResult: Awaited<ReturnType<typeof executeDesktopSubgraph>> | null = null;
 
     try {
-      log.info("[DesktopAgent] Starting executeTaskStream");
-      const stream = desktopAgent.executeTaskStream(taskWithHistory, sessionId);
-
-      let chunkCount = 0;
-      for await (const chunk of stream) {
-        chunkCount++;
-        fullResponse += chunk;
-        log.debug(`[DesktopAgent] Received stream chunk ${chunkCount}, total length: ${fullResponse.length}`);
-      }
-      log.info(`[DesktopAgent] Stream complete, received ${chunkCount} chunk(s), total response length: ${fullResponse.length}`);
+      desktopResult = await executeDesktopSubgraph(taskWithHistory, sessionId);
+      fullResponse = desktopResult.finalResponse;
+      actions = desktopResult.actions;
+      executionTrace = desktopResult.executionTrace;
     } catch (err) {
-      error = err;
-      log.error("[DesktopAgent] Stream error:", err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      try {
-        await desktopAgent.closeSession(sessionId);
-        log.debug("[DesktopAgent] Desktop session cleaned up:", sessionId);
-      } catch (cleanupError) {
-        log.warn('[DesktopAgent] Desktop session cleanup error:', cleanupError);
+      const isInterrupt = err instanceof Error &&
+        (err.name === 'GraphInterrupt' || err.name === 'NodeInterrupt');
+      if (isInterrupt) {
+        log.info(`[DesktopSubgraph] [${sessionId}] Graph interrupt detected — graph will pause for HITL confirmation (elapsed: ${Date.now() - nodeStart}ms)`);
+        throw err;
       }
+      log.error(`[DesktopSubgraph] [${sessionId}] Subgraph error after ${Date.now() - nodeStart}ms:`, err instanceof Error ? err.message : 'Unknown error');
+      fullResponse = `Desktop automation failed: ${err instanceof Error ? err.message : "Unknown error"}`;
     }
 
-    if (error) {
-      const errorStep: ReasoningStep = {
-        step: "desktopAgent",
-        status: "error",
-        detail: error instanceof Error ? error.message : "Desktop automation failed",
-      };
-
-      log.error("[DesktopAgent] Desktop agent error:", { sessionId, error });
-
-      return {
-        finalResponse: fullResponse || `Desktop automation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        confidence: 0,
-        desktopSessionId: sessionId,
-        desktopActions: [{ type: 'error', description: error instanceof Error ? error.message : 'Unknown', success: false }],
-        reasoningSteps: [inProgressStep, errorStep],
-      };
+    if (executionTrace.length > 0) {
+      const traceLine = executionTrace.map(e => `${e.node}(${e.durationMs}ms)`).join(' -> ');
+      log.info(`[DesktopSubgraph] Trace: ${traceLine} -> END`);
     }
 
     const completedStep: ReasoningStep = {
-      step: "desktopAgent",
+      step: "desktopSubgraph",
       status: "completed",
-      detail: "Desktop automation complete",
+      detail: `Desktop subgraph complete: ${actions.length} action(s), ${executionTrace.length} nodes traced`,
     };
-
-    log.info("[DesktopAgent] Desktop task complete, response:", fullResponse.substring(0, 200));
 
     return {
       finalResponse: fullResponse,
       confidence: 0.85,
       desktopSessionId: sessionId,
-      desktopActions,
+      desktopActions: actions.map(a => ({
+        type: a.type,
+        description: a.description,
+        success: a.success,
+        result: a.success ? 'complete' : 'failed',
+      })),
+      desktopExecutionTrace: executionTrace.map(e => ({
+        node: e.node,
+        enterMs: 0,
+        exitMs: e.durationMs,
+        durationMs: e.durationMs,
+        inputSummary: e.inputSummary,
+        outputSummary: e.outputSummary,
+      })),
+      uiPayloads: desktopResult?.uiPayloads ?? [],
       reasoningSteps: [inProgressStep, completedStep],
     };
   });
 }
 
-// === DESKTOP CONFIRMATION NODE ===
+// === DOCUMENT SUBGRAPH NODE ===
+// If intent is NOT document, handles via inline LLM. Otherwise executes document subgraph.
 
-async function replanNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  const reasoningStep: ReasoningStep = {
-    step: "replan",
-    status: "in_progress",
-    detail: `Low confidence — refining search approach (attempt ${state.retryCount + 1}/${MAX_RETRIES})`,
-  };
-
-  let refinedQuery: string;
-  if (state.messages.length > 1) {
-    refinedQuery = await rewriteQueryWithContext(state);
-  } else if (state.researchResults.length > 0) {
-    refinedQuery = `${state.userQuery} more details`;
-  } else {
-    refinedQuery = state.userQuery;
+async function documentSubgraphNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  // If intent is not document, handle via inline LLM
+  if (state.intent !== "document") {
+    return generalChatNode(state);
   }
 
-  const retryCount = state.retryCount + 1;
+  log.info(`[DocumentSubgraph] Starting document workflow: "${state.userQuery.substring(0, 120)}${state.userQuery.length > 120 ? '...' : ''}"`);
 
-  // Preserve previous search results so the synthesis node has full context
-  const previousResults = [...state.researchResults];
-  const previousSources = [...state.sources];
-
-  const completedStep: ReasoningStep = {
-    step: "replan",
-    status: "completed",
-    detail: `Refined query: "${refinedQuery}" (preserving ${previousResults.length} previous results)`,
+  const inProgressStep: ReasoningStep = {
+    step: "documentSubgraph",
+    status: "in_progress",
+    detail: "Initializing hierarchical document subgraph (memory -> classifyAction -> planner -> executor -> verifier -> store)",
   };
 
-  return {
-    userQuery: refinedQuery,
-    retryCount,
-    researchResults: previousResults,
-    sources: previousSources,
-    reasoningSteps: [reasoningStep, completedStep],
-  };
+  return withTiming(log, "documentSubgraph", async () => {
+    const nodeStart = Date.now();
+    const sessionId = `document-${Date.now()}`;
+
+    const recentHistory = state.messages
+      .filter(m => m instanceof HumanMessage || m instanceof AIMessage)
+      .slice(-4)
+      .map(m => `${m instanceof HumanMessage ? "User" : "Assistant"}: ${(m.content as string).substring(0, 400)}`)
+      .join("\n");
+
+    const taskWithHistory = state.messages.length > 1
+      ? `CONVERSATION CONTEXT (for reference):\n${recentHistory}\n\nTASK: ${state.userQuery}`
+      : state.userQuery;
+
+    let fullResponse = "";
+    let filePath = "";
+    let actions: Array<{ type: string; description: string; success: boolean }> = [];
+    let executionTrace: Array<{ node: string; durationMs: number; inputSummary: string; outputSummary: string }> = [];
+    let planStatus = "failed";
+    let documentResult: Awaited<ReturnType<typeof executeDocumentSubgraph>> | null = null;
+
+    try {
+      documentResult = await executeDocumentSubgraph(taskWithHistory, sessionId);
+      fullResponse = documentResult.finalResponse;
+      filePath = documentResult.filePath;
+      actions = documentResult.actions;
+      executionTrace = documentResult.executionTrace;
+      planStatus = documentResult.planStatus;
+    } catch (err) {
+      const isInterrupt = err instanceof Error &&
+        (err.name === 'GraphInterrupt' || err.name === 'NodeInterrupt');
+      if (isInterrupt) {
+        log.info(`[DocumentSubgraph] [${sessionId}] Graph interrupt detected — graph will pause for HITL confirmation (elapsed: ${Date.now() - nodeStart}ms)`);
+        throw err;
+      }
+      log.error(`[DocumentSubgraph] [${sessionId}] Subgraph error after ${Date.now() - nodeStart}ms:`, err instanceof Error ? err.message : 'Unknown error');
+      fullResponse = `Document workflow failed: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
+
+    if (executionTrace.length > 0) {
+      const traceLine = executionTrace.map(e => `${e.node}(${e.durationMs}ms)`).join(' -> ');
+      log.info(`[DocumentSubgraph] Trace: ${traceLine} -> END`);
+    }
+
+    const completedStep: ReasoningStep = {
+      step: "documentSubgraph",
+      status: planStatus === 'complete' ? "completed" : "error",
+      detail: `Document subgraph complete: ${actions.length} action(s), file: ${filePath || 'none'}`,
+    };
+
+    return {
+      finalResponse: fullResponse,
+      confidence: planStatus === 'complete' ? 0.9 : 0.3,
+      documentSessionId: sessionId,
+      documentFilePath: filePath,
+      documentPlanStatus: planStatus as "planning" | "executing" | "verifying" | "complete" | "failed" | "recovering",
+      documentExecutionTrace: executionTrace.map(e => ({
+        node: e.node,
+        enterMs: 0,
+        exitMs: e.durationMs,
+        durationMs: e.durationMs,
+        inputSummary: e.inputSummary,
+        outputSummary: e.outputSummary,
+      })),
+      uiPayloads: documentResult?.uiPayloads ?? [],
+      reasoningSteps: [inProgressStep, completedStep],
+    };
+  });
 }
 
-// === DESKTOP CONFIRMATION NODE (HITL Summary) ===
-// HITL confirmation is handled inside the custom ReAct loop (desktop-agent.ts).
-// This node serves as a summary checkpoint after the desktop agent finishes.
-// It logs the executed actions and can optionally trigger a post-execution review.
+// === POST-PROCESS NODE ===
+// Detects markdown tables and converts them to UIPayloads
+// Also detects comparison/form/chart patterns in text
 
-async function desktopConfirmationNode(state: AskStateType): Promise<Partial<AskStateType>> {
-  if (!state.desktopActions || state.desktopActions.length === 0) {
-    return { desktopActions: [] };
+async function postProcessNode(state: AskStateType): Promise<Partial<AskStateType>> {
+  log.debug("Post-processing response for UI payloads");
+
+  const uiPayloads: UIPayload[] = [...(state.uiPayloads || [])];
+  const finalResponse = state.finalResponse;
+
+  if (!finalResponse) {
+    return { uiPayloads };
   }
 
-  const logResult = createLogger("Graph");
-  logResult.debug(`Desktop confirmation: ${state.desktopActions.length} action(s) executed`);
+  // Detect markdown tables in content for Generative UI
+  const tableRegex = /\|(.+)\|[\s\S]*?\n\|[-\s|:]+\|[\s\S]*?\n((?:\|.+\|\n?)+)/g;
+  let tableMatch;
+  while ((tableMatch = tableRegex.exec(finalResponse)) !== null) {
+    const columns = tableMatch[1].split('|').filter(Boolean).map(c => c.trim());
+    const rows = tableMatch[2].trim().split('\n').map(row => {
+      const cells = row.split('|').filter(Boolean).map(c => c.trim());
+      const obj: Record<string, string> = {};
+      columns.forEach((col, i) => { obj[col] = cells[i] || ''; });
+      return obj;
+    });
 
-  const deniedActions = state.desktopActions.filter(a => a.result === 'denied_by_user');
-  if (deniedActions.length > 0) {
-    logResult.debug(`Desktop actions denied by user: ${deniedActions.map(a => a.type).join(', ')}`);
+    const existingTable = uiPayloads.find(p =>
+      p.type === 'table' &&
+      JSON.stringify(p.data.rows) === JSON.stringify(rows)
+    );
+    if (!existingTable) {
+      uiPayloads.push({
+        type: 'table',
+        title: 'Extracted Data',
+        data: { columns: columns.map(c => ({ key: c, label: c })), rows },
+        node: 'postProcessNode',
+      });
+    }
   }
 
-  // Clear desktopActions after processing so they don't accumulate across graph runs
-  return {
-    desktopActions: [],
-  };
+  // Detect comparison patterns in text (if no comparison UI payload exists)
+  const hasComparisonPayload = uiPayloads.some(p => p.type === 'comparison');
+  if (!hasComparisonPayload && /\b(vs\.?|versus|compared?\s+to|better\s+than|difference\s+between)\b/i.test(finalResponse)) {
+    try {
+      const structuredModel = chatModel.withStructuredOutput(comparisonOutputSchema, {
+        name: "comparisonOutput",
+        method: "jsonMode",
+      });
+
+      const parsed = await structuredModel.invoke([
+        new SystemMessage(`Extract structured comparison data from the following text.`),
+        new HumanMessage(finalResponse.slice(0, 2000)),
+      ]);
+
+      const criteriaWithKeys = parsed.criteria.map((c) => ({
+        key: c.key.toLowerCase().replace(/[\s+/]+/g, '_'),
+        label: c.label,
+      }));
+
+      const itemsAsRecord = parsed.items.map((item) => {
+        const attrs: Record<string, string> = {};
+        for (const a of item.attributes) {
+          const normKey = a.key.toLowerCase().replace(/[\s+/]+/g, '_');
+          attrs[normKey] = a.value;
+        }
+        return { name: item.name, attributes: attrs };
+      });
+
+      uiPayloads.push({
+        type: 'comparison',
+        title: parsed.title || 'Comparison',
+        data: { title: parsed.title || 'Comparison', criteria: criteriaWithKeys, items: itemsAsRecord },
+        node: 'postProcessNode',
+      });
+    } catch (err) {
+      log.debug("Failed to extract comparison data from text:", err);
+    }
+  }
+
+  // Detect form patterns in text (if no form UI payload exists)
+  const hasFormPayload = uiPayloads.some(p => p.type === 'form');
+  if (!hasFormPayload && /\b(form|config|configuration|settings|fields?)\b/i.test(finalResponse)) {
+    try {
+      const structuredModel = chatModel.withStructuredOutput(formOutputSchema, {
+        name: "formOutput",
+        method: "jsonMode",
+      });
+
+      const parsed = await structuredModel.invoke([
+        new SystemMessage(`Extract structured form data from the following text.`),
+        new HumanMessage(finalResponse.slice(0, 2000)),
+      ]);
+
+      const normalizedFields = parsed.fields.map((f) => ({
+        name: f.name.toLowerCase().replace(/[\s-]+/g, "_").replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
+        label: f.label,
+        type: f.type,
+        value: f.value,
+        ...(f.options && f.options.length > 0 && { options: f.options }),
+        ...(f.required !== undefined && { required: f.required }),
+      }));
+
+      uiPayloads.push({
+        type: 'form',
+        title: parsed.title || 'Configuration Form',
+        data: { title: parsed.title || 'Configuration Form', targetUrl: parsed.targetUrl, fields: normalizedFields },
+        node: 'postProcessNode',
+      });
+    } catch (err) {
+      log.debug("Failed to extract form data from text:", err);
+    }
+  }
+
+  // Detect chart patterns in text (if no chart UI payload exists)
+  const hasChartPayload = uiPayloads.some(p => p.type === 'chart');
+  if (!hasChartPayload && /\b(chart|graph|data\s+points|statistics|metrics)\b/i.test(finalResponse)) {
+    try {
+      const structuredModel = chatModel.withStructuredOutput(chartOutputSchema, {
+        name: "chartOutput",
+        method: "jsonMode",
+      });
+
+      const parsed = await structuredModel.invoke([
+        new SystemMessage(`Extract structured chart data from the following text.`),
+        new HumanMessage(finalResponse.slice(0, 2000)),
+      ]);
+
+      const validData = parsed.data.filter(
+        (d) => typeof d.value === "number" && isFinite(d.value)
+      );
+
+      uiPayloads.push({
+        type: 'chart',
+        title: parsed.title || 'Chart Visualization',
+        data: {
+          title: parsed.title || 'Chart Visualization',
+          chartType: parsed.chartType,
+          description: parsed.description || '',
+          data: validData,
+          xKey: parsed.xKey || 'name',
+          yKey: parsed.yKey || 'value',
+        },
+        node: 'postProcessNode',
+      });
+    } catch (err) {
+      log.debug("Failed to extract chart data from text:", err);
+    }
+  }
+
+  return { uiPayloads };
 }

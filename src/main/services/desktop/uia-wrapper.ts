@@ -33,6 +33,31 @@ const FIND_CHILDREN_ROOT_PS = (maxCount: number) => [
   'Write-Output ($results -join "\\n")',
 ].join('\n');
 
+const FIND_CHILDREN_OF_ELEMENT_PS = (handle: string, maxCount: number) => [
+  `param([string]$Handle = "${handle}", [int]$MaxCount = ${maxCount})`,
+  'Add-Type -AssemblyName UIAutomationClient',
+  'try {',
+  '  $hwnd = [IntPtr][Convert]::ToInt64($Handle, 16)',
+  '  $element = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)',
+  '  if ($element -eq $null) { exit 0 }',
+  '  $condition = [System.Windows.Automation.Condition]::TrueCondition',
+  '  $children = $element.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)',
+  '  $results = @()',
+  '  $count = 0',
+  '  foreach ($child in $children) {',
+  '    if ($count -ge $MaxCount) { break }',
+  '    $name = $child.Current.Name',
+  '    if ([string]::IsNullOrWhiteSpace($name)) { continue }',
+  '    $r = $child.Current.BoundingRectangle',
+  '    $results += "$($name)|$($child.Current.ControlType.ProgrammaticName.Split(\'.\')[-1])|$($r.Left),$($r.Top),$($r.Width),$($r.Height)|$($child.Current.IsEnabled)|$($child.Current.HasKeyboardFocus)|$($child.Current.AutomationId)|$($child.Current.ClassName)|$($child.Current.HelpText)"',
+  '    $count++',
+  '  }',
+  '  Write-Output ($results -join "\\n")',
+  '} catch {',
+  '  exit 0',
+  '}',
+].join('\n');
+
 const GET_ELEMENT_AT_POINT_PS = (x: number, y: number) => [
   `param([int]$X = ${x}, [int]$Y = ${y})`,
   'Add-Type -AssemblyName UIAutomationClient',
@@ -120,6 +145,25 @@ export async function getFocusedElementViaAutomation(): Promise<UIAElement | nul
 
 export async function findChildrenOfRoot(maxCount: number = 50): Promise<UIAElement[]> {
   const script = FIND_CHILDREN_ROOT_PS(maxCount);
+  const output = await runPowerShellScript(script);
+  if (!output) return [];
+
+  const lines = output.split('\\n').filter(l => l.trim());
+  const elements: UIAElement[] = [];
+
+  for (const line of lines) {
+    const element = parseElementLine(line);
+    if (element) {
+      elements.push(element);
+    }
+  }
+
+  return elements;
+}
+
+export async function getChildrenOfElementViaAutomation(handle: string, maxCount: number = 50): Promise<UIAElement[]> {
+  if (!handle) return [];
+  const script = FIND_CHILDREN_OF_ELEMENT_PS(handle, maxCount);
   const output = await runPowerShellScript(script);
   if (!output) return [];
 

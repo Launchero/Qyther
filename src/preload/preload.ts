@@ -336,6 +336,13 @@ export const electronAPI = {
         ipcRenderer.removeListener('desktop:confirmation-request', handler);
       };
     },
+    onAgentChange: (callback: (data: { label: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { label: string }) => callback(data);
+      ipcRenderer.on('chat:agent-change', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:agent-change', handler);
+      };
+    },
   },
 
   // Browser Automation API

@@ -60,6 +60,7 @@ export interface ChatMessage {
   uiPayloadType?: GenerativeUIType;
   uiGenerationProgress?: number;
   uiProgressMessage?: string;
+  agent?: { label: string } | null;
 }
 
 export interface ChatSession {
@@ -78,6 +79,10 @@ interface DesktopConfirmationState {
   planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
 }
 
+interface AgentInfo {
+  label: string;
+}
+
 interface UseChatSessionReturn {
   sessionId: string | null;
   messages: ChatMessage[];
@@ -86,6 +91,7 @@ interface UseChatSessionReturn {
   isReady: boolean;
   thinkingSteps: ThinkingStep[];
   confidence: number | null;
+  activeAgent: AgentInfo | null;
   desktopConfirmation: DesktopConfirmationState | null;
   sendMessage: (content: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => Promise<void>;
   submitForm: (formTitle: string, formData: Record<string, unknown>) => Promise<void>;
@@ -106,6 +112,7 @@ export function useChatSession(): UseChatSessionReturn {
   const [isReady, setIsReady] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [confidence, setConfidence] = useState<number | null>(null);
+  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null);
   const [desktopConfirmation, setDesktopConfirmation] = useState<DesktopConfirmationState | null>(null);
 
   useEffect(() => {
@@ -352,6 +359,28 @@ export function useChatSession(): UseChatSessionReturn {
     return cleanup;
   }, []);
 
+  // Agent change listener — tracks which LangGraph agent is currently active
+  useEffect(() => {
+    const cleanup = window.electronAPI.chat.onAgentChange((data: { label: string }) => {
+      setActiveAgent({ label: data.label });
+      // Also attach to the current streaming message so it persists
+      setMessages(msgs => {
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.isStreaming) {
+          const updated = [...msgs];
+          updated[msgs.length - 1] = {
+            ...lastMsg,
+            agent: { label: data.label },
+          };
+          return updated;
+        }
+        return msgs;
+      });
+    });
+
+    return cleanup;
+  }, []);
+
   // Desktop confirmation request listener
   useEffect(() => {
     const cleanup = window.electronAPI.chat.onDesktopConfirmationRequest((data: {
@@ -564,6 +593,7 @@ export function useChatSession(): UseChatSessionReturn {
     isReady,
     thinkingSteps,
     confidence,
+    activeAgent,
     desktopConfirmation,
     sendMessage,
     submitForm,

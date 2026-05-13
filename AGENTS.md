@@ -9,10 +9,15 @@
 ## Essential Commands
 
 ```bash
-npm run dev        # Start dev server
-npm run build      # Build for production
-npm run typecheck  # TypeScript check
-npm run lint       # ESLint check
+npm run dev           # Start dev server
+npm run build         # Build for production
+npm run preview       # Preview production build
+npm run typecheck     # TypeScript check
+npm run lint          # ESLint check
+npm run test          # Run tests
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Run tests with coverage
+npm run build:win     # Build Windows installer
 ```
 
 ## Critical Constraints
@@ -28,6 +33,15 @@ npm run lint       # ESLint check
 - IPC handlers: `src/main/ipc/handlers.ts`
 - Custom hook: `src/renderer/hooks/useKeyboard.ts`
 
+## Key Dependencies
+
+- **AI/LLM**: LangGraph, LangChain, OpenAI SDK, MCP SDK
+- **Database**: better-sqlite3
+- **UI**: Radix UI, shadcn/ui, CVA, Recharts, Phosphor Icons
+- **Validation**: Zod v4
+- **Search**: Fuse.js
+- **Windows Native**: libwin32, koffi
+
 ## Web & MCP Tools
 
 - Use WebSearch for current info (2025-2026)
@@ -37,27 +51,19 @@ npm run lint       # ESLint check
 
 ## Karpathy Principles
 
-### 12 Core Operating Principles (from Andrej Karpathy, 2026)
+### Core Operating Principles (from Andrej Karpathy, 2026)
 
 1. **Sync in macro actions** - Think in features, not lines. Delegate whole features, review system-level.
-2. **Skill issue first** - When agents fail, fix instructions/context before fixing code.
-3. **Remove yourself as bottleneck** - Autonomous loops > interactive sessions.
-4. **Muscle memory for orchestration** - Parallel agents, batch review rhythm.
-5. **Instructions as tunable code** - SKILL.md files are code you iterate on.
-6. **Replace apps with agent API glue** - Natural language over manual UIs.
-7. **Persistent looping setups** - Run overnight, keep what works.
-8. **Jagged model improvements** - Know agent blind spots, design around them.
-9. **Context engineering over implementation** - Context quality dominates output.
-10. **Simplicity bias** - "All else equal, simpler is better." No speculative code.
-11. **Bounded autonomy** - Maximum freedom within tight constraints.
-12. **Instruction-first development** - Write intent before opening editor.
+2. **Instructions as tunable code** - SKILL.md files are code you iterate on.
+3. **Context engineering over implementation** - Context quality dominates output.
+4. **Simplicity bias** - "All else equal, simpler is better." No speculative code.
+5. **Bounded autonomy** - Maximum freedom within tight constraints.
+6. **Instruction-first development** - Write intent before opening editor.
 
 ### Skill Navigation
 
-
 | Situation | Use This Skill |
-| ----------------------------------------- | ------------------------------------------------ |
-| Agent produced wrong output | `skill-issue-diagnosis` |
+|---|---|
 | **Executing approved plan (DEFAULT)** | `plan-executor-orchestrator` |
 | Sequential subagent handoff & verification | `agent-handoff-verification` (rule) |
 | Electron main process / architecture | `electron-core` |
@@ -66,25 +72,20 @@ npm run lint       # ESLint check
 | Security best practices | `electron-react-security` |
 | Performance optimization | `electron-react-performance` |
 | Component design patterns | `electron-react-components` |
-| Library API research | `context7-integration` |
-| Browser UI testing | `browser-use-testing` |
 | Electron-vite build config | `electron-react-build` |
 | React 19 state patterns | `electron-react-state` |
-| Parallel Context7 research | `context7-parallel-research` |
+| Testing patterns | `electron-react-testing` |
 | LangGraph StateGraph / research agent | `langgraph-agent-patterns` |
 | MCP server integration (tool calling) | `mcp-server-integration` |
 | Structured LLM output to React components | `generative-ui-components` |
-| Cost tracking, source citations, trust | `source-transparency` |
 | Electron data persistence (SQLite, better-sqlite3) | `electron-data` |
 | Electron performance profiling | `electron-performance` |
 | TypeScript type patterns | `typescript-core` |
 | TypeScript performance optimization | `typescript-performance` |
 | TypeScript security patterns | `typescript-security` |
 | TypeScript UI patterns | `typescript-ui` |
-| Session data analysis (SQLite narratives) | `session-analytics` |
 | Raw SQLite patterns (hooks state) | `sqlite-patterns` |
 | Windows-specific hook development | `cursor-hooks-windows-dev` |
-
 
 ### Simplicity Rules (Enforced)
 
@@ -96,15 +97,13 @@ npm run lint       # ESLint check
 
 ### Bounded Autonomy Defaults
 
-
-| Constraint      | Default                 |
+| Constraint | Default |
 | --------------- | ----------------------- |
 | Scope           | 1-3 files max per agent |
 | Time budget     | 300s per experiment     |
 | Metric          | One unambiguous metric  |
 | Rollback        | Git reset on failure    |
-| Max experiments | 100 (standard)          |
-
+| Max experiments | 100 (standard) |
 
 ## UI & Design System
 
@@ -135,21 +134,11 @@ Key rules: NEVER hardcode pixel values or OKLCH colors. ALWAYS use `var(--token-
 
 ### Best Practices
 
-- ✅ ALWAYS use design tokens (see Token Usage Rules above)
-- ✅ Use semantic color tokens (`bg-primary`, not `bg-blue-500`)
-- ✅ Create wrapper components for domain-specific logic in `components/common/`
-- ✅ Preserve all ARIA attributes from Radix
-- ✅ Lazy load heavy components (Dialog, Sheet, Calendar, Chart)
-- ❌ NEVER use arbitrary values (e.g., `h-[44px]`, `rounded-[10px]`)
-- ❌ NEVER hardcode OKLCH colors in components
-- ❌ Don't modify base components directly (use wrappers)
-- ❌ Don't put business logic in `components/ui/`
-- ❌ Don't remove accessibility attributes
+- Use semantic color tokens (`bg-primary`, not `bg-blue-500`)
+- Create wrapper components for domain-specific logic in `components/common/`
+- Lazy load heavy components (Dialog, Sheet, Calendar, Chart)
+- See `@design-tokens-enforcement` rule for complete token usage rules and drift prevention
 
 ### Documentation
 
 - See `design-systems/SHADCN-DESIGN-SYSTEM.md` for design system guide (audited for accuracy)
-
-## Auto-Update Rule
-
-This file is automatically maintained by Cursor subagents. Before updating, subagents MUST reference `@AGENT-INSTRUCTION-BEST-PRACTICES.md` to ensure minimal, relevant context only.

@@ -2678,6 +2678,89 @@
   }
 
   /* ========================================================================
+     AGENT INDICATOR — multi-agent routing label with pulse dot
+     ======================================================================== */
+
+  .agent-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    padding: var(--spacing-1) var(--spacing-2);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    line-height: 1;
+    white-space: nowrap;
+    transition: all var(--duration-200) var(--easing-smooth);
+  }
+
+  .agent-indicator__label {
+    font-weight: var(--font-medium);
+  }
+
+  .agent-indicator__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .agent-indicator__dot--pulse {
+    animation: agentPulse 2s ease-in-out infinite;
+  }
+
+  .agent-indicator--research {
+    background: color-mix(in oklch, var(--color-blue-500) 12%, transparent);
+    color: var(--color-blue-500);
+  }
+  .agent-indicator--research .agent-indicator__dot {
+    background: var(--color-blue-500);
+  }
+
+  .agent-indicator--general {
+    background: color-mix(in oklch, var(--color-green-500) 12%, transparent);
+    color: var(--color-green-500);
+  }
+  .agent-indicator--general .agent-indicator__dot {
+    background: var(--color-green-500);
+  }
+
+  .agent-indicator--browser {
+    background: color-mix(in oklch, var(--color-purple-500) 12%, transparent);
+    color: var(--color-purple-500);
+  }
+  .agent-indicator--browser .agent-indicator__dot {
+    background: var(--color-purple-500);
+  }
+
+  .agent-indicator--desktop {
+    background: color-mix(in oklch, var(--color-yellow-500) 12%, transparent);
+    color: var(--color-yellow-500);
+  }
+  .agent-indicator--desktop .agent-indicator__dot {
+    background: var(--color-yellow-500);
+  }
+
+  .agent-indicator--document {
+    background: color-mix(in oklch, var(--color-orange-500) 12%, transparent);
+    color: var(--color-orange-500);
+  }
+  .agent-indicator--document .agent-indicator__dot {
+    background: var(--color-orange-500);
+  }
+
+  @keyframes agentPulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.4;
+      transform: scale(1.4);
+    }
+  }
+
+  /* ========================================================================
      CHIP FILE TYPE INDICATORS
      ======================================================================== */
   .chip-icon {
