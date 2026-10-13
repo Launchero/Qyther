@@ -1,0 +1,14 @@
+# Issue chooser for Qyther.
+#
+# There is no public support forum for this project: GitHub Discussions is not
+# enabled on this repository, and no email address has been published. The two
+# issue forms in this directory are the supported entry points, plus the
+# private security path below.
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution and setup guide
+    url: https://github.com/Launchero/Qyther/blob/HEAD/CONTRIBUTING.md
+    about: Read this first for build steps, the real state of the test suite, and the two manual sync rules that break silently.
+  - name: Reporting a security problem
+    url: https://github.com/Launchero/Qyther/blob/HEAD/SECURITY.md
+    about: Qyther's AI agent can drive your real desktop. Use private vulnerability reporting instead of a public issue for anything exploitable.

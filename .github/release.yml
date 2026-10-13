@@ -1,0 +1,22 @@
+changelog:
+  # Pull requests carrying any of these labels are left out of the
+  # auto-generated release notes.
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: New features
+      labels:
+        - enhancement
+        - feature
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Technical maintenance
+      labels:
+        - "*"

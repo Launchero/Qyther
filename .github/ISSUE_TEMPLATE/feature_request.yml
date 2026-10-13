@@ -1,0 +1,87 @@
+name: Feature request
+description: Propose a new capability or a change to how an existing one behaves.
+title: "[feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are read, but this is a small project with a specific shape: a Windows-only, always-on-top palette whose agents can drive the real desktop. Requests are most likely to land when they describe a user-facing problem in that shape rather than a feature list.
+
+        Before writing: skim `AGENTS.md` at the repository root and the `AGENTS.md` for the subtree you care about (`src/main/services/`, `src/renderer/`). Several things that look missing are documented as deliberately absent — there is no macOS or Linux packaging, no mock/offline LLM path, no MCP *server* in this repo, and no store library in the renderer.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The user-facing problem
+      description: Describe what you cannot do today, and the cost of not being able to do it. Do this before proposing a solution; a good problem statement may be solved a better way.
+      placeholder: |
+        When I ask the desktop agent to rename a batch of files, it must click through File
+        Explorer one file at a time, and every rename raises a confirmation. I give up and do
+        it by hand.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Which mode or surface it belongs to
+      description: This decides which subtree owns the work and which `AGENTS.md` contract applies.
+      options:
+        - Files (palette, file search, commands, window or tray behaviour)
+        - Ask (classification, streaming answer, generative UI)
+        - Browser agent
+        - Desktop automation agent
+        - Document generation agent
+        - MCP servers or tools
+        - Build, packaging or install
+        - Cross-cutting or unclear
+    validations:
+      required: true
+  - type: textarea
+    id: ideal
+    attributes:
+      label: What you would want to happen
+      description: Concrete behaviour, ideally as a short interaction. One example is worth more than five bullet points.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead, and what you considered
+      description: Workarounds you are living with, and any approach you rejected plus why.
+    validations:
+      required: false
+  - type: checkboxes
+    id: surface
+    attributes:
+      label: Does this need new native or Win32 surface
+      description: Check all that apply. New Win32 reach means new coupled edits (`DesktopAdapter`, its implementation in `src/main/services/desktop/input-simulation.ts`, a tool, a danger-policy entry) and it is the highest-maintenance kind of change in this repository.
+      options:
+        - label: It needs a new Win32, UIA or FFI call that no current tool exposes.
+          required: false
+        - label: It needs a new LLM-callable desktop tool (that is six coupled edits, see src/main/services/desktop/AGENTS.md).
+          required: false
+        - label: It needs a new IPC channel (that is four hand-synced sites, see src/main/ipc/AGENTS.md).
+          required: false
+        - label: It needs a new MCP server or external child process.
+          required: false
+        - label: It is renderer-only, or documentation-only.
+          required: false
+        - label: None of these — it is a behaviour or prompt change inside existing surface.
+          required: false
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and reversibility, if you can judge it
+      description: Does the request widen what the agent can do to the machine, or change what leaves the machine to a model endpoint? If so, say how it should be gated (safe, reviewable, dangerous) and whether it needs its own confirmation.
+    validations:
+      required: false
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this, and I have read CONTRIBUTING.md including the read-before-edit and update-after-edit rule for `AGENTS.md`.
+          required: false
+        - label: I am only describing the problem; someone else should own the implementation.
+          required: false

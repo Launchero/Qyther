@@ -1,0 +1,124 @@
+name: Bug report
+description: Report something that does not work as documented.
+title: "[bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a detailed report.
+
+        Before you post: this application's AI modes can drive your real desktop, so **logs and screenshots can leak personal file paths, window titles, document names and clipboard content**. Redact anything you would not want public, and never paste your `API_KEY`, `BASE_URL`, `TAVILY_API_KEY` or MCP server environment values. If the problem is a security problem, do not open a public issue — read `SECURITY.md` and use private vulnerability reporting.
+
+        Note that this repository has no published binaries. If you are running a build you made yourself, say so and give the commit.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: One or two sentences, in plain terms. Save the detail for the fields below.
+      placeholder: The palette window does not appear when I press Alt+Space, but the tray icon is present.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Exact steps
+      description: Numbered, starting from a fresh launch of `npm run dev` or from the installed build. Include the text you typed or the request you gave the agent.
+      placeholder: |
+        1. Launch the app with `npm run dev`
+        2. Press Alt+Space
+        3. Type `report.docx`
+        4. Press Enter on the first result
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: Point at the sentence in the documentation or the behaviour you relied on, if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include timing, whether it is intermittent, and what you saw instead (nothing, an error banner, a stuck progress state, a wrong file).
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Which mode or surface is involved
+      description: Pick every one that applies. Files is the palette search tab; Ask is the AI tab; the other three are agent paths reached from Ask.
+      multiple: true
+      options:
+        - Files (palette, file search, commands, window or tray behaviour)
+        - Ask (classification, streaming answer, generative UI)
+        - Browser agent
+        - Desktop automation agent
+        - Document generation agent
+        - MCP servers or tools
+        - Build, packaging or install
+    validations:
+      required: true
+  - type: dropdown
+    id: hitl
+    attributes:
+      label: Did a human-in-the-loop confirmation appear, and what did you choose
+      description: Relevant for desktop and document paths, where non-safe actions interrupt for approval. This changes how the problem must be read.
+      options:
+        - No confirmation dialog appeared
+        - A confirmation appeared and I approved it
+        - A confirmation appeared and I denied it
+        - A confirmation appeared and the app hung or ignored my choice
+        - Not applicable to this mode
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Reproduce with logging switched on and paste the lines around the failure. Set `LOG_LEVEL=debug` for everything, or a per-subsystem switch to `true` for just one area. The switches that exist in `src/main/utils/logger.ts` are `LOG_APP` (app, tray, shortcuts, platform, preferences), `LOG_WINDOW`, `LOG_IPC`, `LOG_CHAT`, `LOG_BROWSER`, `LOG_MCP`, `LOG_LANGCHAIN`, `LOG_GRAPH`, `LOG_SEARCH` (Everything CLI and document loader), `LOG_DESKTOP`, `LOG_DB`. The renderer has its own level, `VITE_LOG_LEVEL`.
+
+        ```
+        set LOG_LEVEL=debug && set LOG_DESKTOP=true && npm run dev
+        ```
+
+        Redact paths and window titles before posting.
+      render: text
+      placeholder: |
+        [12:04:31] [DesktopAgent] HITL interrupt for close_window
+        [12:04:33] [DesktopAgent] verifier score 0.21 — hard reject
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows edition and build
+      description: From `systeminfo` (look for OS Name and OS Version) or Settings > System > About > Windows specifications. This app is Windows-only, so the build matters for the native input and UIA paths.
+      placeholder: Windows 11 Pro, 23H2, build 22631.3007
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Qyther build or commit
+      description: The commit you are running (`git rev-parse --short HEAD`), or the installer file name if you built a package with `npm run build:win`. Also state your Node version (`node --version`).
+      placeholder: 42cf68b, Node 24.x, built from source with npm run dev
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues and did not find this one.
+          required: true
+        - label: I redacted file paths, window titles, and any API keys from what I pasted.
+          required: true
+        - label: I am reporting a defect against documented behaviour, not a security problem.
+          required: true
+        - label: I read CONTRIBUTING.md and know that a passing `npm run test` is not evidence this is covered.
+          required: false

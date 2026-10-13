@@ -1,0 +1,92 @@
+# Continuous integration for Qyther: lint, test, typecheck, build, and the design
+# token drift greps.
+#
+# Two prerequisites had to be fixed before this file could mean anything, and both
+# are now in the tree: `npm ci` used to abort on a peer-dependency conflict (the
+# unused @langchain/community pulled an optional peer pinned to zod@3 against this
+# project's zod@4), and `npm run typecheck` used to fail because tsconfig.json set
+# `ignoreDeprecations: "6.0"` plus `baseUrl`, both rejected by TypeScript 6.0. The
+# install conflict is documented in .npmrc, which is tracked on purpose.
+#
+# Failures are deliberately not masked: there is no `continue-on-error` and no
+# `|| true` anywhere in this file. A green run here means the gates actually
+# passed. Note also that `npm run test` collects only two test files, neither of
+# which imports production code, so a passing test step is weak evidence — see
+# CONTRIBUTING.md.
+
+name: CI checks
+
+on:
+  push:
+    branches:
+      - agent-handoff/apr16-desktop-input-redesign
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref; a new push replaces the run in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # windows-latest is mandatory, not a preference: koffi, libwin32 and
+    # node-winautomation are Windows-native modules, the global hotkey path uses
+    # a Win32 keyboard hook, and the app ships Windows-only NSIS packaging.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Design token drift check
+        # The three greps from src/renderer/styles/AGENTS.md. The first is a
+        # census for the reviewer to read in the log; the second and third are
+        # hard rules, so they fail the job: no OKLCH or other colour literal may
+        # appear inside components, and exactly one `@theme inline` block may
+        # exist in src/ (it belongs to styles/semantic/theme.css:18).
+        # `shell: bash` because windows-latest ships Git Bash; the repo's greps
+        # are written in bash syntax. Scoped to source extensions so quoted grep
+        # patterns inside AGENTS.md files cannot trip the check.
+        shell: bash
+        run: |
+          set -u
+          echo "Census of bracket-value utilities in src/renderer/components (each must be -[var(--token)] or a documented non-token value):"
+          grep -rn --include='*.ts' --include='*.tsx' --include='*.css' "\-\[" src/renderer/components/ | wc -l
+
+          echo "Colour literals inside components (must be none):"
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' "oklch(" src/renderer/components/; then
+            echo "FAIL: a colour literal appeared in src/renderer/components. Colours belong in src/renderer/styles/tokens/."
+            exit 1
+          fi
+
+          echo "Registering \`@theme inline\` blocks in src (must be exactly one, styles/semantic/theme.css:18):"
+          inline_blocks=$(grep -rl --include='*.css' "@theme inline" src/ | wc -l)
+          if [ "$inline_blocks" -ne 1 ]; then
+            grep -rn --include='*.css' "@theme inline" src/
+            echo "FAIL: expected 1 @theme inline block, found $inline_blocks. A second one means the token layering is broken."
+            exit 1
+          fi
+
+          echo "Drift checks passed: no colour literals in components, one @theme inline block."

@@ -1,0 +1,51 @@
+# Dependabot version updates for Qyther.
+#
+# Kept conservative on purpose. Patch and minor bumps are collapsed into one
+# grouped pull request per ecosystem so the review surface stays small; major
+# bumps stay individual PRs because this repo has three Windows-native modules
+# (koffi, libwin32, node-winautomation) plus sql.js, where a major can change
+# the electron-rebuild story. Five open PRs maximum on the npm side.
+#
+# Note that a green `npm run test` here proves little (see CONTRIBUTING.md), so a
+# Dependabot PR is not safe to merge on CI colour alone — read the diff and check
+# the release notes for anything touching the native or LangChain packages.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      prefix-development: dev/deps
+      include: scope
+    groups:
+      npm-patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - version-update:semver-patch
+      npm-minor-updates:
+        patterns:
+          - "*"
+        update-types:
+          - version-update:semver-minor
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions-patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
