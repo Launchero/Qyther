@@ -19,7 +19,7 @@ import { getAskGraph } from './services/langgraph/research-agent';
 import { execSync } from 'child_process';
 import { createLogger } from './utils/logger';
 
-// Polyfill Node.js globals for ESM compatibility (required by better-sqlite3)
+// Polyfill Node.js globals for ESM compatibility (used by native `bindings` lookups)
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 globalThis.__filename = fileURLToPath(import.meta.url);

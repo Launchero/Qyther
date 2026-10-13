@@ -4,7 +4,8 @@ import type { DynamicStructuredTool } from "@langchain/core/tools";
 import { loadPreferences } from "../../preferences";
 import { createLogger } from "../../utils/logger";
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 const log = createLogger('MCP');
 
@@ -19,8 +20,11 @@ interface MCPConfigFile {
   mcpServers: Record<string, MCPServerConfig>;
 }
 
-// Resolve project root (parent of src/main/services/mcp)
-const PROJECT_ROOT = join(__dirname, "../../../../..");
+// Resolve project root. The main bundle is emitted as a single out/main/main.js, so
+// import.meta.url points at the bundle directory, not at this source file. Bare
+// `__dirname` cannot be used here: main.ts installs its global polyfill after this
+// module is evaluated, so it is still undefined at module scope.
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const MCP_CONFIG_PATH = join(PROJECT_ROOT, "mcp-config.json");
 
 export class MCPService {
