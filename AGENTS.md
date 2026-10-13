@@ -22,11 +22,12 @@ DOX is installed here. AGENTS.md files are binding work contracts for their subt
 
 ## Stack (verified against this checkout)
 
-- Electron 42, React 19, TypeScript 6.0, Vite 8, Tailwind v4, Zod v4 (`package.json:124-160`)
-- Global shortcut: Alt+Space. Performance target: <500ms cold start.
-- Windows native: `koffi`, `libwin32`, `node-winautomation` — these are the only three native modules that must stay in the build externals list (`electron.vite.config.ts:61`)
-- Persistence: `sql.js` (`src/main/services/database/database-manager.ts:8`). `better-sqlite3` is declared in `package.json` and imported by nothing — do not use it or cite it as the storage layer
-- Also declared but imported by nothing: `openai`, `fuse.js`, `langsmith`, `clipboard-event`, `@langchain/community`. LLM access is `@langchain/openai`
+- Electron 42, React 19, TypeScript 6.0, Vite 8, Tailwind v4, Zod v4 (`package.json`)
+- Global shortcut: Alt+Space. Performance target: <500ms cold start — **aspirational, never measured**; there is no instrumentation in the repo, so do not state it as a result.
+- Build externals (`electron.vite.config.ts` `rollupOptions.external`) are the seven entries there: `electron`, `koffi`, `libwin32`, `tesseract.js`, `tesseract.js-core`, `node-winautomation`, `@aws-sdk/client-s3`. The last one is not a dependency — unzipper's optional S3 opener `require`s it and rolldown fails the build if it tries to bundle an absent module, so it is externalised instead of installed.
+- Persistence: `sql.js` (`src/main/services/database/database-manager.ts`). There is no `better-sqlite3` in `package.json` any more — it was declared, imported by nothing, and removed. Never cite it as the storage layer.
+- Also removed as never-imported: `@langchain/community` (its optional peer pinned zod@3 and broke `npm install`), `@aws-sdk/client-s3`, `@langchain/langgraph-checkpoint-sqlite`, `@modelcontextprotocol/sdk` (still present transitively via `@langchain/mcp-adapters`, which is the only MCP import in `src/`), `langchain`, `langsmith`, `uuid`, `fuse.js`, `clipboard-event`, `@radix-ui/react-slot` (the `radix-ui` barrel is what is imported), plus the dead dev deps. LLM access is `@langchain/openai`.
+- `.npmrc` is tracked and sets `legacy-peer-deps=true`: latest-stable `electron-vite` peers `vite ^5–^7` while this project builds on Vite 8, which `vitest`/`@vitejs/plugin-react`/`vite-tsconfig-paths` all require. Remove the file when electron-vite accepts Vite 8. `package.json` is `"private": true`.
 - Document generation: `docx`, `pptxgenjs`, `xlsx`, `mammoth`, `pdf-parse`, `unzipper`; OCR: `tesseract.js`; UI: `radix-ui` barrel, `class-variance-authority`, `recharts`, `@phosphor-icons/react`
 
 ## Essential Commands
@@ -44,9 +45,10 @@ npm run build:win      # electron-builder NSIS x64 installer
 npm run build:win:dir  # unpacked dir build
 npm run generate-icons # node scripts/generate-icons.js
 npm run install-playwright # npx playwright install chromium (needed by the Playwright MCP browser agent)
+node scripts/capture-ui.mjs  # regenerate docs/assets/screenshots from the running app (start `npm run dev` first)
 ```
 
-`node_modules` is not committed; `typecheck`, `lint` and `test` need `npm install` first. Native deps (`koffi`, `node-winautomation`, `sql.js`) require a rebuild step on a fresh Windows checkout — `npx electron-rebuild`.
+`node_modules` is not committed; `typecheck`, `lint` and `test` need `npm install` first, which now resolves out of the box thanks to the tracked `.npmrc`. `koffi` ships win32_x64 binaries and `sql.js` is pure JS + wasm, so neither needs compiling; `node-winautomation` is a node-gyp addon and requires the Visual Studio "Desktop development with C++" workload — without it `npm install` fails on that one package, and the UIA-backed desktop tools are the only casualty. `npx electron-rebuild` is still the right step when an addon must be rebuilt against Electron's ABI.
 
 ## Repo-Wide Invariants
 
@@ -56,16 +58,17 @@ npm run install-playwright # npx playwright install chromium (needed by the Play
 - **Sandbox is on**: `app.enableSandbox()` (`main.ts:40`) with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` (`windows.ts:62-64`). Preload compiles to CJS and is loaded as `../preload/preload.cjs`. Dev-only relaxations: remote-debugging port 9222 (`main.ts:53`).
 - **No `requestSingleInstanceLock` and no blur-to-hide exist in this codebase.** Window hide happens on `close` (`windows.ts:104-111`) and `window:hide` (`handlers.ts:49`). Do not document either as current behaviour.
 - **New logger subsystems need a registry entry.** An unregistered name in `createLogger('<Subsystem>')` inherits `globalLevel`, which defaults to `error` in production (`src/main/utils/logger.ts:41-49,92-96`), so its `info`/`debug` lines never appear and no env switch can enable them. Add a `SUBSYSTEM_ENV_VARS` entry (`logger.ts:57-84`) — none of the `Document*` logger names and most `Browser*` names are registered today. Same coupling for LangGraph node labels: `NODE_AGENT_MAP` (`src/main/ipc/chat-handlers.ts:32-38`) and the token-emitting `responseNodes` whitelist (`chat-handlers.ts:400-403`, duplicated at `:720-723`) — a new node missing either streams nothing, with no error.
-- **Non-code runtime resources are not packaged by default.** `electron.vite.config.ts:11-49` copies only `sql-wasm.wasm` and `Automation.node` into `out/main`, and `package.json:39-42` ships `out/**/*` plus `package.json`. Anything else read from disk at runtime — notably `src/main/services/browser/skills/` — silently disappears in a production build. Adding a copy step requires an explicit request.
+- **Non-code runtime resources are not packaged by default.** `electron.vite.config.ts` copies only `sql-wasm.wasm` and `Automation.node` into `out/main`, and `package.json` ships `out/**/*` plus `package.json`. Anything else read from disk at runtime — notably `src/main/services/browser/skills/` — silently disappears in a production build. Adding a copy step requires an explicit request. `mcp-config.json` is deliberately **untracked** (gitignored) and is created from `mcp-config.example.json`; a missing file is a warn-and-continue path, not a crash.
+- **README screenshots and brand art are generated, never hand-made.** `docs/assets/screenshots/` comes from `scripts/capture-ui.mjs`, which attaches to the dev CDP port and drives the live window; `docs/assets/brand/` renders from the HTML under `docs/assets/brand/src/`. The capture harness refuses to write any frame whose file-search rows fall outside this repository — Everything indexes every drive, so a naive capture leaks personal paths. Re-run the harness after any UI change; do not edit the PNGs.
 - **`.cursor/` does not exist** (gitignored at `.gitignore:82`). Never add `@design-tokens-enforcement`, `.cursor/rules/*` or `.cursor/skills/*` references — every such reference in this repo's older docs is dangling.
-- **No browser tool is declared in this repo.** The browser agent drives Chromium through the Playwright MCP server (`mcp-config.json:15-24`) and selects tools by name prefix at runtime. Never hard-code a browser tool count.
+- **No browser tool is declared in this repo.** The browser agent drives Chromium through the Playwright MCP server (see the `playwright` entry in `mcp-config.example.json`; the live `mcp-config.json` is untracked) and selects tools by name prefix at runtime. Never hard-code a browser tool count.
 - **Desktop automation is the only in-repo tool registry**: 32 tools (`src/main/services/desktop/desktop-tools.ts`), each requiring six coupled edits documented in `src/main/services/desktop/AGENTS.md`. Docs citing 26 or 28 tools are stale.
 
 ## Documentation Authority
 
-Authoritative: this file, `overall-architecture.md` (correct "28 tools" to 32 before citing), `design-systems/SHADCN-DESIGN-SYSTEM.md`, `docs/desktop-agent-gap-analysis.md` (roadmap, not inventory).
+Authoritative: this file; `README.md` (public-facing, rewritten 2026-10-13 against this checkout — every count in it is re-derivable, see its own grep block); `docs/architecture.md` (live deep reference); `docs/diagrams/` (Mermaid sources are truth, SVGs are renders); `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`; `overall-architecture.md` (correct "28 tools" to 32 before citing); `design-systems/SHADCN-DESIGN-SYSTEM.md`; `docs/desktop-agent-gap-analysis.md` (roadmap, not inventory).
 
-Quarantined — stale enough to mislead; do not cite as authority and do not repair casually: `README.md` (wrong Electron/TS/Vite versions, advertises MIT while `LICENSE:1` is a commercial EULA, documents `USE_CUSTOM_LLM_PROVIDER`/`LLM_BASE_URL`/`LLM_PROVIDER_TYPE` env vars that exist nowhere in `src/`, lists `build:mac`/`build:linux` scripts that do not exist), `MCP-CONFIG.md` (`USE_MCP=true` is read by nothing), `COMPLETE-TEST-SUMMARY.md` and `config/opencode.json` (orphaned by `8b4b22e` which removed the OpenCode integration), `REFACTORING-SAFETY.md` (freezes a removed `electronAPI.opencode` surface), `docs/WEB-TOOLS-GUIDE.md` (documents Cursor, not Qyther), `UI-FIXES-SUMMARY.md` and `VISUAL-TESTING-REPORT.md` (point-in-time diaries that also celebrate the exact token violations the design system forbids), `docs/desktop-agent.md` (tool count stale). Empty tracked stubs: `browser-agent.md`, `desktop-agent.md`, `test-extract/es.zip`.
+Quarantined — stale enough to mislead; do not cite as authority and do not repair casually: `MCP-CONFIG.md` (`USE_MCP=true` is read by nothing), `COMPLETE-TEST-SUMMARY.md` (diary; the OpenCode integration it describes was removed by `8b4b22e`), `REFACTORING-SAFETY.md` (freezes a removed `electronAPI.opencode` surface), `docs/WEB-TOOLS-GUIDE.md` (documents Cursor, not Qyther), `UI-FIXES-SUMMARY.md` and `VISUAL-TESTING-REPORT.md` (point-in-time diaries that also celebrate the exact token violations the design system forbids), `docs/desktop-agent.md` (tool count stale). `AGENT-INSTRUCTION-BEST-PRACTICES.md` is a generic essay, not repo documentation. The old root stubs `browser-agent.md`, `desktop-agent.md`, `test-extract/es.zip`, `pyproject.toml`, `show-window.ps1` and `config/opencode.json` are deleted; `mcp-config.json` is untracked.
 
 ## Global Preferences
 
@@ -127,4 +130,4 @@ Token-driven architecture is mandatory: never hardcode pixel values or OKLCH col
 | `src/renderer/styles/AGENTS.md` | Three-layer token system: `tokens/` → `semantic/theme.css` → component, naming, dark mode, drift grep |
 | `docs/AGENTS.md` | Documentation boundary: which files are live vs diary, changelog convention, freshness classification rule |
 
-Leaf folders with no doc of their own (rules live in the nearest parent above): `src/preload/`, `src/main/utils/`, `src/main/types/`, `src/main/services/utils/`, `src/main/services/langchain/`, `src/renderer/lib/`, `src/renderer/utils/`, `src/renderer/types/`, `src/renderer/context/`, `src/renderer/contexts/`, `src/renderer/data/`, `src/renderer/components/common/`, `public/`, `assets/`, `scripts/`, `config/`, `design-systems/`.
+Leaf folders with no doc of their own (rules live in the nearest doc above): `.github/`, `src/preload/`, `src/main/utils/`, `src/main/types/`, `src/main/services/utils/`, `src/main/services/langchain/`, `src/renderer/lib/`, `src/renderer/utils/`, `src/renderer/types/`, `src/renderer/context/`, `src/renderer/contexts/`, `src/renderer/data/`, `src/renderer/components/common/`, `public/`, `assets/`, `scripts/`, `docs/diagrams/`, `docs/assets/`, `design-systems/`.
