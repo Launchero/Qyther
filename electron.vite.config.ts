@@ -58,7 +58,11 @@ export default defineConfig({
         formats: ['es'],
       },
       rollupOptions: {
-        external: ['electron', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core', 'node-winautomation'],
+        // Native/host modules stay external so they resolve from node_modules at runtime.
+        // @aws-sdk/client-s3 is externalised rather than installed: it is only reached by
+        // unzipper's optional S3 opener (unzipper/lib/Open/index.js:98), which this app
+        // never calls, and rolldown fails the build if it tries to bundle an absent module.
+        external: ['electron', 'koffi', 'libwin32', 'tesseract.js', 'tesseract.js-core', 'node-winautomation', '@aws-sdk/client-s3'],
         output: {
           format: 'es',
         },
