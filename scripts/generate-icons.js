@@ -1,8 +1,12 @@
 // Generate app icons from SVG at proper resolutions
 // Uses sharp for SVG -> PNG conversion, then creates ICO
-const sharp = require('sharp');
-const fs = require('fs');
-const path = require('path');
+// ESM: package.json sets "type": "module", so require()/__dirname are unavailable here.
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const sizes = [16, 32, 48, 64, 128, 256, 512];
 const inputSvg = path.join(__dirname, '..', 'assets', 'icon.svg');
