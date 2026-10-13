@@ -16,7 +16,11 @@
     "install-playwright": "npx playwright install chromium",
     "build:win": "npm run build && electron-builder --win",
     "build:win:dir": "npm run build && electron-builder --win dir",
-    "generate-icons": "node scripts/generate-icons.js"
+    "generate-icons": "node scripts/generate-icons.js",
+    "harness:preflight": "node scripts/harness/cli.mjs preflight",
+    "harness:selftest": "node scripts/harness/cli.mjs selftest",
+    "harness:mcp": "node scripts/harness/mcp-server.mjs",
+    "harness:capture": "node scripts/capture-ui.mjs"
   },
   "keywords": [
     "electron",
@@ -99,6 +103,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^22.19.18",
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.0.0",

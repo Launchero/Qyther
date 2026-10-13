@@ -7,6 +7,7 @@ import { searchFiles, formatFileSize, formatDate, isEverythingRunning } from '..
 import { getSystemInfo, getPlatform, getPlatformName, isWindows, isMacOS, isLinux } from '../utils/platform';
 import { registerChatHandlers } from './chat-handlers';
 import { registerMCPHandlers } from './mcp-handlers';
+import { isCommandSafe } from './command-guard';
 import { createLogger } from '../utils/logger';
 
 const execAsync = promisify(exec);
@@ -126,6 +127,10 @@ export function registerIPCHandlers(): void {
 
   // Command execution handler
   ipcMain.handle('command:execute', async (_, command: string): Promise<{ success: boolean; output?: string; error?: string }> => {
+    if (!isCommandSafe(command)) {
+      log.warn('Blocked command:execute attempt');
+      return { success: false, error: 'Command not allowed for security reasons' };
+    }
     try {
       const { stdout, stderr } = await execAsync(command);
       if (stderr) {
