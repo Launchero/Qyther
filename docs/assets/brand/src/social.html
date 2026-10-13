@@ -1,0 +1,162 @@
+<!doctype html>
+<!--
+  Qyther social preview — 1280x640 CSS px (renders at 2x via --force-device-scale-factor=2).
+  All colours are verbatim OKLCH design tokens from:
+    src/renderer/styles/tokens/colors.css        (--color-brand-500 etc.)
+    src/renderer/styles/semantic/theme.css       (.dark block — this artwork uses dark-theme tokens)
+    src/renderer/styles/tokens/typography.css    (font families)
+    src/renderer/styles/tokens/radius.css        (--radius-command-palette, --radius-shortcut-key)
+    src/renderer/styles/tokens/shadow.css        (--shadow-command-palette, --shadow-shortcut-key)
+    src/renderer/styles/tokens/spacing.css       (--container-command-palette: 800px, shortcut-key sizes)
+  Mark geometry reused from public/logo-nothing-terminal.svg (bracket-Q, tail and dot recoloured to brand-500).
+  Render: see ../README.md
+-->
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    /* dark-theme semantic tokens, verbatim from semantic/theme.css .dark block */
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --primary: oklch(0.715 0.143 230.923);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    /* primitives */
+    --color-brand-500: oklch(0.715 0.143 230.923);
+    /* radius / shadow / spacing tokens */
+    --radius-command-palette: 0.625rem;                                   /* radius.css:32 = --radius */
+    --radius-shortcut-key: calc(0.625rem - 2px);                          /* radius.css:31 */
+    --radius-chip: calc(0.625rem - 2px);                                  /* radius.css:41 */
+    --shadow-command-palette: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* shadow.css:18 */
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);        /* shadow.css:14 */
+    --shadow-shortcut-key: 0 1px 2px 0 rgb(0 0 0 / 0.05);                 /* shadow.css:19 */
+    --container-command-palette: 800px;                                   /* spacing.css:36 */
+    --shortcut-key-width: 40px;                                           /* spacing.css:51 */
+    --shortcut-key-height: 28px;                                          /* spacing.css:52 */
+    --result-item-height: 44px;                                           /* spacing.css:59 */
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;        /* typography.css:25 */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 72px;
+  }
+  .left { width: 500px; display: flex; flex-direction: column; gap: 30px; }
+  .lockup { display: flex; align-items: center; gap: 22px; }
+  .lockup svg { width: 78px; height: 71px; display: block; }
+  .wordmark { font-size: 58px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; }
+  .wordmark .tail-dot { color: var(--color-brand-500); }
+  .tagline { font-size: 21px; font-weight: 400; line-height: 1.5; color: var(--muted-foreground); max-width: 440px; }
+  .keys { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  kbd {
+    height: var(--shortcut-key-height);
+    min-width: 20px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--foreground);
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-shortcut-key);
+    box-shadow: var(--shadow-shortcut-key);
+  }
+  kbd.space { width: var(--shortcut-key-width); }
+  .plus { color: var(--muted-foreground); font-size: 14px; }
+  /* palette mock: true 800px token width, scaled to sit in the right column */
+  .stage { width: 620px; display: flex; justify-content: center; }
+  .palette {
+    width: var(--container-command-palette);
+    transform: scale(0.78);
+    transform-origin: center center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-command-palette);
+    box-shadow: var(--shadow-command-palette), var(--shadow-xl);
+    overflow: hidden;
+  }
+  .tabs { display: flex; align-items: center; gap: 8px; padding: 14px 18px 0; }
+  .tab {
+    font-size: 13px;
+    line-height: 1;
+    padding: 7px 14px;
+    border-radius: var(--radius-chip);
+    color: var(--muted-foreground);
+    background: transparent;
+  }
+  .tab.active { color: var(--primary-foreground); background: var(--primary); font-weight: 600; }
+  .searchrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 18px 0;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--background);
+    border: 1px solid var(--input);
+    border-radius: calc(0.625rem + 2px); /* radius.css:40 --radius-input */
+  }
+  .lens { width: 16px; height: 16px; border: 2px solid var(--muted-foreground); border-radius: 50%; position: relative; flex: none; }
+  .lens::after { content: ""; position: absolute; width: 6px; height: 2px; background: var(--muted-foreground); transform: rotate(45deg); right: -6px; bottom: 1px; }
+  .query { font-size: 15px; color: var(--foreground); }
+  .caret { display: inline-block; width: 2px; height: 18px; background: var(--color-brand-500); vertical-align: text-bottom; }
+  .results { margin: 14px 18px 18px; border-top: 1px solid var(--border); }
+  .row { display: flex; align-items: center; justify-content: space-between; height: var(--result-item-height); padding: 0 8px; font-size: 13px; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row .name { color: var(--foreground); }
+  .row .path { color: var(--muted-foreground); font-size: 11px; }
+  .row.selected { background: var(--muted); border-radius: var(--radius-chip); }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="lockup">
+      <!-- bracket-Q mark, geometry from public/logo-nothing-terminal.svg -->
+      <svg viewBox="24 22 90 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M 52 28 L 28 28 L 28 88 L 52 88" fill="none" stroke="var(--foreground)" stroke-width="4" stroke-linejoin="miter"/>
+        <path d="M 76 28 L 100 28 L 100 88 L 76 88" fill="none" stroke="var(--foreground)" stroke-width="4" stroke-linejoin="miter"/>
+        <line x1="52" y1="28" x2="76" y2="28" stroke="var(--foreground)" stroke-width="4"/>
+        <line x1="52" y1="88" x2="76" y2="88" stroke="var(--foreground)" stroke-width="4"/>
+        <line x1="84" y1="78" x2="108" y2="102" stroke="var(--color-brand-500)" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="64" cy="58" r="6" fill="var(--color-brand-500)"/>
+      </svg>
+      <div class="wordmark">qyther<span class="tail-dot">.</span></div>
+    </div>
+    <p class="tagline">Windows command palette with an agent that can drive the desktop.</p>
+    <div class="keys">
+      <kbd>Alt</kbd><span class="plus">+</span><kbd class="space">Space</kbd>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="palette" role="img" aria-label="Command palette suggestion">
+      <div class="tabs">
+        <span class="tab active">Files</span>
+        <span class="tab">Ask</span>
+      </div>
+      <div class="searchrow">
+        <span class="lens"></span>
+        <span class="query">report<span class="caret"></span></span>
+      </div>
+      <div class="results">
+        <div class="row selected"><span class="name">Q3-report.docx</span><span class="path">~/Documents</span></div>
+        <div class="row"><span class="name">report-draft.md</span><span class="path">~/Desktop</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

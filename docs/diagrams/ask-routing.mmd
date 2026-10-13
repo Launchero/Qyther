@@ -1,0 +1,42 @@
+---
+title: AskGraph top-level routing (5 real nodes)
+---
+%%{accTitle: "AskGraph: classify routes via a conditional edge to browserSubgraph, desktopSubgraph or documentSubgraph; all three fan into postProcessNode then END. The browser node imperatively dispatches six non-graph handlers that are not nodes."}%%
+flowchart TB
+  classDef node fill:#0a0a0a,stroke:#38bdf8,stroke-width:2px,color:#fafafa;
+  classDef term fill:#1b1b1b,stroke:#5b6470,color:#fafafa;
+  classDef fake fill:#161305,stroke:#a87500,color:#e8d9a0,stroke-dasharray:5 4;
+
+  START(["__start__"]):::term
+  C["classify (classifyNode)<br/>routerModel.invoke "]:::node
+  B["browserSubgraph<br/>(browserSubgraphNode)"]:::node
+  D["desktopSubgraph"]:::node
+  DOC["documentSubgraph"]:::node
+  PP["postProcessNode"]:::node
+  ENDN(["END"]):::term
+
+  START --> C
+  C -- "detectFastPath skips the LLM ()" --> C
+  C -- "routeAfterClassify<br/>intent==desktop" --> D
+  C -- "intent==document" --> DOC
+  C -- "else (research/general/browser)" --> B
+
+  B --> PP
+  D --> PP
+  DOC --> PP
+  PP --> ENDN
+
+  subgraph NONNODES["Imperative dispatch INSIDE browserSubgraphNode (checks ) — NOT graph nodes"]
+    direction TB
+    CMP["comparisonNode"]:::fake
+    FORM["formNode"]:::fake
+    CHART["chartNode"]:::fake
+    EXT["externalSearchNode"]:::fake
+    INT["internalKnowledgeNode"]:::fake
+    GEN["generalChatNode"]:::fake
+    CMP -.-> FORM -.-> CHART -.-> EXT -.-> INT -.-> GEN
+  end
+  B == "function-call dispatch<br/>(no edge, no checkpointer)" ==> NONNODES
+
+  CP["checkpointer: MemorySaver ()"]:::term
+  C -.-> CP

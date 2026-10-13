@@ -1,0 +1,37 @@
+---
+title: Qyther system context and process topology
+---
+%%{accTitle: "Qyther system context: Electron main, sandboxed preload, React renderer, tray, and external boundaries (MCP stdio children, Playwright-driven Chromium, es.exe, LLM endpoint, web search, userData stores, Win32/UIA)"}%%
+flowchart LR
+  classDef proc fill:#0a0a0a,stroke:#38bdf8,stroke-width:2px,color:#fafafa;
+  classDef ext fill:#111111,stroke:#5b6470,stroke-width:1px,color:#fafafa,stroke-dasharray:4 3;
+  classDef store fill:#0d1b22,stroke:#38bdf8,color:#fafafa;
+
+  subgraph MAIN["Electron main process (src/main/main.ts)"]
+    direction TB
+    M["Main host shell<br/>window/tray/boot<br/>windows.ts"]:::proc
+    P["Sandboxed preload (CJS)<br/>contextIsolation:true, nodeIntegration:false, sandbox:true<br/>windows.ts main.ts"]:::proc
+    R["React renderer<br/>src/renderer/main.tsx"]:::proc
+    T["System tray<br/>src/main/tray.ts"]:::proc
+    R -- "window.electronAPI<br/>IPC invoke/listen" --> P
+    P -- "ipcRenderer.invoke / webContents.send<br/>60 handlers" --> M
+  end
+
+  G["Alt+Space global hook<br/>koffi WH_KEYBOARD_LL + 10ms pump<br/>shortcuts.ts"]:::proc
+  M --- G
+
+  MCP["MCP stdio child processes<br/>filesystem · sequential-thinking · playwright<br/>mcp-config.json"]:::ext
+  CH["Chromium (headless)<br/>driven ONLY via Playwright MCP"]:::ext
+  ES["es.exe (Everything CLI)<br/>utils/esRunner.ts"]:::ext
+  LLM["LLM endpoint<br/>any OpenAI-compatible API"]:::ext
+  WEB["html.duckduckgo.com<br/>api.tavily.com fallback"]:::ext
+  OS["Win32 / UIA / OCR<br/>koffi · libwin32 · node-winautomation · tesseract.js"]:::ext
+  DB["userData stores<br/>desktop-agent.db (sql.js)<br/>browser-memory/trajectories.db<br/>preferences.json"]:::store
+
+  M -- "stdio JSON-RPC<br/>MultiServerMCPClient (client.ts)" --> MCP
+  MCP -- "Playwright MCP server" --> CH
+  M -- "child_process.exec" --> ES
+  M -- "HTTPS (@langchain/openai)" --> LLM
+  M -- "HTTPS fetch (tools.ts)" --> WEB
+  M -- "FFI / DLL call · COM" --> OS
+  M -- "fs.writeFileSync (flush per write)" --> DB

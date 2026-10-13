@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  Qyther README hero banner — 1600x400 CSS px (renders at 2x via --force-device-scale-factor=2).
+  One source, two themes: default renders dark-theme tokens, append #light for light-theme tokens.
+  Colours are verbatim OKLCH from src/renderer/styles/semantic/theme.css (:root = light, .dark = dark);
+  radius/shadow/spacing from tokens/radius.css, tokens/shadow.css, tokens/spacing.css;
+  font stack from tokens/typography.css. Mark geometry reused from public/logo-nothing-terminal.svg.
+  Render: see ../README.md
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+  document.documentElement.className = (location.hash === '#light') ? '' : 'dark';
+</script>
+<style>
+  .dark, :root { /* light-theme defaults, verbatim from semantic/theme.css :root */
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --primary: oklch(0.715 0.143 230.923);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --border: oklch(0.922 0 0);
+  }
+  .dark { /* verbatim from semantic/theme.css .dark */
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --primary: oklch(0.715 0.143 230.923);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+  }
+  :root {
+    --color-brand-500: oklch(0.715 0.143 230.923);   /* colors.css:52 */
+    --radius-shortcut-key: calc(0.625rem - 2px);      /* radius.css:31 */
+    --shadow-shortcut-key: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow.css:19 */
+    --shortcut-key-width: 40px;                       /* spacing.css:51 */
+    --shortcut-key-height: 28px;                      /* spacing.css:52 */
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace; /* typography.css:25 */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1600px; height: 400px; overflow: hidden; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+  }
+  .lockup { display: flex; align-items: center; gap: 26px; }
+  .lockup svg { width: 96px; height: 88px; display: block; }
+  .wordmark { font-size: 88px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; }
+  .wordmark .tail-dot { color: var(--color-brand-500); }
+  .divider { width: 2px; height: 180px; background: var(--border); }
+  .meta { display: flex; flex-direction: column; gap: 26px; align-items: flex-start; }
+  .tagline { font-size: 26px; line-height: 1.55; color: var(--muted-foreground); max-width: 620px; }
+  .tagline strong { color: var(--foreground); font-weight: 600; }
+  .keys { display: flex; align-items: center; gap: 10px; }
+  kbd {
+    height: var(--shortcut-key-height);
+    min-width: 20px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--foreground);
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-shortcut-key);
+    box-shadow: var(--shadow-shortcut-key);
+  }
+  kbd.space { width: var(--shortcut-key-width); }
+  .plus { color: var(--muted-foreground); font-size: 15px; }
+  .accent-bar { width: 84px; height: 3px; background: var(--color-brand-500); border-radius: 2px; }
+</style>
+</head>
+<body>
+  <div class="lockup">
+    <svg viewBox="24 22 90 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M 52 28 L 28 28 L 28 88 L 52 88" fill="none" stroke="var(--foreground)" stroke-width="4" stroke-linejoin="miter"/>
+      <path d="M 76 28 L 100 28 L 100 88 L 76 88" fill="none" stroke="var(--foreground)" stroke-width="4" stroke-linejoin="miter"/>
+      <line x1="52" y1="28" x2="76" y2="28" stroke="var(--foreground)" stroke-width="4"/>
+      <line x1="52" y1="88" x2="76" y2="88" stroke="var(--foreground)" stroke-width="4"/>
+      <line x1="84" y1="78" x2="108" y2="102" stroke="var(--color-brand-500)" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="64" cy="58" r="6" fill="var(--color-brand-500)"/>
+    </svg>
+    <div class="wordmark">qyther<span class="tail-dot">.</span></div>
+  </div>
+  <div class="divider"></div>
+  <div class="meta">
+    <p class="tagline"><strong>Windows command palette</strong> with an agent that can drive the desktop.</p>
+    <div class="accent-bar"></div>
+    <div class="keys">
+      <kbd>Alt</kbd><span class="plus">+</span><kbd class="space">Space</kbd>
+    </div>
+  </div>
+</body>
+</html>
