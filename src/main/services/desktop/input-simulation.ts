@@ -152,7 +152,7 @@ let SendMessageWFn: unknown = null;
 let IsIconicFn: unknown = null;
 let IsWindowVisibleFn: unknown = null;
 
-let EnumWindowsProcType: import('koffi').IKoffiCType | null = null;
+let EnumWindowsProcType: import('koffi').TypeObject | null = null;
 
 // EnumWindows callback type storage
 let enumWindowsCallback: unknown = null;
@@ -928,7 +928,7 @@ export async function getForegroundWindowInfoAndRect(): Promise<{
 
 export function cleanup(): void {
   if (enumWindowsCallback) {
-    koffi.unregister(enumWindowsCallback as import('koffi').IKoffiRegisteredCallback);
+    koffi.unregister(enumWindowsCallback as bigint);
   }
   user32Dll = null;
   shell32Dll = null;

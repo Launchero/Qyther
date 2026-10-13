@@ -101,7 +101,7 @@ async function setupWindowsGlobalHotkey(): Promise<void> {
     }, koffi.pointer(HOOKPROC));
 
     // Install the hook
-    keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, hookCallback as Buffer, null, 0);
+    keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, hookCallback as bigint, null, 0);
 
     if (!keyboardHook) {
       log.error('Failed to install low-level keyboard hook');
