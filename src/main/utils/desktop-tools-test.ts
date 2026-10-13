@@ -9,6 +9,7 @@
  */
 
 import koffi from 'koffi';
+import { tmpdir } from 'os';
 import { screen, clipboard } from 'electron';
 import { createLogger } from './logger';
 import { WindowsDesktopAdapter } from '../services/desktop/windows-adapter';
@@ -473,13 +474,13 @@ export async function runDesktopToolsTest(): Promise<void> {
     // ═══════════════════════════════════════════
     console.log(`\n${BOLD}${CYAN}── File Operations Tool ──${RESET}`);
 
-    const testDir = path.join(process.env.TEMP || 'C:\\Users\\kanis\\AppData\\Local\\Temp', 'desktop-agent-test-' + Date.now());
+    const testDir = path.join(process.env.TEMP || tmpdir(), 'desktop-agent-test-' + Date.now());
     const testFile = path.join(testDir, 'test-file.txt');
     const testFileCopy = path.join(testDir, 'test-file-copy.txt');
     const testFileMove = path.join(testDir, 'test-file-moved.txt');
 
     await runTest('file_operations (list_directory): lists a directory', async () => {
-      const tempDir = process.env.TEMP || 'C:\\Users\\kanis\\AppData\\Local\\Temp';
+      const tempDir = process.env.TEMP || tmpdir();
       const entries = await fs.readdir(tempDir, { withFileTypes: true });
       console.log(`    Listed ${entries.length} entries`);
       return entries.length > 0;

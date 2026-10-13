@@ -58,9 +58,23 @@ electron-api.json
 electron.d.ts
 ts-gen/
 
-# npm configuration
-.npmrc
+# npm configuration — the root .npmrc is tracked on purpose (see its header),
+# nested ones are not
 **/.npmrc
+!/.npmrc
+
+# MCP runtime config: the live file is machine-local, only the example is tracked
+mcp-config.json
+
+# Local databases (the app keeps its own under userData; guard in-repo dumps)
+*.db
+*.sqlite
+*.sqlite3
+
+# Everything CLI binary fetched at runtime by src/main/utils/esDownloader.ts
+es.exe
+es.zip
+test-extract/
 
 # Testing
 coverage/

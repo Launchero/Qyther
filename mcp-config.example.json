@@ -4,13 +4,13 @@
   "_usage": "Place this file in your project root. Servers will be loaded automatically.",
   
   "mcpServers": {
-    "_filesystem_comment": "File System MCP - Allows AI to read/write/search files",
+    "_filesystem_comment": "File System MCP - Grants the AI read/write access, but ONLY inside the directories listed here. Prefer a narrow project path over a whole home directory.",
     "filesystem": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "C:\\Users\\kanis"
+        "C:\\Path\\To\\Your\\Project"
       ],
       "disabled": false,
       "env": {}

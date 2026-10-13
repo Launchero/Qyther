@@ -19,7 +19,7 @@ Enable the servers you want to use:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\kanis"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Path\\To\\Your\\Project"],
       "disabled": false
     },
     "sequential-thinking": {
