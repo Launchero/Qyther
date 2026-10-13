@@ -1,6 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { app } from 'electron';
 import { createLogger } from '../../utils/logger';
 import type { BrowserTrajectoryRecord } from './types';
@@ -21,14 +22,23 @@ export class BrowserMemoryStore {
       fs.mkdirSync(MEMORY_DIR, { recursive: true });
     }
 
-    const sqlJsPath = path.join(path.dirname(import.meta.url.replace('file://', '').split('?')[0]), '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+    // Same resolution order as database-manager: bundled beside the main-process bundle,
+    // then inside the sql.js package. The previous version warned about a missing path and
+    // then handed it to locateFile anyway, so the failure surfaced later as an initSqlJs throw.
+    const sqlJsDir = path.dirname(fileURLToPath(import.meta.resolve('sql.js')));
+    const candidates = [
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'sql-wasm.wasm'),
+      path.join(sqlJsDir, 'sql-wasm.wasm'),
+      path.join(sqlJsDir, 'dist', 'sql-wasm.wasm'),
+    ];
+    const wasmPath = candidates.find(candidate => fs.existsSync(candidate));
 
-    if (!fs.existsSync(sqlJsPath)) {
-      log.warn(`sql-wasm.wasm not found at ${sqlJsPath}`);
+    if (!wasmPath) {
+      throw new Error(`sql-wasm.wasm not found. Searched: ${candidates.join(', ')}`);
     }
 
     const SQL = await initSqlJs({
-      locateFile: () => sqlJsPath
+      locateFile: () => wasmPath
     });
 
     if (fs.existsSync(MEMORY_FILE)) {

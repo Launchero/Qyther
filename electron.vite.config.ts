@@ -2,6 +2,7 @@ import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readdir, readFile, writeFile, copyFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -28,22 +29,31 @@ const __dirnameFixPlugin = () => ({
       }
     }
 
-    // Copy sql-wasm.wasm to output dir so runtime can load it
+    // Copy sql-wasm.wasm to output dir so runtime can load it. A missing wasm is a hard
+    // build failure: silently shipping without it turns every database write into a no-op.
     const wasmSrc = resolve('node_modules/sql.js/dist/sql-wasm.wasm');
     const wasmDst = resolve(outDir, 'sql-wasm.wasm');
-    try {
-      await copyFile(wasmSrc, wasmDst);
-    } catch {
-      // WASM file already copied or not available
+    if (!existsSync(wasmSrc)) {
+      throw new Error(
+        `sql-wasm.wasm not found at ${wasmSrc}. Install dependencies (sql.js ships it) — ` +
+        `the build must not ship without it or agent memory silently stops persisting.`
+      );
     }
+    await copyFile(wasmSrc, wasmDst);
 
-    // Copy native Automation.node from node-winautomation to output dir
+    // Copy native Automation.node from node-winautomation to output dir. The addon only
+    // exists on machines that ran node-gyp with a C++ toolchain, so its absence is a loud
+    // warning naming the consequence rather than a swallowed catch.
     const nodeSrc = resolve('node_modules/node-winautomation/build/Release/Automation.node');
     const nodeDst = resolve(outDir, 'Automation.node');
-    try {
+    if (existsSync(nodeSrc)) {
       await copyFile(nodeSrc, nodeDst);
-    } catch {
-      // Automation.node not built yet or already copied
+    } else {
+      console.warn(
+        `[build] ${nodeSrc} is not built: the UIA desktop tools (get_element_info, ` +
+        `click_element, search_elements, invoke_element, set_element_value, get_element_text) ` +
+        `will be unavailable. Build it with node-gyp in node_modules/node-winautomation.`
+      );
     }
   },
 });

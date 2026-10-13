@@ -50,6 +50,32 @@ describe('koffi FFI surface used by the desktop agent', () => {
     expect(typeof await inputSim.isProcessDpiAware()).toBe('boolean');
   });
 
+  it('invokes a registered callback across the FFI boundary', () => {
+    // Mirrors shortcuts.ts:76-104: koffi.register(fn, koffi.pointer(proto)) handed to a
+    // Win32 function that calls back into JS. koffi 3 removed koffi.callback() and hands
+    // back BigInt pointers, so this is the mechanism Alt+Space lives or dies on.
+    const user32 = koffi.load('user32.dll');
+    const WNDENUMPROC = koffi.proto('bool __stdcall QytherEnumWindowsProc(void *hWnd, void *lParam)');
+    const EnumWindows = user32.func('__stdcall', 'EnumWindows', 'bool', [
+      koffi.pointer(WNDENUMPROC),
+      'void *',
+    ]);
+
+    const seen: unknown[] = [];
+    const callback = koffi.register((hWnd: unknown) => {
+      seen.push(hWnd);
+      return true;
+    }, koffi.pointer(WNDENUMPROC));
+
+    try {
+      EnumWindows(callback, null);
+    } finally {
+      koffi.unregister(callback);
+    }
+
+    expect(seen.length).toBeGreaterThan(3);
+  });
+
   it('returns the thread/process pair through the libwin32 wrapper', async () => {
     const { GetForegroundWindow, GetWindowThreadProcessId } = await import('libwin32/user32');
     const hwnd = GetForegroundWindow() as unknown;
