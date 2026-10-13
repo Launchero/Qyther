@@ -75,22 +75,19 @@ export class DatabaseManager {
       // Locate sql-wasm.wasm: try output dir first (bundled), then node_modules
       let wasmPath: string | null = null;
       const __filename = fileURLToPath(import.meta.url);
-      const bundledWasm = path.join(dirname(__filename), 'sql-wasm.wasm');
-      const nodeModulesWasm = path.join(
-        path.dirname(import.meta.resolve('sql.js').replace('file://', '').split('?')[0]),
-        'dist',
-        'sql-wasm.wasm'
-      );
+      const sqlJsRoot = path.dirname(fileURLToPath(import.meta.resolve('sql.js')));
+      const candidates = [
+        path.join(dirname(__filename), 'sql-wasm.wasm'),
+        // import.meta.resolve lands inside dist/ for sql.js, so try both depths.
+        path.join(sqlJsRoot, 'sql-wasm.wasm'),
+        path.join(sqlJsRoot, 'dist', 'sql-wasm.wasm'),
+      ];
 
-      if (fs.existsSync(bundledWasm)) {
-        wasmPath = bundledWasm;
-      } else if (fs.existsSync(nodeModulesWasm)) {
-        wasmPath = nodeModulesWasm;
-      }
+      wasmPath = candidates.find(candidate => fs.existsSync(candidate)) ?? null;
 
       if (!wasmPath) {
         throw new Error(
-          `sql-wasm.wasm not found. Searched: ${bundledWasm}, ${nodeModulesWasm}`
+          `sql-wasm.wasm not found. Searched: ${candidates.join(', ')}`
         );
       }
 

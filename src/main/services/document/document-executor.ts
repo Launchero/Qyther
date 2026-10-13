@@ -188,14 +188,17 @@ async function createPptx(
     });
 
     if (slideData.bulletPoints && slideData.bulletPoints.length > 0) {
-      const bulletItems = slideData.bulletPoints.map(bp => ({
-        text: bp,
-        options: { bullet: true, fontSize: 16 },
-      }));
-      slide.addList(bulletItems, {
-        x: '5%', y: '20%', w: '90%', h: '70%',
-        fontSize: 16, lineSpacingMultiple: 1.2,
-      });
+      // pptxgenjs has no addList(); one bullet per TextProps entry through addText().
+      slide.addText(
+        slideData.bulletPoints.map(bp => ({
+          text: bp,
+          options: { bullet: true, fontSize: 16 },
+        })),
+        {
+          x: '5%', y: '20%', w: '90%', h: '70%',
+          lineSpacingMultiple: 1.2,
+        },
+      );
     } else if (slideData.bodyText) {
       slide.addText(slideData.bodyText, {
         x: '5%', y: '20%', w: '90%', h: '70%',
