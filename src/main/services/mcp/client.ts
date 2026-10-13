@@ -1,4 +1,4 @@
-import { MultiServerMCPClient, type Connection } from "@langchain/mcp-adapters";
+import { MCPAdapter, type Connection } from "@langchain/mcp-adapters";
 import type { RunnableToolLike } from "@langchain/core/runnables";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import { loadPreferences } from "../../preferences";
@@ -28,7 +28,7 @@ const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const MCP_CONFIG_PATH = join(PROJECT_ROOT, "mcp-config.json");
 
 export class MCPService {
-  private client: MultiServerMCPClient | null = null;
+  private client: MCPAdapter | null = null;
   private tools: (RunnableToolLike | DynamicStructuredTool)[] = [];
   private isInitializedFlag = false;
   private serverToolCounts: Map<string, number> = new Map();
@@ -102,12 +102,17 @@ export class MCPService {
         return;
       }
 
-      this.client = new MultiServerMCPClient({
-        mcpServers,
+      this.client = new MCPAdapter({
+        servers: mcpServers,
+        // 2.x prefixes every tool with its server key by default (playwright's tools would
+        // arrive as playwright_browser_navigate). That breaks the browser subtree's
+        // tool.name.startsWith('browser_') filter and the router prefixes in tool-router.ts,
+        // so tool names are kept exactly as the servers emit them.
+        prefixToolNameWithServerName: false,
         defaultToolTimeout: 30000, // 30 seconds
       });
 
-      this.tools = await this.client.getTools();
+      this.tools = await this.client.listTools();
       this.isInitializedFlag = true;
       this.serverNames = enabledServers;
 

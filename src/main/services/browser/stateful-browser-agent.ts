@@ -2,7 +2,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MemorySaver } from '@langchain/langgraph';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
+import { MCPAdapter } from '@langchain/mcp-adapters';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Browser/MCP tool results are highly dynamic */
 import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
@@ -35,7 +35,7 @@ export class StatefulBrowserAgent extends EventEmitter {
   private checkpointer: MemorySaver;
   private headedMode: boolean = false;
   private browserTools: any[] = [];
-  private fallbackClient: MultiServerMCPClient | null = null;
+  private fallbackClient: MCPAdapter | null = null;
   private usingFallback = false;
   private isInitialized: boolean = false;
   private readonly maxSteps: number = 10;
@@ -65,15 +65,22 @@ export class StatefulBrowserAgent extends EventEmitter {
       } else {
         // Fallback: create own Playwright client if mcpService not initialized
         log.warn('mcpService not initialized, creating fallback Playwright client');
-        this.fallbackClient = new MultiServerMCPClient({
-          playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            transport: 'stdio' as const,
+        // 2.x validates config strictly, so the bare connections record this used to pass
+        // is now rejected; connections belong under `servers`.
+        this.fallbackClient = new MCPAdapter({
+          servers: {
+            playwright: {
+              command: 'npx',
+              args: ['@playwright/mcp@latest'],
+              transport: 'stdio' as const,
+            },
           },
+          // Without this the tools arrive as playwright_browser_navigate and the
+          // startsWith('browser_') filter below matches nothing.
+          prefixToolNameWithServerName: false,
         });
 
-        const allTools = await this.fallbackClient.getTools();
+        const allTools = await this.fallbackClient.listTools();
         this.browserTools = allTools.filter((tool: any) =>
           tool.name?.startsWith('browser_')
         );
