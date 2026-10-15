@@ -21,12 +21,21 @@
  */
 import koffi from 'koffi';
 
+const MOUSEEVENTF_MOVE = 0x0001;
 const MOUSEEVENTF_LEFTDOWN = 0x0002;
 const MOUSEEVENTF_LEFTUP = 0x0004;
 const MOUSEEVENTF_RIGHTDOWN = 0x0008;
 const MOUSEEVENTF_RIGHTUP = 0x0010;
 const MOUSEEVENTF_WHEEL = 0x0800;
+/**
+ * Without ABSOLUTE|VIRTUALDESK, `dx`/`dy` are normalised against the PRIMARY monitor
+ * and the virtual desktop's origin is ignored, so a window on a second screen is
+ * clicked at the wrong place while every DOM read still looks healthy.
+ */
+const MOUSEEVENTF_ABSOLUTE = 0x8000;
+const MOUSEEVENTF_VIRTUALDESK = 0x4000;
 
+const KEYEVENTF_EXTENDEDKEY = 0x0001;
 const KEYEVENTF_KEYUP = 0x0002;
 const KEYEVENTF_UNICODE = 0x0004;
 
@@ -73,6 +82,7 @@ const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(void *hWnd, 
 const user32 = koffi.load('user32.dll');
 const shcore = koffi.load('shcore.dll');
 const gdi32 = koffi.load('gdi32.dll');
+const kernel32 = koffi.load('kernel32.dll');
 
 const api = {
   SendInput: user32.func('uint32 __stdcall SendInput(uint32 cInputs, INPUT *pInputs, int cbSize)'),
@@ -101,12 +111,23 @@ const api = {
   GetDIBits: gdi32.func('int __stdcall GetDIBits(void *hdc, void *hbm, uint32 uStartScan, uint32 cScanLines, void *lpvBits, void *lpbi, uint32 uUsage)'),
   DeleteObject: gdi32.func('bool __stdcall DeleteObject(void *ho)'),
   DeleteDC: gdi32.func('bool __stdcall DeleteDC(void *hDC)'),
+  GetLastError: kernel32.func('uint32 __stdcall GetLastError()'),
 };
+
+/**
+ * What a zero return from `SendInput` actually means. The documented causes are a UIPI
+ * block (the target runs elevated, so Windows refuses injected input) and a queue that
+ * will not take the event. Windows is not reliably loud about which one it was, so this
+ * does not claim to diagnose every silent drop — it stops the harness from reporting a
+ * bare "inserted 0 of 1" and blaming the app for input Windows refused to deliver.
+ */
+const UIPI_ERROR = 5;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const INPUT_SIZE = koffi.sizeof(INPUT);
 
-/** Named keys from `VK`, then bare letters and digits, like the shipped helper. */
+/**
+ * Named keys from `VK`, then bare letters and digits, like the shipped helper. */
 function vkFor(name) {
   const key = String(name).toLowerCase();
   if (VK[key]) return VK[key];
@@ -114,6 +135,18 @@ function vkFor(name) {
   if (key.length === 1 && key >= '0' && key <= '9') return 0x30 + key.charCodeAt(0) - 48;
   return 0;
 }
+
+/**
+ * Keys a hardware keyboard reports with the extended byte set, per the documented
+ * `SendInput` rule for the arrows and the navigation block. Sent as a virtual key with
+ * `wScan = 0`, Windows synthesises a scancode from the VK, and without this flag an
+ * arrow arrives as the *non*-extended key that shares its scancode — the harness would
+ * then be driving something a real keyboard cannot produce, which is the one thing this
+ * whole layer exists to avoid.
+ */
+const EXTENDED_VKS = new Set([
+  0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2d, 0x2e, 0x5c, 0xa3, 0xa5, 0x6f,
+]);
 
 /**
  * Pin this process to per-monitor-DPI-aware (`PROCESS_PER_MONITOR_DPI_AWARE = 2`).
@@ -128,7 +161,25 @@ export function makePerMonitorAware() {
 
 function sendInput(event) {
   const n = api.SendInput(1, [event], INPUT_SIZE);
-  if (n !== 1) throw new Error(`SendInput inserted ${n} of 1 events`);
+  if (n === 1) return;
+  const code = api.GetLastError();
+  const why = code === UIPI_ERROR
+    ? 'the foreground window runs elevated (UIPI) and Windows refuses injected input into it'
+    : `Win32 error ${code}`;
+  throw new Error(`SendInput inserted ${n} of 1 events — ${why}`);
+}
+
+/**
+ * A key-down/key-up pair, with the extended byte set applied where the hardware sets
+ * it. The gap between the two halves is deliberate: `SendInput` inserts events serially
+ * but with no time between them, and a zero-duration press is not something a hand
+ * produces — an app that coalesces a down/up pair sees nothing at all.
+ */
+async function keyPress(vk, { holdMs = 20 } = {}) {
+  const flags = EXTENDED_VKS.has(vk) ? KEYEVENTF_EXTENDEDKEY : 0;
+  keyEvent(vk, 0, flags);
+  await sleep(holdMs);
+  keyEvent(vk, 0, flags | KEYEVENTF_KEYUP);
 }
 
 function mouseEvent(flags, dx = 0, dy = 0, mouseData = 0) {
@@ -143,6 +194,26 @@ export function setCursorPosition(x, y) {
   if (!api.SetCursorPos(Math.round(x), Math.round(y))) {
     throw new Error(`SetCursorPos(${x}, ${y}) failed — off-screen or clamped?`);
   }
+}
+
+/**
+ * Move the cursor by inserting a real mouse-move event, not by calling `SetCursorPos`.
+ *
+ * `SetCursorPos` repositions the arrow but inserts nothing into the input stream, so no
+ * `WM_MOUSEMOVE` reaches the app: hover tracking, CSS `:hover`, and the intermediate
+ * positions of a drag are all skipped, and the harness would be claiming to have moved
+ * a cursor the way a hand does when it did not. `MOUSEEVENTF_ABSOLUTE` takes `dx`/`dy`
+ * normalised to 0-65535; with `MOUSEEVENTF_VIRTUALDESK` that normalisation is against
+ * the whole virtual desktop, measured from its origin — which is negative when a monitor
+ * sits left of or above the primary one, and is why the origin is subtracted here.
+ */
+export function moveTo(x, y) {
+  const { left, top, width, height } = virtualScreen();
+  if (!(width > 0 && height > 0)) throw new Error(`Virtual desktop reports ${width}x${height}`);
+  const clamp = (n) => Math.max(0, Math.min(65535, Math.round(n)));
+  const dx = clamp(((x - left) * 65535) / width);
+  const dy = clamp(((y - top) * 65535) / height);
+  mouseEvent(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK, dx, dy);
 }
 
 export function getCursorPosition() {
@@ -161,9 +232,9 @@ export function virtualScreen() {
   };
 }
 
-/** Move the real cursor, then click wherever it landed — no MOUSEEVENTF_ABSOLUTE. */
+/** Move the real cursor with a real move event, then click wherever it landed. */
 export async function clickAt(x, y, { button = 'left', settleMs = 20 } = {}) {
-  setCursorPosition(x, y);
+  moveTo(x, y);
   await sleep(settleMs);
   const [down, up] = button === 'right'
     ? [MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP]
@@ -174,18 +245,23 @@ export async function clickAt(x, y, { button = 'left', settleMs = 20 } = {}) {
 }
 
 export async function scrollAt(x, y, amount = -3, { settleMs = 20 } = {}) {
-  setCursorPosition(x, y);
+  moveTo(x, y);
   await sleep(settleMs);
   mouseEvent(MOUSEEVENTF_WHEEL, 0, 0, amount * 120);
 }
 
+/**
+ * A drag is only a drag if the app sees the pointer travel. Each hop is a real move
+ * event, so the intermediate positions reach the renderer the way a hand's would —
+ * `SetCursorPos` hops would teleport the arrow and a drop-target would never see it.
+ */
 export async function drag(from, to, { settleMs = 40, hops = 8 } = {}) {
-  setCursorPosition(from.x, from.y);
+  moveTo(from.x, from.y);
   await sleep(settleMs);
   mouseEvent(MOUSEEVENTF_LEFTDOWN);
   await sleep(settleMs);
   for (let i = 1; i <= hops; i++) {
-    setCursorPosition(from.x + ((to.x - from.x) * i) / hops, from.y + ((to.y - from.y) * i) / hops);
+    moveTo(from.x + ((to.x - from.x) * i) / hops, from.y + ((to.y - from.y) * i) / hops);
     await sleep(10);
   }
   mouseEvent(MOUSEEVENTF_LEFTUP);
@@ -196,6 +272,8 @@ export async function drag(from, to, { settleMs = 40, hops = 8 } = {}) {
  * `WH_KEYBOARD_LL` hook gates on `GetAsyncKeyState(VK_MENU) & 0x8000`, which only
  * reflects a held Alt. Space alone toggles nothing and is swallowed by the hook.
  */
+const ext = (vk) => (EXTENDED_VKS.has(vk) ? KEYEVENTF_EXTENDEDKEY : 0);
+
 export async function pressCombo({ modifiers = [], key }, { holdMs = 30 } = {}) {
   const vkKey = vkFor(key);
   if (!vkKey) throw new Error(`Unknown key "${key}" — known: ${Object.keys(VK).join(', ')}, a-z, 0-9`);
@@ -204,21 +282,19 @@ export async function pressCombo({ modifiers = [], key }, { holdMs = 30 } = {}) 
     if (!vk) throw new Error(`Unknown modifier "${m}"`);
     return vk;
   });
-  for (const vk of vks) keyEvent(vk, 0, 0);
+  for (const vk of vks) keyEvent(vk, 0, ext(vk));
   await sleep(holdMs);
-  keyEvent(vkKey, 0, 0);
+  keyEvent(vkKey, 0, ext(vkKey));
   await sleep(holdMs);
-  keyEvent(vkKey, 0, KEYEVENTF_KEYUP);
+  keyEvent(vkKey, 0, ext(vkKey) | KEYEVENTF_KEYUP);
   await sleep(holdMs);
-  for (const vk of [...vks].reverse()) keyEvent(vk, 0, KEYEVENTF_KEYUP);
+  for (const vk of [...vks].reverse()) keyEvent(vk, 0, ext(vk) | KEYEVENTF_KEYUP);
 }
 
 export async function pressKey(name) {
   const vk = vkFor(name);
   if (!vk) throw new Error(`Unknown key "${name}" — known: ${Object.keys(VK).join(', ')}, a-z, 0-9`);
-  keyEvent(vk, 0, 0);
-  await sleep(20);
-  keyEvent(vk, 0, KEYEVENTF_KEYUP);
+  await keyPress(vk);
 }
 
 /** Per UTF-16 code unit, the shipped `typeText` pattern. Produces real WM_CHAR. */
@@ -331,12 +407,32 @@ const BITMAPINFOHEADER = koffi.struct('BITMAPINFOHEADER', {
 export function captureScreenRect(rect) {
   const { left, top, width, height } = rect;
   if (!(width > 0 && height > 0)) throw new Error(`Refusing to capture a ${width}x${height} region`);
+  // The rect comes from `GetWindowRect`, but an absurd one still meant a multi-gigabyte
+  // `Buffer.alloc` that takes the whole harness down rather than reporting a bad rect.
+  const MAX_PIXELS = 3840 * 2160;
+  if (width * height > MAX_PIXELS) {
+    throw new Error(`Refusing to capture ${width}x${height} (${(width * height / 1e6).toFixed(1)} MP > ${(MAX_PIXELS / 1e6).toFixed(1)} MP)`);
+  }
 
   const screenDc = api.GetDC(null);
   if (!screenDc) throw new Error('GetDC(NULL) failed');
   const memDc = api.CreateCompatibleDC(screenDc);
-  const bitmap = api.CreateCompatibleBitmap(screenDc, width, height);
+  const bitmap = memDc ? api.CreateCompatibleBitmap(screenDc, width, height) : null;
+  // Checked before use, because an unchecked null made the `finally` block call
+  // `SelectObject(memDc, undefined)` and mask the real GDI failure behind a confusing throw.
+  if (!memDc || !bitmap) {
+    if (bitmap) api.DeleteObject(bitmap);
+    if (memDc) api.DeleteDC(memDc);
+    api.ReleaseDC(null, screenDc);
+    throw new Error(`CreateCompatibleDC/Bitmap failed for ${width}x${height} (out of GDI handles?)`);
+  }
   const old = api.SelectObject(memDc, bitmap);
+  if (!old) {
+    api.DeleteObject(bitmap);
+    api.DeleteDC(memDc);
+    api.ReleaseDC(null, screenDc);
+    throw new Error('SelectObject into the memory DC failed');
+  }
   try {
     const blit = api.BitBlt(memDc, 0, 0, width, height, screenDc, left, top, SRCCOPY);
     if (!blit) throw new Error('BitBlt from the screen DC failed (driver or secure-desktop restriction?)');
@@ -351,7 +447,9 @@ export function captureScreenRect(rect) {
 
     const pixels = Buffer.alloc(width * height * 4);
     const lines = api.GetDIBits(memDc, bitmap, 0, height, pixels, info, DIB_RGB_COLORS);
-    if (lines === 0) throw new Error('GetDIBits returned 0 scan lines');
+    // A short copy leaves the tail of the buffer uninitialised, which encodes as a
+    // partially transparent PNG rather than as an error. Refuse instead of shipping it.
+    if (lines < height) throw new Error(`GetDIBits copied ${lines} of ${height} scan lines`);
 
     // GDI hands back BGRA; pngjs wants RGBA.
     for (let i = 0; i < pixels.length; i += 4) {

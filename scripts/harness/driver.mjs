@@ -30,8 +30,8 @@ const MIN_FREE_BYTES = 2 * 1024 * 1024 * 1024;
 const HOTKEY_FLOOR_MS = 400;
 const SCALE_TOLERANCE = 0.02;
 
-/** Measured CSS heights per mode; `MODE_CONFIGS` in `src/main/windowManager.ts` is the DIP source. */
-const MODE_HEIGHTS = { compact: 103, expanded: 603 };
+/** Measured CSS heights per mode; `MODE_CONFIGS` in `src/main/windowManager.ts` is the DIP source. Live-verified at dpr 1.25: compact asks 72 → realizes 74; expanded asks 600 → 603. */
+const MODE_HEIGHTS = { compact: 74, expanded: 603 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let session = null;
@@ -99,7 +99,9 @@ export async function preflight() {
   try {
     conn = await cdp.connect({ endpoint });
     domState = await conn.read('state');
-    conn.installRecorder();
+    // Unawaited on purpose: the recorder only upgrades `wait` from polling to events.
+    // Left unhandled it rejects after its call timeout and kills the CLI with it.
+    conn.installRecorder().catch(() => {});
   } catch (e) {
     problems.push(e.message);
   }
@@ -134,6 +136,10 @@ export async function preflight() {
 }
 
 async function need() {
+  // A dead socket must not be reused. The CLI is safe (one verb per process) but the MCP
+  // server is long-lived: after the app restarted, every verb failed with "CDP socket
+  // closed" until the server process itself was restarted. Rebuild the session once.
+  if (session && !session.conn.isOpen()) session = null;
   if (!session) {
     const info = await preflight();
     if (!info.ok) throw new Error(`preflight refused:\n- ${info.problems.join('\n- ')}`);
@@ -141,16 +147,59 @@ async function need() {
   return session;
 }
 
+/**
+ * Argument checks live here, not only in the MCP handlers: the CLI reaches these verbs
+ * directly, so validating at the layer both surfaces cross is what makes a non-finite
+ * coordinate impossible to turn into a dead `SendInput`.
+ */
+function requireNumber(value, what) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new Error(`${what} must be a finite number, got ${JSON.stringify(value)}`);
+  return n;
+}
+
 /** `GetWindowRect` changes when the window resizes, so never trust the boot snapshot. */
 function syncWindow(s) {
   const fresh = findPaletteForPid(s.pid, os.listWindows());
   if (fresh) s.palette = fresh;
+  if (!s.palette) {
+    // Previously this returned null and every caller dereferenced it, so a vanished
+    // window surfaced as `Cannot read properties of null (reading 'rect')` — which says
+    // nothing about what happened. Name it: the app is gone, or its window class changed.
+    throw new Error(
+      `the palette window for pid ${s.pid} no longer exists — it was closed, the app exited, `
+      + `or the window class changed. Re-run preflight.`,
+    );
+  }
   return s.palette;
 }
 
+/**
+ * Is the PALETTE the foreground window — not merely some window of the app's process?
+ *
+ * Comparing pids was wrong and the mistake was invisible: `npm run dev` opens DevTools detached
+ * (`src/main/windows.ts`), DevTools belongs to the same pid, and it can hold the foreground. Every
+ * OS keystroke then went to DevTools while the harness believed the palette was focused — measured
+ * as three VK_ESCAPE presses that hid nothing, `focused: {how:'already'}`, and a palette whose
+ * `document.activeElement` was still a button. The handle comparison makes that state report as
+ * unfocused, which is when `ensureFocused` clicks the palette's own input and activates it for real.
+ */
 function paletteHasFocus(s) {
   const fg = os.getForegroundWindow();
-  return !!fg && fg.pid === s.pid;
+  if (!fg) return false;
+  // Handles are koffi pointers, which `JSON.stringify` refuses (`Do not know how to serialize a
+  // BigInt`) and which do not compare equal across call sites by identity, so compare their
+  // decimal/hex text and never let a raw pointer into a returned object.
+  const hwnd = s.palette?.hwnd ?? null;
+  if (hwnd) return String(fg.hwnd) === String(hwnd);
+  return fg.pid === s.pid;
+}
+
+/** What actually holds the keyboard, so a refusal is diagnosable from the transcript alone. */
+function foregroundInfo() {
+  const fg = os.getForegroundWindow();
+  if (!fg) return null;
+  return { hwnd: String(fg.hwnd), pid: fg.pid, title: (fg.title || '').slice(0, 60) };
 }
 
 /**
@@ -166,7 +215,7 @@ async function ensureFocused(s) {
   const point = target?.point ?? { x: rect.left + Math.round(rect.width / 2), y: rect.top + Math.round(rect.height / 2) };
   await os.clickAt(point.x, point.y);
   await sleep(80);
-  return { focused: paletteHasFocus(s), how: 'real click', point };
+  return { focused: paletteHasFocus(s), how: 'real click', point, foreground: foregroundInfo() };
 }
 
 export async function who() {
@@ -190,20 +239,36 @@ export async function listWindows() {
     .map(({ hwnd, ...w }) => w);
 }
 
-/** CSS-px element centre → physical screen point, through the measured scale. */
-async function cssToScreen(selector) {
-  const s = await need();
-  const rect = syncWindow(s).rect;
-  const live = await s.conn.read('state');
-  const scale = rect.width / live.width;
-  const box = await s.conn.rectOf(selector);
-  if (!box) throw new Error(`no element matches "${selector}"`);
+/**
+ * CSS-px rect → physical screen point, through the scale measured right now.
+ *
+ * Scale is re-derived per call from `GetWindowRect.width / innerWidth` rather than
+ * trusted from the session, because the window resizes between verbs — the tween alone
+ * changes it by 500 px — and a cached scale is a click in the wrong place.
+ */
+function cssCentreToScreen(s, box, innerWidth) {
+  const win = syncWindow(s).rect;
+  // A hidden or mid-teardown window can report `innerWidth` 0, which made the scale NaN
+  // and produced a click point of NaN rather than a diagnosable refusal.
+  if (!Number.isFinite(innerWidth) || innerWidth <= 0) {
+    throw new Error(`the palette reported innerWidth ${innerWidth} — cannot map CSS to screen pixels`);
+  }
+  const scale = win.width / innerWidth;
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   return {
-    point: { x: Math.round(rect.left + cx * scale), y: Math.round(rect.top + cy * scale) },
-    rect: box, cssCentre: { x: cx, y: cy }, scale,
+    point: { x: Math.round(win.left + cx * scale), y: Math.round(win.top + cy * scale) },
+    scale, cssCentre: { x: cx, y: cy },
   };
+}
+
+/** CSS-px element centre → physical screen point, through the measured scale. */
+async function cssToScreen(selector) {
+  const s = await need();
+  const live = await s.conn.read('state');
+  const box = await s.conn.rectOf(selector);
+  if (!box) throw new Error(`no element matches "${selector}"`);
+  return { rect: box, ...cssCentreToScreen(s, box, live.width) };
 }
 
 async function tapHotkey(combo) {
@@ -233,9 +298,25 @@ export async function hide() {
   if (!syncWindow(s).visible) return { hidden: true, note: 'already hidden' };
   const focus = await ensureFocused(s);
   if (!focus.focused) return { hidden: false, focus, note: 'palette never took focus; Escape would go elsewhere' };
-  await os.pressKey('escape');
-  const seen = await cdp.waitOn(s.conn, 'state', (v) => v.hidden, { timeoutMs: 4000 });
-  return { hidden: seen.ok, via: 'real VK_ESCAPE → useKeyboard.ts → window:hide', focus };
+  /**
+   * Escape is graded (`useKeyboard.ts:249-264`): a mounted dialog takes the first press, a
+   * non-empty query takes the next, and only then does the palette hide. A single press was
+   * therefore read as "the app ignores Escape" whenever a previous run left text in the field —
+   * measured: 3 presses on a stale expanded palette with a query, versus 2 presses from a known
+   * state. Clear to a defined state first, then allow three presses so a stranded
+   * `[role="dialog"]` (see `hooks/AGENTS.md`) is still survivable, and fail honestly if the
+   * window never hides.
+   */
+  if ((await s.conn.read('state')).inputValue) await clearInput();
+  let presses = 0;
+  let seen = { ok: false };
+  while (presses < 3) {
+    await os.pressKey('escape');
+    presses += 1;
+    seen = await cdp.waitOn(s.conn, 'state', (v) => v.hidden, { timeoutMs: 4000 });
+    if (seen.ok) break;
+  }
+  return { hidden: seen.ok, escapePresses: presses, via: 'real VK_ESCAPE → useKeyboard.ts → window:hide', focus };
 }
 
 /**
@@ -246,8 +327,13 @@ export async function hide() {
 export async function clearInput() {
   const s = await need();
   const before = (await s.conn.read('state')).inputValue;
+  // `null` means there is no `#search-input` in the DOM at all, which is not the same as
+  // an already-empty field: reporting `cleared: true` there scored a missing element as a
+  // successful clear.
+  if (before === null) throw new Error('no #search-input in the DOM — is the palette mounted?');
   if (!before) return { cleared: true, before: '', how: 'nothing to clear' };
-  await ensureFocused(s);
+  const focus = await ensureFocused(s);
+  if (!focusedForInput(focus)) return { cleared: false, refused: 'unfocused', before, focus };
   await os.pressCombo({ modifiers: ['ctrl'], key: 'a' });
   await os.pressKey('delete');
   const done = await cdp.waitOn(s.conn, 'state', (v) => v.inputValue === '', { timeoutMs: 3000 });
@@ -255,15 +341,20 @@ export async function clearInput() {
 }
 
 export async function clickAt(x, y, { button = 'left', anywhere = false } = {}) {
+  const px = requireNumber(x, 'x');
+  const py = requireNumber(y, 'y');
+  // Previously anything that was not exactly 'right' became a left click, so a typo like
+  // `middle` silently left-clicked and still reported success.
+  if (!['left', 'right'].includes(button)) throw new Error(`button must be left or right, got ${JSON.stringify(button)}`);
   const s = await need();
   if (!anywhere) {
     const rect = syncWindow(s).rect;
-    const inside = x >= rect.left && x < rect.left + rect.width
-      && y >= rect.top && y < rect.top + rect.height;
-    if (!inside) throw new Error(`(${x}, ${y}) is outside the palette rect ${JSON.stringify(rect)} — pass anywhere only when you mean to click another app`);
+    const inside = px >= rect.left && px < rect.left + rect.width
+      && py >= rect.top && py < rect.top + rect.height;
+    if (!inside) throw new Error(`(${px}, ${py}) is outside the palette rect ${JSON.stringify(rect)} — pass anywhere only when you mean to click another app`);
   }
-  await os.clickAt(x, y, { button });
-  return { clicked: { x, y, button }, cursor: os.getCursorPosition() };
+  await os.clickAt(px, py, { button });
+  return { clicked: { x: px, y: py, button }, cursor: os.getCursorPosition() };
 }
 
 /** Real cursor move + `SendInput` click. Never `el.click()`. */
@@ -275,10 +366,27 @@ export async function clickElement(selector) {
   return { selector, rect, cssCentre, point, cursor: os.getCursorPosition(), focused: after.activeElementId };
 }
 
+/**
+ * Keystrokes only reach the FOREGROUND window, so a verb that injects keys without
+ * confirming the palette holds the keyboard is reporting another application's
+ * keystrokes as a Qyther result. `hide()` already refused on this; typing and key
+ * presses did not, which is how the harness would type its probe query into a foreign
+ * session dialog and report that Qyther ignored typing.
+ */
+function focusedForInput(focus) {
+  return focus.focused === true;
+}
+
 export async function typeText(text) {
+  // `String(undefined)` is "undefined", so an omitted argument used to type that literal
+  // into the palette instead of failing.
+  if (typeof text !== 'string') throw new Error(`type needs a string, got ${typeof text}`);
+  if (!text.length) throw new Error('type needs a non-empty string');
+  if (text.length > 500) throw new Error(`refusing to type ${text.length} characters`);
   const s = await need();
   const focus = await ensureFocused(s);
-  await os.typeText(String(text));
+  if (!focusedForInput(focus)) return { typed: false, refused: 'unfocused', focus };
+  await os.typeText(text);
   const after = await s.conn.read('state');
   return { typed: text, inputValue: after.inputValue, focused: after.activeElementId, focus };
 }
@@ -286,20 +394,43 @@ export async function typeText(text) {
 export async function pressKey(name) {
   const s = await need();
   const focus = await ensureFocused(s);
+  if (!focusedForInput(focus)) return { key: name, pressed: false, refused: 'unfocused', focus };
   await os.pressKey(name);
-  return { key: name, focus, state: await s.conn.read('state') };
+  return { key: name, pressed: true, focus, state: await s.conn.read('state') };
 }
 
 export async function scrollAt(x, y, amount = -3) {
   await need();
-  await os.scrollAt(x, y, amount);
+  await os.scrollAt(requireNumber(x, 'x'), requireNumber(y, 'y'), requireNumber(amount, 'amount'));
   return { scrolled: { x, y, amount } };
 }
 
 export async function dragBetween(from, to) {
   await need();
-  await os.drag(from, to);
+  if (!from || !to) throw new Error('drag needs {from:{x,y}} and {to:{x,y}}');
+  await os.drag(
+    { x: requireNumber(from.x, 'from.x'), y: requireNumber(from.y, 'from.y') },
+    { x: requireNumber(to.x, 'to.x'), y: requireNumber(to.y, 'to.y') },
+  );
   return { dragged: { from, to } };
+}
+
+/**
+ * Wait for main's measured `window:modeSettled` rather than polling `innerHeight`. The poll runs
+ * at 150 ms against a 180 ms tween, so it could never resolve the transition — it could only
+ * notice that the window had already finished. The event carries main's own `height`, so the
+ * caller can assert the announced geometry against the geometry the renderer sees.
+ */
+async function waitModeSettled(conn, mode, timeoutMs = 1200) {
+  const since = Date.now();
+  const deadline = since + cdp.positiveMs(timeoutMs, 1200);
+  for (;;) {
+    const events = await conn.recorderEvents();
+    const hit = events.find((e) => e.at >= since && e.event === 'electron-window-mode-settled' && e.detail?.mode === mode);
+    if (hit) return { ok: true, height: hit.detail?.height };
+    if (Date.now() > deadline) return { ok: false };
+    await sleep(25);
+  }
 }
 
 /** Real Alt+Shift+M, the app's own cross-platform mode shortcut — not `window:setMode`. */
@@ -310,24 +441,77 @@ export async function setMode(mode) {
   const from = (await s.conn.read('state')).height;
   for (let attempt = 0; attempt < 2; attempt++) {
     await tapHotkey({ modifiers: ['alt', 'shift'], key: 'm' });
-    const settled = await cdp.waitOn(s.conn, 'state', (v) => Math.abs(v.height - want) <= 6, { timeoutMs: 3000 });
-    if (settled.ok) return { mode, from, to: settled.value.height, attempts: attempt + 1 };
+    const settled = await waitModeSettled(s.conn, mode);
+    if (settled.ok) {
+      const to = (await s.conn.read('state')).height;
+      // The whole point of carrying main's own number is comparing it with what the
+      // renderer sees, so say so rather than reporting both and calling it a check.
+      const mainDisagrees = Number.isFinite(settled.height) && Math.abs(settled.height - to) > 6;
+      if (Math.abs(to - want) <= 6) {
+        return {
+          mode, from, to, mainReportedHeight: settled.height, attempts: attempt + 1,
+          settledBy: 'window:modeSettled',
+          ...(mainDisagrees ? { geometryMismatch: { main: settled.height, dom: to } } : {}),
+        };
+      }
+    }
+    const polled = await cdp.waitOn(s.conn, 'state', (v) => Math.abs(v.height - want) <= 6, { timeoutMs: 3000 });
+    if (polled.ok) return { mode, from, to: polled.value.height, attempts: attempt + 1, settledBy: 'poll' };
   }
   return { mode, from, to: (await s.conn.read('state')).height, attempts: 2, note: `did not settle at ${want}px — the hotkey may not accept injected input` };
 }
 
 async function capture({ scope = 'palette' } = {}) {
   const s = await need();
+  if (scope !== 'palette' && scope !== 'desktop') {
+    throw new Error(`unknown scope "${scope}" — palette or desktop`);
+  }
+  const st = await s.conn.read('state');
+  // Measured: Page.captureScreenshot never returns against a hidden window — it hangs
+  // to the 20 s timeout. Refuse fast instead of pretending the frame is empty.
+  //
+  // This refusal used to be palette-only, which was the more dangerous of the two: a
+  // `desktop` grab of a hidden window's rect is not empty, it is *the desktop behind the
+  // palette* — another application's window, composited into a frame the harness then
+  // reports as a successful capture of this app, and (via `save_frame`) onto disk.
+  if (st.hidden) {
+    return {
+      refused: 'hidden',
+      scope,
+      hint: 'call reveal — a hidden window renders no frames, and the desktop behind it is not this app',
+      state: st,
+    };
+  }
   if (scope === 'desktop') {
     const frame = os.captureScreenRect(syncWindow(s).rect);
     return { scope, source: 'gdi-bitblt', width: frame.width, height: frame.height, png: encodePng(frame) };
   }
-  if (scope !== 'palette') throw new Error(`unknown scope "${scope}" — palette or desktop`);
-  const st = await s.conn.read('state');
-  // Measured: Page.captureScreenshot never returns against a hidden window — it hangs
-  // to the 20 s timeout. Refuse fast instead of pretending the frame is empty.
-  if (st.hidden) return { refused: 'hidden', hint: 'call reveal — a hidden window renders no frames', state: st };
   return { scope, source: 'cdp-page-capture', png: await s.conn.capturePalette() };
+}
+
+/**
+ * Pixel statistics, so "the capture returned bytes" is not mistaken for "the capture
+ * shows the app". `bytes > 1000` passes for a uniformly transparent PNG and for a frame
+ * of the desktop showing someone else's window, which are exactly the two failures the
+ * two capture scopes exist to catch. The palette is `transparent: true`, so a real frame
+ * has both an alpha-varying margin and an opaque card; the desktop grab is composited
+ * and is opaque throughout.
+ */
+export function frameStats(png) {
+  const img = PNG.sync.read(png);
+  const seen = new Set();
+  let opaque = 0;
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] > 8) opaque += 1;
+    if (seen.size < 4096) seen.add(((img.data[i] << 24) ^ (img.data[i + 1] << 16) ^ (img.data[i + 2] << 8) ^ img.data[i + 3]) >>> 0);
+  }
+  const pixels = img.width * img.height || 1;
+  return {
+    width: img.width,
+    height: img.height,
+    distinctColours: seen.size,
+    opaqueFraction: Number((opaque / pixels).toFixed(4)),
+  };
 }
 
 /**
@@ -338,7 +522,7 @@ async function capture({ scope = 'palette' } = {}) {
 export async function screenshot({ scope = 'palette', inline = false } = {}) {
   const shot = await capture({ scope });
   if (shot.refused) return shot;
-  const out = { scope: shot.scope, source: shot.source, bytes: shot.png.length };
+  const out = { scope: shot.scope, source: shot.source, bytes: shot.png.length, ...frameStats(shot.png) };
   if (inline) out.base64 = shot.png.toString('base64');
   return out;
 }
@@ -350,7 +534,11 @@ function encodePng({ width, height, rgba }) {
 }
 
 function framePath(id) {
-  return join(TMP_DIR, `${String(id).replace(/[^\w.-]/g, '_')}.png`);
+  const safe = String(id ?? '').replace(/[^\w.-]/g, '_');
+  // The sanitiser already strips separators, so this cannot traverse; an empty result
+  // would just write `.png`, which is a junk artifact rather than a named one.
+  if (!safe) throw new Error('save_frame needs a non-empty id');
+  return join(TMP_DIR, `${safe}.png`);
 }
 
 async function pruneFrames() {
@@ -369,17 +557,57 @@ async function pruneFrames() {
 }
 
 /**
+ * Absolute filesystem paths anywhere in a string: `C:\…`, `D:/…` and UNC `\\host\share`.
+ *
+ * The privacy gate used to be "every visible row contains the repo root", which is wrong
+ * in a way this repo can measure. A result row is chrome plus a path plus a file-type
+ * badge, so a row with no path at all — the palette's own `🌐 Search web for "query"`
+ * action — was reported as a leak: the baseline run refused the frame with
+ * `leaked: 1, samples: ["🌐 Search web for \"desktop-hitl\" Open in default browser Action ↵"]`,
+ * which contains no path and nothing personal. Meanwhile the gate read only the rows,
+ * so a path typed into the search box was rendered into the captured pixels unchecked.
+ *
+ * What actually leaks is a filesystem path, so that is what is matched. The match is
+ * deliberately over-eager at the edges — a path containing spaces is cut short, and the
+ * truncated prefix is still outside the repo, so the gate keeps refusing. Failing closed
+ * is the correct direction for a privacy gate.
+ */
+const ABS_PATH = /(?:[A-Za-z]:[\\/]|\\\\)[^\s"'<>|]*/g;
+
+/** Pure, so the selftest can prove the gate can say no without an Everything index. */
+export function foreignPaths(strings, root = REPO_ROOT) {
+  const rootLower = String(root).toLowerCase();
+  const out = [];
+  for (const s of strings ?? []) {
+    for (const match of String(s).match(ABS_PATH) ?? []) {
+      if (!match.toLowerCase().startsWith(rootLower)) out.push(match);
+    }
+  }
+  return out;
+}
+
+/**
  * Writes a frame only if the privacy gate passes. Everything indexes every drive, so a
  * captured result list leaks personal paths (measured: an ordinary word query returned
  * dozens of rows, most of them under the user profile or `C:\Windows\WinSxS`).
+ *
+ * The scan covers the rows, the selected row, and the query itself: the input field is
+ * rendered into the frame, so an agent that typed a path and captured would have written
+ * that path to disk without ever touching a result row.
  */
 export async function saveFrame(id, { scope = 'palette' } = {}) {
   const shot = await capture({ scope });
   if (shot.refused) return shot;
   const st = await readState('state');
-  const foreign = (st.rows ?? []).filter((r) => !r.includes(REPO_ROOT));
+  const scanned = [st.inputValue, st.selectedText, ...(st.rows ?? [])].filter((v) => typeof v === 'string');
+  const foreign = foreignPaths(scanned, REPO_ROOT);
   if (foreign.length) {
-    return { refused: 'privacy-gate', leaked: foreign.length, total: st.rows.length, samples: foreign.slice(0, 3) };
+    return {
+      refused: 'privacy-gate',
+      leaked: foreign.length,
+      scanned: scanned.length,
+      samples: [...new Set(foreign)].slice(0, 3),
+    };
   }
   const decoded = PNG.sync.read(shot.png);
   await mkdir(TMP_DIR, { recursive: true });
@@ -401,11 +629,24 @@ export async function waitFor(cond, { timeoutMs = 9000 } = {}) {
     value: (v) => v.inputValue === cond.value,
     mode: (v) => Math.abs(v.height - MODE_HEIGHTS[cond.mode]) <= 6,
   };
+  /**
+   * The recorder buffer is persistent and bounded, so an event that fired between the
+   * caller's action and this wait is still in it — and that is normally the event the
+   * caller is waiting for. Filtering by "since the wait started" therefore discarded the
+   * very event being waited on and reported `ok: false` while listing the event in its own
+   * `events` payload.
+   *
+   * So there is no implicit time filter. A caller that genuinely needs only future events
+   * passes `cond.sinceMs` (epoch ms, captured before its action); callers that drove the
+   * action themselves get the whole buffer, which is what makes the wait able to report
+   * an event that already arrived.
+   */
   if (cond.kind === 'event') {
-    const deadline = Date.now() + timeoutMs;
+    const since = Number.isFinite(Number(cond.sinceMs)) ? Number(cond.sinceMs) : -Infinity;
+    const deadline = Date.now() + cdp.positiveMs(timeoutMs, 9000);
     for (;;) {
-      const events = await s.conn.drainRecorder();
-      const hit = events.find((e) => e.event === `electron-window-${cond.name}`);
+      const events = await s.conn.recorderEvents();
+      const hit = events.find((e) => e.at >= since && e.event === `electron-window-${cond.name}`);
       if (hit) return { ok: true, hit, events };
       if (Date.now() > deadline) return { ok: false, events };
       await sleep(150);
@@ -418,32 +659,51 @@ export async function waitFor(cond, { timeoutMs = 9000 } = {}) {
 }
 
 /**
- * Interactive elements with their CSS rects, so a driver can pick a target without
- * guessing selectors. This stands in for the accessibility tree: CDP
- * `Accessibility.getFullAXTree` returns 0 nodes against this app, and the OS UIA path
- * cannot load at all in this checkout (`node-winautomation` has no built addon).
+ * Interactive elements as a user and a screen reader perceive them, with CSS rects.
+ *
+ * Built on the real accessibility tree (`Accessibility.enable` → `getFullAXTree`), not a
+ * DOM selector sweep. The difference is what the `name` is: Chromium computes it from
+ * the accessible name specification, so it is the label a person reads — "Keyboard
+ * shortcuts", "Search for files, tools, actions...", "Switch to light mode" — rather
+ * than a textContent scrape that changes with styling. See `cdp.mjs` `axNodes` for why
+ * the previously recorded "0 nodes" was a measurement artefact.
  */
 export async function axSnapshot({ limit = 40 } = {}) {
   const s = await need();
-  const expr = `(() => {
-    const sel = '[role],[id],button,input,a[href],[aria-label],[tabindex]:not([tabindex="-1"])';
-    const out = [];
-    for (const el of document.querySelectorAll(sel)) {
-      const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) continue;
-      out.push({
-        role: el.getAttribute('role') || el.tagName.toLowerCase(),
-        name: (el.getAttribute('aria-label') || el.textContent || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 60),
-        id: el.id || null,
-        disabled: !!el.disabled,
-        rect: { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) },
-      });
-      if (out.length >= ${Math.trunc(Number(limit) || 40)}) break;
-    }
-    return JSON.stringify(out);
-  })()`;
-  const r = await s.conn.cdp('Runtime.evaluate', { expression: expr, returnByValue: true });
-  return JSON.parse(r.result.value);
+  return s.conn.axNodes({ limit });
+}
+
+/**
+ * Click a control the way a person names it — role plus accessible name — instead of
+ * asking the caller for a CSS selector it cannot see. This is the `getByRole` model:
+ * targeting survives a restyle that renames a class, and it cannot silently address the
+ * wrong element by matching a loose selector.
+ *
+ * Matching is a case-insensitive substring on the accessible name, and the failure path
+ * lists what *was* on screen, so a miss is diagnosable from the transcript alone.
+ */
+export async function clickRole(role, name) {
+  const s = await need();
+  const nodes = await s.conn.axNodes({ limit: 200 });
+  const wantRole = String(role ?? '').toLowerCase();
+  const wantName = String(name ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const matches = nodes.filter((n) => (n.role ?? '').toLowerCase() === wantRole && (n.name ?? '').toLowerCase().includes(wantName));
+  if (!matches.length) {
+    return { clicked: false, role, name, reason: `no ${role} whose name contains "${name}"`, available: nodes.map((n) => `${n.role}: ${n.name}`) };
+  }
+  const node = matches[0];
+  if (!node.rect) return { clicked: false, role, name, reason: 'matched node has no box', available: matches.map((n) => n.name) };
+  const live = await s.conn.read('state');
+  const { point, scale, cssCentre } = cssCentreToScreen(s, node.rect, live.width);
+  await os.clickAt(point.x, point.y);
+  const after = await s.conn.read('state');
+  return {
+    clicked: true, role: node.role, name: node.name, rect: node.rect,
+    // Substring matching can legitimately be ambiguous, and silently taking the first hit
+    // is a wrong-element click reported as success. Report it so the caller can narrow.
+    ambiguous: matches.length > 1 ? matches.map((n) => n.name) : undefined,
+    point, scale, cssCentre, cursor: os.getCursorPosition(), focused: after.activeElementId,
+  };
 }
 
 export async function closeSession() {

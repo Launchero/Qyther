@@ -88,9 +88,17 @@ const clickText = (label) => evaluate(`(() => {
 
 const api = (call) => evaluate(`(async () => await window.electronAPI.${call})()`);
 
-/** Radix closes on the header X or an outside pointerdown/pointerup. Escape is unusable here: it hides the whole window. */
+/** Radix closes on the header X or an outside pointerdown/pointerup. Escape is unusable here: it hides the whole window.
+ *  The upstream close button carries no `aria-label` — its accessible name is an
+ *  `sr-only` span, which `textContent` sees and `innerText` does not. */
 const dismissDialog = async () => {
-  const closed = await click('button[aria-label="Close"]');
+  const closed = await evaluate(`(() => {
+    const btn = [...document.querySelectorAll('[data-slot="dialog-content"] button')]
+      .find((b) => /close/i.test((b.getAttribute('aria-label') || '') + (b.textContent || '')));
+    if (!btn) return 'not-found';
+    btn.click();
+    return 'clicked';
+  })()`);
   if (closed !== 'clicked') {
     await evaluate(`(() => {
       const overlay = document.querySelector('[data-slot="dialog-overlay"]') || document.querySelector('[role="dialog"]')?.parentElement;
@@ -134,7 +142,7 @@ const shown = async () => {
   return s;
 };
 
-/** Window height animates 30px per 16ms, so wait for the geometry to settle before shooting. */
+/** Window height eases to the target over ~180ms, so wait for the geometry to settle before shooting. */
 const setMode = async (mode) => {
   await shown();
   // A live result list auto-grows the window and fights the requested mode, so empty it first.
@@ -145,7 +153,7 @@ const setMode = async (mode) => {
     set.call(el, '');
     el.dispatchEvent(new Event('input', { bubbles: true }));
   })()`).catch(() => {});
-  const want = mode === 'compact' ? 103 : 603;
+  const want = mode === 'compact' ? 74 : 603;
   for (let attempt = 0; attempt < 3; attempt++) {
     await api(`window.setMode('${mode}')`);
     const s = await poll((x) => !x.hidden && Math.abs(x.height - want) <= 2, { ms: 4000 });
@@ -202,9 +210,44 @@ const shotResults = async (id, query) => {
   console.log(`  ${id.padEnd(28)} ${s.width}x${s.height} ${s.theme.padEnd(6)} ${s.rows.length} rows, all inside repo`);
 };
 
+/**
+ * The palette renders `#search-input` only in the Files tab, and `searchMode` is
+ * React state with no IPC surface — so a session left in Ask mode makes the first
+ * `type()` throw and the whole run die. Two non-obvious things this has to do right:
+ * - Match by role, not text. While collapsed, `ModeTabs` renders ONE pill whose
+ *   label is the *current* mode and whose click only expands the pair, so a text
+ *   match on "Files" hits the pill in Ask mode and ping-pongs forever.
+ * - A Radix `TabsTrigger` does not activate on `element.click()`. It activates from
+ *   its pointer/mouse down handler, so the tab needs a real pointer sequence —
+ *   measured: `.click()` left Ask mode mounted, the sequence below switched it.
+ */
+const clickFilesTab = () => evaluate(`(() => {
+  const pill = document.querySelector('button[aria-label^="Switch mode"]');
+  if (pill) { pill.click(); return 'expanded'; }
+  const tab = [...document.querySelectorAll('[role="tab"]')].find((t) => (t.innerText || '').trim().startsWith('Files'));
+  if (!tab) return 'nothing-to-click';
+  const r = tab.getBoundingClientRect();
+  const o = { bubbles: true, cancelable: true, composed: true, view: window, button: 0, pointerId: 1, isPrimary: true, pointerType: 'mouse', clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+  ['pointerover', 'pointerenter', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((k) =>
+    tab.dispatchEvent(k.startsWith('pointer') ? new PointerEvent(k, o) : new MouseEvent(k, o)));
+  return 'tab-activated';
+})()`);
+
+const ensureFilesMode = async () => {
+  const mounted = () => evaluate(`!!document.getElementById('search-input')`);
+  if (await mounted()) return;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await clickFilesTab();
+    await sleep(350);
+    if (await mounted()) return;
+  }
+  throw new Error('could not reach the Files tab — #search-input never mounted');
+};
+
 await cdp('Page.enable');
 await mkdir(OUT, { recursive: true });
 console.log(`Attaching to ${page.url}\nWriting ${OUT}\n`);
+await ensureFilesMode();
 
 for (const theme of ['light', 'dark']) {
   await type('');           // a live result list keeps the window auto-grown, so clear first
