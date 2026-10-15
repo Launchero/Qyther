@@ -91,6 +91,7 @@ coverage/
 .cache/
 temp/
 tmp/
+.tmp-brand/
 
 # Cursor (IDE)
 .cursor/
