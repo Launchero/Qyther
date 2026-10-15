@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 05 · Focus First (GOV.UK Design System utility language)</title>
+<!--
+  DIRECTION: "Focus First" — the GOV.UK Design System's accessibility-first utility language
+  (govuk-frontend, MIT). Black-and-white with one blue link, one yellow focus plate, one red
+  error, ONE 5px rule doing all the structural work.
+  Provenance: GOV.UK Design System / `govuk-frontend` SCSS palette and functional colour map.
+  Type plan: GDS Transport is licence-restricted to *.gov.uk / service.gov.uk, so the mock ships
+  the substitution GDS itself prescribes (Arial / Helvetica). Weights 400 and 700 only.
+  Geometry: ZERO radius, ZERO shadow, the 5/10/15/20/25/30/40/50/60px scale (not an 8px grid),
+  a 5px solid black left bar as the interactive-block marker, and a yellow focus plate with a
+  black underline as the loudest state on the page.
+  The page shell (the lab chrome behind the two columns) is NOT this direction — it is the
+  baseline's own neutral #1b1c20 plate, so the only thing being judged is the two surfaces.
+  Markup added beyond the baseline skeleton, all of it reported:
+    - `.ib` wrapper on the selected result row, on every settings row and on the desktop-agent
+      panel: the 5px bar has to live on the border box, and the baseline's rows and `.setting`
+      elements already use a `<span style="flex:1">` + `<br>` cell shape and a plain grid cell
+      that cannot carry it without a second box.
+    - one labelled specimen section in surface 2 for the loading skeleton (the app's real
+      `.skeleton-row` state), beside the baseline's existing tooltip specimen.
+    - `data-state="disabled"` on the surface-3 send button: Send is inert while an answer
+      streams, which is the only honest disabled control in these five surfaces.
+    - `data-state="visited"` on one plain result row. That is an attribute on existing markup, in
+      the `hover`/`selected`/`focus` vocabulary the baseline already uses, not a new element: it
+      buys the third link state this system has and a command palette has never had.
+-->
+<style>
+/* ══ token block: light — GOV.UK palette, our role names ═══════════════════ */
+[data-theme="light"] {
+  --background: #f3f3f3;            /* black tint-95 — the page plate */
+  --foreground: #0b0c0c;            /* black — 19.59:1 on white */
+  --card: #ffffff;                  /* white */
+  --card-foreground: #0b0c0c;
+  --popover: #ffffff;
+  --popover-foreground: #0b0c0c;
+  --primary: #1d70b8;               /* blue — the one colour that means "act" */
+  --primary-foreground: #ffffff;
+  --secondary: #cecece;             /* black tint-80 — their tag fill; 12.45:1 black on it */
+  --secondary-foreground: #0b0c0c;
+  --muted: #f3f3f3;                 /* black tint-95 */
+  --muted-foreground: #484949;      /* black tint-25 — 9.03:1 */
+  --accent: #f3f3f3;                /* hover is a whisper; focus is the shout */
+  --accent-foreground: #0b0c0c;
+  --destructive: #ca3535;           /* 5.16:1 as text on white */
+  --destructive-foreground: #ffffff;
+  --destructive-shade: #982828;     /* shade-25 */
+  --success: #0f7a52;               /* 5.35:1 as text on white */
+  --success-foreground: #ffffff;
+  --success-shade: #0b5c3e;
+  --warning: #806f00;               /* yellow shade-50 — 5.01:1 as text on white. their yellow is
+                                       NEVER text on white (1.35:1); it is only ever a PLATE */
+  --warning-soft: #ffdd00;          /* the plate itself */
+  --warning-foreground: #0b0c0c;    /* 14.55:1 — black, the only foreground yellow accepts */
+  --info: #1a65a6;                  /* blue shade-10 — the link colour, 6.08:1 */
+  --info-foreground: #ffffff;
+  --info-shade: #0f385c;            /* blue shade-50 — link hover, 12.07:1 */
+  --visited: #54319f;               /* purple — the only visited state this system admits */
+  --success-soft: #eff7f3;          /* 4.91:1 under --success text */
+  --info-soft: #f4f8fb;                /* 5.69:1 under --info text */
+  --destructive-soft: #fbedec;         /* 17.19:1 black, 4.53:1 --destructive */
+  --border: #cecece;                /* black tint-80 — decorative rule, 1.57:1 */
+  --input: #0b0c0c;                 /* FULL BLACK — the loudest line on the page */
+  --ring: #ffdd00;                  /* focus = a yellow plate, not a ring */
+  --ring-ink: #0b0c0c;              /* and black text + a black underline on it */
+  /* Declared so this block diffs cleanly against semantic/theme.css even where these five
+     surfaces paint nothing: --scrim (the loading overlay's plate) and the two agent pill hues,
+     which are Browser and Document — the transcript here carries the Desktop label. */
+  --scrim: #0b0c0c;
+  --desktop-plate: #ffffff;
+  --mark-bg: #ffdd00;               /* the match highlight is a yellow inline plate */
+  --mark-ink: #0b0c0c;
+  --file-css: #1a65a6;
+  --file-md: #484949;
+  --file-folder: #0f7a52;
+  --file-ts: #54319f;               /* their palette has no file-type hues at all, so the icon
+                                       column borrows the link/visited ramp — see the risk line */
+  --agent-browser: #54319f;         /* their palette holds no separate agent hue */
+  --agent-document: #806f00;
+  --shadow-command-palette: none;   /* shadows are ZERO: their elevation language is a border  */
+  --shadow-popover: none;           /* plus a value step, so the three shadow tokens every     */
+  --shadow-key: none;               /* other mock fills with a tinted OKLCH shadow are `none`  */
+}
+/* ══ token block: dark — a night-service plate, authored, not inverted ═════ */
+[data-theme="dark"] {
+  --background: #0b0c0c;            /* black, used as the plate */
+  --foreground: #ffffff;            /* 19.59:1 */
+  --card: #171819;                  /* lifted one step; white on it 17.78:1 */
+  --card-foreground: #ffffff;
+  --popover: #232424;               /* white on it 15.56:1 */
+  --popover-foreground: #ffffff;
+  --primary: #5694ca;               /* night-service blue — 5.49:1 on card */
+  --primary-foreground: #0b0c0c;
+  --secondary: #565656;             /* black tint-50 lifted — 7.34:1 under white */
+  --secondary-foreground: #ffffff;
+  --muted: #232424;
+  --muted-foreground: #cbcbcb;      /* a tint-95-ish grey — 10.96:1 on card */
+  --accent: #2e2f2f;                /* hover is a step of value, never a hue */
+  --accent-foreground: #ffffff;
+  --destructive: #f6a8a8;           /* red lifted for the plate; #ca3535 is only 3.45:1 on card */
+  --destructive-foreground: #0b0c0c;
+  --destructive-shade: #d87373;
+  --success: #45c58f;               /* green lifted — 8.16:1 on card */
+  --success-foreground: #0b0c0c;
+  --success-shade: #2f9e71;
+  --warning: #ffdd00;               /* unchanged — their yellow is already night-legible */
+  --warning-soft: #ffdd00;
+  --warning-foreground: #0b0c0c;
+  --info: #5694ca;                  /* the declared night link — 5.49:1 as text */
+  --info-foreground: #0b0c0c;
+  --info-shade: #8fbfe0;            /* hover LIGHTENS on a dark plate */
+  --visited: #b08ccf;               /* purple lifted */
+  --success-soft: #123a2c;
+  --destructive-soft: #2a1416;         /* 17.35:1 white, 9.16:1 lifted red */
+  --info-soft: #12283f;                /* 4.63:1 under the night link */
+  --border: #565656;                /* decorative rule: 2.67:1 on the plate, 2.42:1 on card */
+  --input: #ffffff;                 /* control boundary stays the loudest line */
+  --ring: #ffdd00;                  /* focus yellow is absolute, not theme-relative */
+  --ring-ink: #0b0c0c;
+  --scrim: #000000;
+  --desktop-plate: #171819;
+  --mark-bg: #ffdd00;
+  --mark-ink: #0b0c0c;
+  --file-css: #5694ca;
+  --file-md: #cbcbcb;
+  --file-folder: #45c58f;
+  --file-ts: #b08ccf;
+  --agent-browser: #b08ccf;
+  --agent-document: #ffdd00;
+  --shadow-command-palette: none;
+  --shadow-popover: none;
+  --shadow-key: none;
+}
+/* ══ shared geometry — theme-independent ══════════════════════════════════ */
+:root {
+  --palette-w: 800px;               /* unchanged, and the only number both systems agree on */
+  --header-h: 72px;
+  --row-h: 40px;
+  --target-min: 32px;
+  --radius-base: 0px;               /* THE RULE: a radius of zero, everywhere, no exceptions */
+  --radius-palette: 0px;
+  --radius-md: 0px;
+  --radius-sm: 0px;
+  --radius-xs: 0px;
+  --radius-pill: 0px;               /* their spinner is a conic wedge, not a round pill */
+  --hair: 1px;                      /* decorative rule */
+  --rule-w: 2px;                    /* control border: 2px of full black */
+  --rule-w-heavy: 4px;              /* heading underline */
+  --bar-w: 5px;                     /* the interactive-block bar */
+  /* The black underline of the yellow focus plate, drawn as a box-shadow so it costs no layout.
+     It is the ONE shadow in this file and it is not elevation: GOV.UK's own focused-text mixin
+     paints its plate with `box-shadow: 0 -2px #ffdd00, 0 4px #ffdd00` and switches the link
+     underline off, which is this shape inverted. `--ring-ink` resolves per theme. */
+  --focus-underline: inset 0 calc(-1 * var(--rule-w-heavy)) 0 0 var(--ring-ink);
+  --sp-0: 0px;
+  --sp-1: 5px;                      /* their scale is 5/10/15/20/25/30/40/50/60 — */
+  --sp-2: 10px;                     /* NOT an 8px grid, however often that is claimed */
+  --sp-3: 15px;
+  --sp-4: 20px;
+  --sp-5: 25px;
+  --sp-6: 30px;
+  --sp-7: 40px;
+  --sp-8: 50px;
+  --sp-9: 60px;
+  /* control sizes the 5-point scale does NOT have a rung for. this is a finding,
+     not an oversight: 18/20/22/24/26/28 are shadcn numbers, and their scale is 5/10/15/20. */
+  --count-h: 18px;
+  --keycap-min-w: 20px;
+  --tag-mini-h: 22px;
+  --chip-w: 24px;
+  --tag-h: 26px;
+  --ghost-h: 28px;
+  --tile-min-w: 200px;
+  --swatch-w: 34px;
+  --lab-brief-w: 1720px;
+  --bubble-max: 88%;
+  --text-code-inline: .9em;
+  --pad-card: 10px;
+  --pad-row: 10px;
+  --gap-inline: 10px;
+  --gap-block: 15px;
+  --gap-section: 20px;
+  --icon-w: 28px;                   /* unchanged, and now next to a 5px bar that eats it */
+  --measure: 42rem;
+  --font-ui: Arial, "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --text-xs: 13px;  --lh-xs: 1.35;  --ls-xs: 0;      /* the ramp is COMPRESSED: their real scale */
+  --text-sm: 13px;  --lh-sm: 1.4;   --ls-sm: 0;      /* is 16/19/21/24/32/48/80px with 24-50px    */
+  --text-base: 16px; --lh-base: 1.5; --ls-base: 0;   /* leading, a page scale. 13px is the floor */
+  --text-lg: 20px;  --lh-lg: 1.5;                     /* here, so the 16px body is where type     */
+  --text-xl: 28px;  --lh-xl: 1.25;                    /* starts to feel like the real thing.      */
+  --text-2xl: 40px; --lh-2xl: 1.1;                    /* 24px is their first heading rung.        */
+  --tracking-label: 0.03em;
+  --weight-regular: 400;
+  --weight-bold: 700;
+  --transition-colour: 150ms;       /* colour only. nothing else moves. */
+  --lab-page: #1b1c20;              /* lab chrome, not part of the direction */
+  --lab-ink: #e8e8ea;
+  --lab-muted: #b9bac1;
+  --lab-faint: #8f929c;
+  --lab-panel: #d5d6db;
+  --lab-rule: #33353c;
+}
+
+* { box-sizing: border-box; }
+/* ONE RULE: the radius collapse. Tailwind v4 maps the `--radius-*` namespace onto `rounded-*`,
+   so in the real app this is a single edit in tokens/radius.css — every rung to 0, no component
+   touched, the pristine ui/ primitives included. Spelled out rung by rung below rather than
+   simply omitted, so this block still diffs against tokens/radius.css. */
+* { border-radius: var(--radius-base); }
+body {
+  margin: var(--sp-0); padding: var(--sp-7) var(--sp-7) var(--sp-8);
+  font-family: var(--font-ui); font-weight: var(--weight-regular);
+  background: var(--lab-page);
+  color: var(--lab-ink);
+}
+h1 { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: var(--weight-bold); letter-spacing: var(--ls-sm); margin: var(--sp-0) 0 var(--sp-2); }
+.brief { max-width: var(--lab-brief-w); margin: var(--sp-0) auto var(--sp-6); }
+.brief p { max-width: 80ch; font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: var(--weight-regular); color: var(--lab-muted); margin: var(--sp-0) 0 var(--sp-2); }
+.brief p b { color: var(--lab-ink); font-weight: var(--weight-bold); }
+.brief code { font-family: var(--font-mono); }
+.moves { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-0) 0 var(--sp-2); padding: var(--sp-0); list-style: none; }
+.moves li { flex: 1 1 340px; border: var(--hair) solid var(--lab-rule); border-left: var(--bar-w) solid var(--lab-ink); padding: var(--sp-2); font-size: var(--text-sm); color: var(--lab-panel); }
+.moves b { display: block; font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-faint); margin-bottom: var(--sp-1); }
+.swatches { display: flex; gap: var(--sp-4); margin: var(--sp-4) 0 0; flex-wrap: wrap; }
+.swatch-set { display: flex; gap: var(--sp-0); border: var(--hair) solid var(--lab-rule); }
+.swatch { width: var(--swatch-w); height: var(--tag-h); }
+.swatch-set figcaption { font-size: var(--text-xs); color: var(--lab-faint); margin-top: var(--sp-1); }
+.board { display: flex; gap: var(--sp-7); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--text-base); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-faint); margin: var(--sp-0) 0 var(--sp-3); text-align: center; border-bottom: var(--rule-w-heavy) solid var(--lab-rule); padding-bottom: var(--sp-1); }
+.surface { margin-bottom: var(--sp-7); }
+.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground); margin: var(--sp-0) 0 var(--sp-1); font-weight: var(--weight-bold); }
+.page { background: var(--background); color: var(--foreground); padding: var(--sp-4); }
+.desktop { background: var(--desktop-plate); }
+
+/* ── palette shell ───────────────────────────────────────────────────────── */
+.palette {
+  width: 100%; border: var(--hair) solid var(--border);
+  border-left: var(--bar-w) solid var(--input);
+  background: var(--card); color: var(--foreground);
+  box-shadow: var(--shadow-command-palette); overflow: hidden;
+}
+.palette-header {
+  height: var(--header-h); display: flex; align-items: center; gap: var(--gap-inline);
+  padding: var(--sp-0) var(--pad-card); background: var(--card); border-bottom: var(--rule-w) solid var(--input);
+}
+.mode-pill {
+  display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--tag-h); padding: var(--sp-0) var(--sp-2);
+  background: var(--secondary); color: var(--secondary-foreground);
+  font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  border: var(--rule-w) solid var(--input);
+}
+.search { flex: 1; display: flex; align-items: center; gap: var(--gap-inline); min-width: 0;
+  border: var(--rule-w) solid var(--input); padding: var(--sp-0) var(--sp-1); height: var(--target-min); }
+.search svg { flex: none; color: var(--foreground); }
+.query {
+  flex: 1; min-width: 0; border: 0; background: transparent; color: var(--foreground);
+  font-family: var(--font-ui); font-size: var(--text-base); line-height: var(--lh-base); letter-spacing: var(--ls-base);
+}
+.query::placeholder { color: var(--muted-foreground); }
+.icon-btn {
+  width: var(--target-min); height: var(--target-min); display: grid; place-items: center;
+  background: transparent; color: var(--foreground); border: var(--hair) solid transparent;
+  transition: background-color var(--transition-colour) linear, color var(--transition-colour) linear;
+}
+.icon-btn:hover { background-color: var(--accent); }
+.icon-btn:focus-visible, .query:focus-visible, .btn:focus-visible, .ghost-btn:focus-visible,
+.row[data-state="focus"], .ib[data-state="focus"], .tile:focus-visible, .switch:focus-visible {
+  background-color: var(--ring); color: var(--ring-ink);
+  box-shadow: var(--focus-underline);
+  outline: var(--rule-w) solid var(--ring); outline-offset: var(--sp-0);
+}
+.vr { width: var(--hair); height: var(--sp-6); background: var(--border); }
+.keycap {
+  display: inline-grid; place-items: center; min-width: var(--keycap-min-w); height: var(--tag-mini-h); padding: var(--sp-0) var(--sp-1);
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--foreground);
+  background: var(--card); border: var(--rule-w) solid var(--input);
+  box-shadow: var(--shadow-key);
+}
+.palette-body { background: var(--card); }
+.palette-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline);
+  padding: var(--sp-2) var(--pad-card); background: var(--muted); border-top: var(--rule-w) solid var(--input);
+  font-size: var(--text-xs); color: var(--foreground);
+}
+.ghost-btn {
+  display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--ghost-h); padding: var(--sp-0) var(--sp-2);
+  border: var(--rule-w) solid var(--input); background: var(--card);
+  color: var(--foreground); font-size: var(--text-xs); font-weight: var(--weight-bold);
+  transition: background-color var(--transition-colour) linear, color var(--transition-colour) linear;
+}
+.ghost-btn:hover { background-color: var(--accent); }
+
+/* ── lists ───────────────────────────────────────────────────────────────── */
+.section-head {
+  display: flex; align-items: center; gap: var(--gap-inline);
+  padding: var(--sp-2) var(--pad-card) var(--sp-1); font-size: var(--text-xs); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground);
+}
+.count {
+  display: inline-grid; place-items: center; min-width: var(--keycap-min-w); height: var(--count-h); padding: var(--sp-0) var(--sp-1);
+  background: var(--secondary); color: var(--secondary-foreground); font-weight: var(--weight-bold);
+}
+.tile-row { display: flex; gap: var(--gap-block); padding: var(--sp-2) var(--pad-card); }
+.tile {
+  display: flex; align-items: center; gap: var(--gap-inline); padding: var(--sp-2); min-width: var(--tile-min-w);
+  border: var(--rule-w) solid var(--input); background: var(--card);
+  font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--foreground);
+  transition: background-color var(--transition-colour) linear, color var(--transition-colour) linear;
+}
+.tile:hover { background-color: var(--accent); }
+.row {
+  display: grid; grid-template-columns: var(--icon-w) minmax(0,1fr) minmax(0,auto) auto;
+  align-items: center; gap: var(--gap-inline); min-height: var(--row-h);
+  padding: var(--pad-row) var(--pad-card);
+  transition: background-color var(--transition-colour) linear, color var(--transition-colour) linear;
+}
+/* the 5px black left bar. it is a BORDER, so it needs the border box: that is the .ib wrapper
+   added on the selected row, on every settings row and on the agent panel. 5px 5px 5px 0 is
+   GOV.UK's block-rule weight; the edge a palette row can actually spend is the leading one. */
+.ib { border-left: var(--bar-w) solid var(--input); }
+.row .glyph { display: grid; place-items: center; color: var(--foreground); }
+.row-title { font-size: var(--text-sm); font-weight: var(--weight-regular); letter-spacing: var(--ls-sm);
+  /* the result row is the only thing in the palette you can act on, so it wears their LINK
+     language — shade-10 blue and a 2px underline, not a colourless label. shade-50 on hover. */
+  color: var(--info); text-decoration: underline;
+  text-decoration-thickness: var(--rule-w); text-underline-offset: var(--sp-1); }
+.row-title:hover { color: var(--info-shade); }
+/* the third link state this system has and Qyther's palette has never had: a row that was already
+   opened goes purple rather than losing its affordance. data-state, the same vocabulary the
+   baseline already uses for hover / selected / focus — no new element. */
+.row[data-state="visited"] .row-title { color: var(--visited); }
+.row-path { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kind { font-size: var(--text-xs); letter-spacing: var(--ls-xs); color: var(--muted-foreground); }
+.row[data-state="hover"] { background: var(--accent); }
+.row[data-state="hover"] .row-title, .row[data-state="hover"] .kind { color: var(--accent-foreground); }
+/* selection is STRUCTURAL here: the bar, a step of value, and a black bottom rule — not a flood */
+.row[data-state="selected"] { background: var(--muted); border-bottom: var(--rule-w) solid var(--input); }
+.row[data-state="selected"] .row-title, .row[data-state="selected"] .kind, .row[data-state="selected"] .row-path { color: var(--foreground); }
+.row[data-state="selected"] .row-title { font-weight: var(--weight-bold); }
+/* focus is the loudest thing on the page and arrives BEFORE hover. permanent here so it can be read.
+   the plate + black underline come from the shared focus rule above — no extra border, no layout shift */
+.row[data-state="focus"], .row[data-state="focus"]:hover { background: var(--ring); }
+.row[data-state="focus"] .row-title, .row[data-state="focus"] .kind, .row[data-state="focus"] .row-path,
+.row[data-state="focus"] .glyph, .row[data-state="focus"] .badge, .row[data-state="focus"] .ask-pill { color: var(--ring-ink); }
+.row[data-state="focus"] .row-title { text-decoration: none; }  /* focused-text kills the underline */
+.row[data-state="focus"] .row-path, .row[data-state="focus"] .kind { font-weight: var(--weight-bold); }
+mark { background: var(--mark-bg); color: var(--mark-ink); padding: var(--sp-0); font-weight: var(--weight-bold); }
+/* inside a yellow plate a yellow highlight is invisible: the match becomes a black underline */
+.row[data-state="focus"] mark { background: transparent; color: inherit; text-decoration: underline; text-decoration-thickness: var(--rule-w); text-underline-offset: var(--sp-1); }
+.ask-pill {
+  display: inline-flex; align-items: center; height: var(--tag-mini-h); padding: var(--sp-0) var(--sp-1); margin-right: var(--sp-1);
+  background: var(--card); color: var(--foreground);
+  border: var(--rule-w) solid var(--input); box-shadow: var(--shadow-popover); font-size: var(--text-xs); font-weight: var(--weight-bold);
+}
+.tooltip {
+  display: inline-block; padding: var(--sp-1); border: var(--rule-w) solid var(--input);
+  background: var(--card); color: var(--foreground);
+  font-size: var(--text-xs);
+}
+.badge {
+  display: inline-grid; place-items: center; width: var(--chip-w); height: var(--tag-mini-h);
+  background: var(--secondary); color: var(--secondary-foreground);
+  border: var(--rule-w) solid var(--input); font-family: var(--font-mono); font-size: var(--text-xs);
+}
+/* no border-radius: 50% here — their spinner is a conic wedge, which is why radius is zero */
+.spinner { width: var(--sp-4); height: var(--sp-4); background: conic-gradient(from 0deg, transparent, var(--foreground)); }
+.skeleton { height: var(--sp-2); background: var(--muted); }
+.row[data-state="skeleton"] .row-path { color: transparent; }
+.empty { padding: var(--sp-4) var(--pad-card); text-align: center; }
+.empty h3 { margin: var(--sp-0) 0 var(--sp-1); font-size: var(--text-sm); font-weight: var(--weight-bold); }
+.empty p { margin: var(--sp-0); font-size: var(--text-xs); color: var(--muted-foreground); }
+
+/* ── chat ────────────────────────────────────────────────────────────────── */
+.chat { display: grid; gap: var(--gap-section); padding: var(--sp-4) var(--pad-card); background: var(--card); }
+.bubble-user {
+  justify-self: end; max-width: var(--bubble-max); padding: var(--sp-2);
+  background: var(--secondary); color: var(--secondary-foreground);
+  border: var(--rule-w) solid var(--input);
+  font-size: var(--text-base); line-height: var(--lh-base);
+}
+.answer { max-width: var(--measure); display: grid; gap: var(--gap-block); }
+.answer p { margin: var(--sp-0); font-size: var(--text-base); line-height: var(--lh-base); }
+.answer code { font-family: var(--font-mono); font-size: var(--text-code-inline); background: var(--muted); color: var(--foreground); padding: var(--sp-0) var(--sp-1); border: var(--hair) solid var(--border); }
+.caret { font-family: var(--font-mono); color: var(--info); font-weight: var(--weight-bold); }
+.pill {
+  display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--tag-mini-h); padding: var(--sp-0) var(--sp-1);
+  font-size: var(--text-xs); font-weight: var(--weight-bold);
+  background: var(--info-soft); color: var(--info); border: var(--rule-w) solid var(--input);
+}
+.pill--agent { background: var(--secondary); color: var(--secondary-foreground); }
+.steps { display: grid; gap: var(--sp-1); padding: var(--sp-2); border: var(--hair) solid var(--border); background: var(--background); }
+.step { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-sm); color: var(--muted-foreground); }
+.step .dot { width: var(--sp-4); height: var(--sp-4); display: grid; place-items: center; background: var(--success); color: var(--success-foreground); border: var(--rule-w) solid var(--success-shade); font-size: var(--text-xs); font-weight: var(--weight-bold); }
+.step[data-state="running"] { color: var(--warning); }  /* the olive text-yellow, never the plate */
+.step[data-state="running"] .dot { background: var(--warning-soft); color: var(--warning-foreground); border-color: var(--input); }
+.step .tag { margin-left: auto; padding: var(--sp-0) var(--sp-1); background: var(--info); color: var(--info-foreground); font-family: var(--font-mono); border: var(--rule-w) solid var(--input); }
+.step[data-state="running"] .tag { background: var(--muted); color: var(--muted-foreground); }
+.genui { border: var(--hair) solid var(--border); background: var(--popover); color: var(--popover-foreground); overflow: hidden; }
+.genui-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); padding: var(--sp-2); border-bottom: var(--rule-w) solid var(--input); }
+.genui-head h4 { margin: var(--sp-0); font-size: var(--text-base); line-height: var(--lh-base); font-weight: var(--weight-bold); }
+.genui-tools { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--text-xs); color: var(--muted-foreground); }
+.chip { padding: var(--sp-0) var(--sp-1); border: var(--rule-w) solid var(--input); background: var(--card); color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-xs); }
+table { width: 100%; border-collapse: collapse; font-size: var(--text-base); }
+th { text-align: left; padding: var(--sp-1) var(--sp-2); font-size: var(--text-sm); font-weight: var(--weight-bold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--foreground); background: var(--muted); border-bottom: var(--rule-w) solid var(--input); }
+td { padding: var(--sp-2); border-bottom: var(--hair) solid var(--border); }
+td.num { font-family: var(--font-mono); text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.sources { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-sm); color: var(--muted-foreground); }
+details { border: var(--hair) solid var(--border); background: var(--background); }
+summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--weight-bold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--foreground); cursor: pointer; border-bottom: var(--hair) solid var(--border); }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: var(--sp-3); padding: var(--sp-2); }
+.metric b { display: block; font-family: var(--font-mono); font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: var(--weight-bold); color: var(--foreground); }
+.metric span { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground); }
+.caveat { padding: var(--sp-0) var(--sp-2) var(--sp-2); font-size: var(--text-xs); line-height: var(--lh-xs); color: var(--muted-foreground); }
+.command-bar { display: grid; gap: var(--sp-2); padding: var(--sp-2); border: var(--rule-w) solid var(--input); background: var(--card); }
+.command-bar:focus-within { box-shadow: inset 0 calc(-1 * var(--rule-w-heavy)) 0 0 var(--ring-ink); outline: var(--sp-1) solid var(--ring); }
+.command-bar textarea {
+  width: 100%; min-height: var(--sp-9); resize: none; border: 0; background: transparent; color: var(--foreground);
+  font-family: var(--font-ui); font-size: var(--text-base); line-height: var(--lh-base);
+}
+.command-bar textarea::placeholder { color: var(--muted-foreground); }
+.command-bar textarea:focus { outline: none; }
+.cmdbar-foot { display: flex; align-items: center; gap: var(--gap-inline); }
+.send {
+  margin-left: auto; width: var(--target-min); height: var(--target-min); display: grid; place-items: center;
+  background: var(--primary); color: var(--primary-foreground); border: var(--rule-w) solid var(--input);
+  transition: background-color var(--transition-colour) linear;
+}
+.send:hover { background-color: var(--info-shade); }
+/* the one honest disabled control in these surfaces: Send is inert while an answer streams */
+.send[data-state="disabled"] { background: var(--card); color: var(--muted-foreground); border-color: var(--border); opacity: .5; cursor: not-allowed; }
+
+/* ── agent activity ──────────────────────────────────────────────────────── */
+.agent-panel { display: grid; gap: var(--gap-block); padding: var(--sp-4) var(--pad-card); border: var(--hair) solid var(--border); background: var(--background); }
+.agent-panel h3 { margin: var(--sp-0); font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: var(--weight-bold); display: flex; align-items: center; gap: var(--gap-inline); border-bottom: var(--rule-w-heavy) solid var(--input); padding-bottom: var(--sp-1); }
+.kv { display: grid; grid-template-columns: var(--sp-9) minmax(0,1fr); gap: var(--sp-1); font-size: var(--text-sm); }
+.kv dt { color: var(--muted-foreground); font-weight: var(--weight-bold); }
+.kv dd { margin: var(--sp-0); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress { height: var(--sp-2); background: var(--card); border: var(--hair) solid var(--border); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 66%; background: var(--input); }
+.trace { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.trace td { padding: var(--sp-1) var(--sp-2); border-bottom: var(--hair) solid var(--border); }
+.trace td:first-child { font-family: var(--font-mono); }
+.status { display: inline-flex; align-items: center; gap: var(--sp-1); font-weight: var(--weight-bold); }
+.status::before { content: ""; width: var(--sp-1); height: var(--sp-1); background: currentColor; }
+.status--ok { color: var(--success); }
+.status--error { color: var(--destructive); }
+.status--pending { color: var(--muted-foreground); }
+
+/* ── settings ────────────────────────────────────────────────────────────── */
+.dialog { border: var(--hair) solid var(--border); background: var(--card); color: var(--card-foreground); overflow: hidden; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); padding: var(--sp-4) var(--pad-card); border-bottom: var(--rule-w) solid var(--input); }
+.dialog-head h3 { margin: var(--sp-0); font-size: var(--text-xl); line-height: var(--lh-xl); font-weight: var(--weight-bold); letter-spacing: var(--ls-base); }
+.setting { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--sp-4) var(--pad-card); border-bottom: var(--hair) solid var(--border); }
+.setting > .ib { display: flex; flex: 1; align-items: center; gap: var(--gap-inline); padding-right: var(--sp-2); }
+.setting:last-child { border-bottom: 0; }
+.setting .t { font-size: var(--text-base); line-height: var(--lh-base); font-weight: var(--weight-bold); }
+.setting .d { font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target-min); padding: var(--sp-0) var(--sp-2); border: var(--rule-w) solid var(--input); background: var(--card); color: var(--foreground); font-size: var(--text-base); line-height: var(--lh-base); font-weight: var(--weight-bold); transition: background-color var(--transition-colour) linear, color var(--transition-colour) linear; }
+.btn:hover { background-color: var(--accent); }
+.mcp-card { display: flex; align-items: center; gap: var(--gap-inline); background: var(--card); }
+.dot-live { width: var(--sp-2); height: var(--sp-2); background: var(--success); }
+.dot-off { width: var(--sp-2); height: var(--sp-2); background: var(--muted); border: var(--rule-w) solid var(--input); }
+.switch { width: var(--sp-7); height: var(--sp-4); background: var(--card); border: var(--rule-w) solid var(--input); position: relative; }
+.switch::after { content: ""; position: absolute; top: var(--hair); left: var(--hair); width: var(--sp-4); height: var(--sp-4); background: var(--input); }
+.switch[data-on="true"] { background: var(--input); }
+.switch[data-on="true"]::after { left: var(--sp-5); background: var(--card); }
+/* GOV.UK's error summary is a 5px red box — the one place their rule weight is not black */
+.alert-card { display: grid; gap: var(--gap-block); padding: var(--sp-4) var(--pad-card); border: var(--bar-w) solid var(--destructive); background: var(--destructive-soft); }
+.alert-card h4 { margin: var(--sp-0); font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: var(--weight-bold); color: var(--destructive); }
+.alert-card ul { margin: var(--sp-0); padding-left: var(--sp-4); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--foreground); }
+.alert-card .btn { border-color: var(--destructive); color: var(--destructive); }
+.alert-card .btn:hover { background: var(--destructive-shade); color: var(--destructive-foreground); }
+
+/* ── radius rungs, written out so every rung of tokens/radius.css is named ── */
+.palette { border-radius: var(--radius-palette); }
+.tile, .dialog, .genui, .agent-panel, .steps, .alert-card, .tooltip, .command-bar, details { border-radius: var(--radius-md); }
+.btn, .ghost-btn, .chip, .badge, .keycap, .mode-pill, .pill, .icon-btn, .send, .search, .ask-pill { border-radius: var(--radius-sm); }
+.count, mark, .step .tag, .skeleton, .answer code { border-radius: var(--radius-xs); }
+.progress, .progress i, .switch, .switch::after, .spinner { border-radius: var(--radius-pill); }
+</style>
+</head>
+<body>
+<div class="brief">
+  <h1>05 · Focus First — a public-service utility system</h1>
+  <p><b>Provenance</b> — the <b>GOV.UK Design System</b>, specifically the palette, spacing and focus primitives in <code>govuk-frontend</code> SCSS (<code>settings/colours/palette.scss</code>, <code>settings/spacing/</code>, <code>core/links</code>, <code>objects/</code>). Licence: <b>MIT</b>, Crown copyright. Functional mapping copied, not approximated: text = black <code>#0b0c0c</code>, secondary text = black tint-25 <code>#484949</code>, border = black tint-80 <code>#cecece</code>, <b>input border = full black</b>, focus = yellow <code>#ffdd00</code> plate with black text, link = blue shade-10 <code>#1a65a6</code>, link hover = shade-50 <code>#0f385c</code>, visited = purple <code>#54319f</code>. Measured on white, re-derived for this file: black 19.59:1, secondary 9.03:1, link 6.08:1, link-hover 12.07:1, black-on-focus-yellow 14.55:1, input black 19.59:1. The decorative tint-80 rule is <b>1.57:1</b>, not the 4.56:1 figure this direction is usually quoted with — 4.56:1 belongs to a <code>#767676</code>-class mid-grey, so this mock keeps tint-80 for dividers and spends all of its boundary weight on the control instead. The dark half is authored as a night-service plate (<code>#0b0c0c</code> background, white text, secondary <code>#cbcbcb</code> 10.96:1, border <code>#565656</code>, input border white, focus yellow unchanged, link <code>#5694ca</code> 5.49:1); every text pair sits at or above 4.5:1.</p>
+  <p><b>Type plan</b> — their stack is <code>"GDS Transport", arial, sans-serif</code>, and <b>GDS Transport is licence-restricted to <code>*.gov.uk</code> / <code>service.gov.uk</code></b>: it is not shippable here, and downloading it would be the one part of this adoption that cannot be done. The substitution GDS itself prescribes is Arial/Helvetica, so this mock declares <code>Arial, "Helvetica Neue", system-ui, sans-serif</code>. If a bundled face is wanted later, <b>Archivo</b> or <b>Inter</b> (both OFL) are the upgrade path. Weights <b>400 and 700 only</b> — no 500, no 600. Their real responsive scale is 16/19/21/24/32/48/80px with 24-50px leading; this mock keeps <b>13/16/20/28/40</b> with letter-spacing flattened to 0, which is a page-scale system compressed into a palette. That compression is the honest test of the direction: 24px is their first heading rung, and a 40px row cannot hold their body size. Because the row title is the only actionable thing in the list, it wears the link: shade-10 with a 2px underline, which measures 5.48:1 on the tint-95 hover plate — still over the 4.5 floor. The match `&lt;mark&gt;` is a yellow plate at 14.55:1, and inside the yellow focus plate it flips to a black underline, because yellow-on-yellow is invisible.</p>
+  <p><b>Geometry</b> — spacing is <b>5/10/15/20/25/30/40/50/60 px</b>. It is <b>not an 8px grid</b>, however often that is repeated: 5 and 15 and 25 exist on their own terms, and an 8px translation loses the half-steps. <b>Radius is ZERO everywhere</b> — not the smallest rung, zero, including on the card, the spinner (a conic wedge instead) and the toggle (which becomes a square knob in a square track). <b>Shadows are ZERO</b>, so the entire elevation language is the one 5px solid black rule plus steps of value. A <code>5px 5px 5px 0</code> solid black bar marks an interactive block; the edge a palette row can actually spend is the leading one, so it is drawn as a left bar. Motion is 150ms colour-only, and the signature ordering — <b>focus arrives before hover</b> — is why the yellow plate is rendered permanently on one row rather than described.</p>
+  <ul class="moves">
+    <li><b>Move 1 — collapse the token system</b><br><code>src/renderer/styles/tokens/radius.css</code> → every rung <code>0</code>. Tailwind v4 maps the <code>--radius-*</code> namespace onto <code>rounded-*</code>, so one file moves every corner including the pristine <code>components/ui/</code> primitives, with no component edit. <code>tokens/shadow.css</code> → <code>none</code> for all of <code>--shadow-command-palette</code> / <code>-popover</code> / <code>-dialog</code> / <code>-tooltip</code> / <code>-toast</code> / <code>-shortcut-key</code>; the five surfaces then separate only by border and value step.</li>
+    <li><b>Move 2 — re-map colour and type</b><br><code>src/renderer/styles/semantic/theme.css</code> → <code>--input</code> becomes the loudest line on the page (full black in light, white in dark) while <code>--border</code> drops to a 1.57:1 decorative hairline; <code>--ring</code> stops being a ring and becomes the yellow plate, so <code>focus-visible:ring-2 ring-ring/30</code> in the primitives reads as a plate rather than a halo. <code>tokens/typography.css</code> → the Arial stack GDS prescribes and <b>400/700 only</b>; <code>--font-mono</code> loses JetBrains and falls to Cascadia Mono / Consolas.</li>
+    <li><b>Move 3 — the two things the tokens cannot do</b><br>The 5px left bar needs markup: <code>src/renderer/components/ResultItem.tsx</code> already grids its own <code>&lt;span&gt;</code> cells, so a bordered wrapper has to be added. The yellow focus plate must override the pristine <code>src/renderer/components/ui/input.tsx</code> <code>focus-visible:</code> utilities, and per <code>src/renderer/components/ui/AGENTS.md</code> a primitive is never edited — it lands as a <code>[data-slot="input"]</code> rule in <code>src/renderer/styles/globals.css</code>, which is also where <code>border-radius: 0</code> beats the upstream utility.</li>
+  </ul>
+  <p><b>Cost</b> — colour, radius and spacing are token-only and genuinely cheap: three files, no component touched, and the <code>--radius-*</code> / <code>--shadow-*</code> collapses are a one-line-per-rung change. The 5px left bar and the yellow focus plate are <b>markup</b>: a wrapper in <code>ResultItem.tsx</code> (and wherever else a block must be marked), plus a <code>[data-slot]</code> override in <code>globals.css</code> for every primitive that currently draws its own focus ring.</p>
+  <p><b>Biggest risk</b> — a yellow focus plate is loud in an <b>always-on-top palette</b>: the window floats over whatever the user was already looking at, so a full-width <code>#ffdd00</code> bar plus a 4px black underline competes with the desktop underneath it and reads as a system alert rather than a caret position. Second, the black left bar lands in the <b>file-type icon column</b> — <code>grid-cols-[var(--spacing-7)_…]</code> is 28px wide and a 5px black rule eats 18% of it, so the extension glyph and the bar fight for the same 15px. Third, <b>a page-scale type ramp does not survive compression to 13px rows</b>: their link is an underlined sentence-level affordance at 19px, and six 13px underlined titles stacked in 40px rows read as a wall of hyperlinks rather than a file list — while the 400/700-only weight limit leaves nothing under bold to soften a path with.</p>
+  <div class="swatches">
+    <figure style="margin:0"><div class="swatch-set" data-theme="light"><span class="swatch" style="background:var(--background)"></span><span class="swatch" style="background:var(--card)"></span><span class="swatch" style="background:var(--muted)"></span><span class="swatch" style="background:var(--popover)"></span><span class="swatch" style="background:var(--border)"></span><span class="swatch" style="background:var(--input)"></span><span class="swatch" style="background:var(--ring)"></span><span class="swatch" style="background:var(--primary)"></span><span class="swatch" style="background:var(--success)"></span><span class="swatch" style="background:var(--destructive)"></span></div><figcaption>light — black / white / tint-80 / yellow</figcaption></figure>
+    <figure style="margin:0"><div class="swatch-set" data-theme="dark"><span class="swatch" style="background:var(--background)"></span><span class="swatch" style="background:var(--card)"></span><span class="swatch" style="background:var(--muted)"></span><span class="swatch" style="background:var(--popover)"></span><span class="swatch" style="background:var(--border)"></span><span class="swatch" style="background:var(--input)"></span><span class="swatch" style="background:var(--ring)"></span><span class="swatch" style="background:var(--primary)"></span><span class="swatch" style="background:var(--success)"></span><span class="swatch" style="background:var(--destructive)"></span></div><figcaption>dark — night-service plate, authored not inverted</figcaption></figure>
+  </div>
+</div>
+
+<main class="board">
+<!-- ══════════════════ LIGHT COLUMN (dark column repeats the same markup) ══════════════════ -->
+<section class="col" data-theme="light">
+  <h2>Light</h2>
+
+  <div class="surface">
+    <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
+    <div class="desktop">
+      <div class="palette">
+        <div class="palette-header">
+          <span class="mode-pill">Files</span>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+            <input class="query" value="" placeholder="Search for files, tools, actions..." aria-label="Search for files">
+          </div>
+          <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+          <span class="vr"></span>
+          <span class="keycap">Alt</span><span class="keycap">Space</span>
+        </div>
+        <div class="palette-body">
+          <p class="section-head">Quick Actions</p>
+          <div class="tile-row"><span class="tile"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg>Find in Folder</span></div>
+          <p class="section-head">Recently Opened</p>
+          <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">colors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-md)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-folder)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-ts)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">toolbox.ts</span><br><span class="row-path">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="kind">TypeScript</span><span class="badge">↵</span></div>
+        </div>
+        <div class="palette-footer"><span>Tip: Press Alt+Enter to ask about the selected file</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
+    <div class="desktop">
+      <div class="palette">
+        <div class="palette-header">
+          <span class="mode-pill">Files</span>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+            <input class="query" value="design tokens" aria-label="Search for files">
+          </div>
+          <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+          <span class="vr"></span>
+          <span class="keycap">Alt</span><span class="keycap">Space</span>
+        </div>
+        <div class="palette-body">
+          <p class="section-head">Results <span class="count">6</span></p>
+          <div class="row ib" data-state="selected"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title"><mark>co</mark>lors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row ib" data-state="focus"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title"><mark>design</mark> system</span><br><span class="row-path">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+          <div class="row" data-state="visited"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">theme.css</span><br><span class="row-path">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row" data-state="hover"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">spacing.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="kind"><span class="ask-pill">Ask</span>CSS</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+          <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="spinner"></span></div>
+          <p class="section-head" style="padding-top:var(--sp-1)">Tooltip · Ask affordance</p>
+          <div style="padding:0 var(--pad-card) var(--sp-2)"><span class="tooltip">Ask about this file (Alt+Enter)</span></div>
+          <p class="section-head" style="padding-top:var(--sp-1)">States · skeleton while the search is in flight</p>
+          <div style="padding:0 var(--pad-card) var(--sp-2)"><div class="row" data-state="skeleton"><span class="glyph"><span class="skeleton" style="width:var(--sp-4);height:var(--sp-4)"></span></span><span><span class="skeleton" style="display:block;width:44%"></span><br><span class="skeleton" style="display:block;width:72%;margin-top:var(--sp-1)"></span></span><span class="kind">&nbsp;</span><span class="skeleton" style="width:var(--sp-4);height:var(--sp-2)"></span></div></div>
+        </div>
+        <div class="palette-footer"><span>6 results found</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
+    <div class="page">
+      <div class="palette">
+        <div class="palette-header" style="height:56px">
+          <span class="mode-pill">Ask</span>
+          <span class="pill pill--agent">Desktop</span>
+          <span class="vr"></span>
+          <span class="ghost-btn">New Chat</span>
+        </div>
+        <div class="chat">
+          <div class="bubble-user">What is our current cold-start cost breakdown?</div>
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
+            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+          </div>
+          <div class="answer">
+            <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
+          </div>
+          <div class="genui">
+            <div class="genui-head"><h4>Cold-start cost by phase</h4><div class="genui-tools"><span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">MD</span><span>Filter {column}…</span><span class="chip">All columns</span></div></div>
+            <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+              <tr><td>main boot</td><td class="num">214</td><td>main.ts</td></tr>
+              <tr><td>graph precompile</td><td class="num">388</td><td>getAskGraph</td></tr>
+              <tr><td>MCP connect</td><td class="num">1,204</td><td>mcpService</td></tr>
+              <tr><td>es.exe init</td><td class="num">96</td><td>initializeEs</td></tr>
+            </tbody></table>
+          </div>
+          <div class="sources"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4h11v8h-11z"/><path d="M5 6.5h6M5 9h4"/></svg>3 sources<span class="pill" style="background:var(--success-soft);color:var(--success)">High confidence (85%)</span></div>
+          <details open>
+            <summary>Task Details</summary>
+            <div class="metrics">
+              <div class="metric"><b>4,812</b><span>Tokens</span></div>
+              <div class="metric"><b>$0.0131</b><span>Cost (est.)</span></div>
+              <div class="metric"><b>8.6 s</b><span>Time</span></div>
+              <div class="metric"><b>559 tok/s</b><span>Speed</span></div>
+            </div>
+            <p class="caveat">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+          </details>
+          <div class="command-bar">
+            <textarea placeholder="Ask anything about your code, files, or project..." aria-label="Ask the AI assistant"></textarea>
+            <div class="cmdbar-foot">
+              <button class="icon-btn" aria-label="Attach file or folder"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+              <span class="chip">3 MCP</span>
+              <span class="ghost-btn">Stop response</span>
+              <button class="send" data-state="disabled" aria-disabled="true" aria-label="Send message (disabled while the answer streams)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
+    <div class="page">
+      <div class="agent-panel ib">
+        <h3>Automating browser task… <span class="pill" style="background:var(--warning-soft);color:var(--warning-foreground)">in_progress</span></h3>
+        <dl class="kv">
+          <dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+          <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+          <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+          <dt>Time:</dt><dd>4.2 s</dd>
+        </dl>
+        <div class="progress" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+        <span style="font-size:var(--text-sm);color:var(--muted-foreground);font-weight:var(--weight-bold)">Step 2 of 3</span>
+      </div>
+      <table class="trace" style="margin-top:var(--sp-2)"><tbody>
+        <tr><td>screenshot</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+        <tr><td>get_screen_text</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+        <tr><td>search_elements</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+        <tr><td>invoke_element</td><td><span class="status status--error">error</span></td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+        <tr><td>type_text</td><td><span class="status status--pending">pending</span></td><td></td></tr>
+        <tr><td>close_window <span class="chip">verifies</span></td><td><span class="status status--pending">pending</span></td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
+    <div class="page" style="display:grid;gap:var(--gap-section)">
+      <div class="dialog">
+        <div class="dialog-head"><h3>Settings</h3><button class="icon-btn" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Theme</span><br><span class="d">Currently light</span></span></span><span class="btn">Switch to dark</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span></span><span class="btn">Compact</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span></span><span class="btn">View</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span></span><span class="btn">Manage</span></div>
+      </div>
+      <div class="dialog">
+        <div class="dialog-head"><h3 style="font-size:var(--text-base)">MCP servers</h3><input class="query" style="max-width:220px;font-size:var(--text-sm);border:var(--rule-w) solid var(--input);padding:0 var(--sp-1);height:var(--target-min);background:var(--card)" placeholder="Search servers..." aria-label="Search MCP servers"></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable filesystem"></span></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable sequential-thinking"></span></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-off" aria-label="Status: disconnected"></span><span style="flex:1"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="false" aria-label="Enable playwright"></span></div>
+      </div>
+      <div class="alert-card" role="alert">
+        <h4>Ask mode is not ready</h4>
+        <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+        <div><span class="btn">Back to Files</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ DARK COLUMN ══════════════════ -->
+<section class="col" data-theme="dark">
+  <h2>Dark</h2>
+
+  <div class="surface">
+    <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
+    <div class="desktop">
+      <div class="palette">
+        <div class="palette-header">
+          <span class="mode-pill">Files</span>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+            <input class="query" value="" placeholder="Search for files, tools, actions..." aria-label="Search for files">
+          </div>
+          <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+          <span class="vr"></span>
+          <span class="keycap">Alt</span><span class="keycap">Space</span>
+        </div>
+        <div class="palette-body">
+          <p class="section-head">Quick Actions</p>
+          <div class="tile-row"><span class="tile"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg>Find in Folder</span></div>
+          <p class="section-head">Recently Opened</p>
+          <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">colors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-md)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-folder)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+          <div class="row"><span class="glyph" style="color:var(--file-ts)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">toolbox.ts</span><br><span class="row-path">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="kind">TypeScript</span><span class="badge">↵</span></div>
+        </div>
+        <div class="palette-footer"><span>Tip: Press Alt+Enter to ask about the selected file</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
+    <div class="desktop">
+      <div class="palette">
+        <div class="palette-header">
+          <span class="mode-pill">Files</span>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+            <input class="query" value="design tokens" aria-label="Search for files">
+          </div>
+          <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+          <span class="vr"></span>
+          <span class="keycap">Alt</span><span class="keycap">Space</span>
+        </div>
+        <div class="palette-body">
+          <p class="section-head">Results <span class="count">6</span></p>
+          <div class="row ib" data-state="selected"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title"><mark>co</mark>lors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row ib" data-state="focus"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title"><mark>design</mark> system</span><br><span class="row-path">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+          <div class="row" data-state="visited"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">theme.css</span><br><span class="row-path">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+          <div class="row" data-state="hover"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">spacing.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="kind"><span class="ask-pill">Ask</span>CSS</span><span class="badge">↵</span></div>
+          <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+          <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="spinner"></span></div>
+          <p class="section-head" style="padding-top:var(--sp-1)">Tooltip · Ask affordance</p>
+          <div style="padding:0 var(--pad-card) var(--sp-2)"><span class="tooltip">Ask about this file (Alt+Enter)</span></div>
+          <p class="section-head" style="padding-top:var(--sp-1)">States · skeleton while the search is in flight</p>
+          <div style="padding:0 var(--pad-card) var(--sp-2)"><div class="row" data-state="skeleton"><span class="glyph"><span class="skeleton" style="width:var(--sp-4);height:var(--sp-4)"></span></span><span><span class="skeleton" style="display:block;width:44%"></span><br><span class="skeleton" style="display:block;width:72%;margin-top:var(--sp-1)"></span></span><span class="kind">&nbsp;</span><span class="skeleton" style="width:var(--sp-4);height:var(--sp-2)"></span></div></div>
+        </div>
+        <div class="palette-footer"><span>6 results found</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
+    <div class="page">
+      <div class="palette">
+        <div class="palette-header" style="height:56px">
+          <span class="mode-pill">Ask</span>
+          <span class="pill pill--agent">Desktop</span>
+          <span class="vr"></span>
+          <span class="ghost-btn">New Chat</span>
+        </div>
+        <div class="chat">
+          <div class="bubble-user">What is our current cold-start cost breakdown?</div>
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
+            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+          </div>
+          <div class="answer">
+            <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
+          </div>
+          <div class="genui">
+            <div class="genui-head"><h4>Cold-start cost by phase</h4><div class="genui-tools"><span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">MD</span><span>Filter {column}…</span><span class="chip">All columns</span></div></div>
+            <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+              <tr><td>main boot</td><td class="num">214</td><td>main.ts</td></tr>
+              <tr><td>graph precompile</td><td class="num">388</td><td>getAskGraph</td></tr>
+              <tr><td>MCP connect</td><td class="num">1,204</td><td>mcpService</td></tr>
+              <tr><td>es.exe init</td><td class="num">96</td><td>initializeEs</td></tr>
+            </tbody></table>
+          </div>
+          <div class="sources"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4h11v8h-11z"/><path d="M5 6.5h6M5 9h4"/></svg>3 sources<span class="pill" style="background:var(--success-soft);color:var(--success)">High confidence (85%)</span></div>
+          <details open>
+            <summary>Task Details</summary>
+            <div class="metrics">
+              <div class="metric"><b>4,812</b><span>Tokens</span></div>
+              <div class="metric"><b>$0.0131</b><span>Cost (est.)</span></div>
+              <div class="metric"><b>8.6 s</b><span>Time</span></div>
+              <div class="metric"><b>559 tok/s</b><span>Speed</span></div>
+            </div>
+            <p class="caveat">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+          </details>
+          <div class="command-bar">
+            <textarea placeholder="Ask anything about your code, files, or project..." aria-label="Ask the AI assistant"></textarea>
+            <div class="cmdbar-foot">
+              <button class="icon-btn" aria-label="Attach file or folder"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+              <span class="chip">3 MCP</span>
+              <span class="ghost-btn">Stop response</span>
+              <button class="send" data-state="disabled" aria-disabled="true" aria-label="Send message (disabled while the answer streams)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
+    <div class="page">
+      <div class="agent-panel ib">
+        <h3>Automating browser task… <span class="pill" style="background:var(--warning-soft);color:var(--warning-foreground)">in_progress</span></h3>
+        <dl class="kv">
+          <dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+          <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+          <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+          <dt>Time:</dt><dd>4.2 s</dd>
+        </dl>
+        <div class="progress" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+        <span style="font-size:var(--text-sm);color:var(--muted-foreground);font-weight:var(--weight-bold)">Step 2 of 3</span>
+      </div>
+      <table class="trace" style="margin-top:var(--sp-2)"><tbody>
+        <tr><td>screenshot</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+        <tr><td>get_screen_text</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+        <tr><td>search_elements</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+        <tr><td>invoke_element</td><td><span class="status status--error">error</span></td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+        <tr><td>type_text</td><td><span class="status status--pending">pending</span></td><td></td></tr>
+        <tr><td>close_window <span class="chip">verifies</span></td><td><span class="status status--pending">pending</span></td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
+    <div class="page" style="display:grid;gap:var(--gap-section)">
+      <div class="dialog">
+        <div class="dialog-head"><h3>Settings</h3><button class="icon-btn" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Theme</span><br><span class="d">Currently dark</span></span></span><span class="btn">Switch to light</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span></span><span class="btn">Compact</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span></span><span class="btn">View</span></div>
+        <div class="setting"><span class="ib"><span style="flex:1"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span></span><span class="btn">Manage</span></div>
+      </div>
+      <div class="dialog">
+        <div class="dialog-head"><h3 style="font-size:var(--text-base)">MCP servers</h3><input class="query" style="max-width:220px;font-size:var(--text-sm);border:var(--rule-w) solid var(--input);padding:0 var(--sp-1);height:var(--target-min);background:var(--card)" placeholder="Search servers..." aria-label="Search MCP servers"></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable filesystem"></span></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable sequential-thinking"></span></div>
+        <div class="setting"><span class="ib"><span class="mcp-card" style="flex:1"><span class="dot-off" aria-label="Status: disconnected"></span><span style="flex:1"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span></span></span><span class="chip">stdio</span><span class="switch" data-on="false" aria-label="Enable playwright"></span></div>
+      </div>
+      <div class="alert-card" role="alert">
+        <h4>Ask mode is not ready</h4>
+        <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+        <div><span class="btn">Back to Files</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+</body>
+</html>

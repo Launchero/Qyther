@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 21 · Quadrangle (USGS topographic sheet, ink = class of information)</title>
+<!--
+  WAVE 2 · 21 — the USGS topographic quadrangle.
+  Markup is the 00-current-baseline.html template: the same <symbol> sprite, the same .brief header,
+  the same two <section class="col" data-theme="light|dark"> columns, the same .hero banner structure
+  and the same five surfaces. Strings and data are identical to the control so the two stay comparable;
+  only the two token blocks, the header prose, one idiom CSS block and the hero's added devices change.
+  The thesis is the one this direction owns: USGS publishes a RULE, not a palette — colour encodes the
+  CLASS of information — and Qyther already ships --file-typescript/javascript/python/rust/go as a
+  file-class legend, so the identity is load-bearing rather than cosmetic.
+  Self-contained: no script, no webfont, no @import, no url(), no image. Inline SVG + CSS gradients only.
+-->
+<style>
+/* ── FIRST EDITION — quad paper ───────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #EFE8D8; --foreground: #1B1A17;                 /* quad paper · cultural black */
+  --card: #F7F3E8; --card-foreground: #1B1A17;                  /* sheet inside the neatline  DERIVED */
+  --popover: #FCF8EE; --popover-foreground: #1B1A17;             /* collar-note stock          DERIVED */
+  --primary: #1B1A17; --primary-foreground: #F5EFE1;             /* selection = annotation, so black */
+  --secondary: #EAE3D2; --secondary-foreground: #1B1A17;         /* a 6% cultural screen       DERIVED */
+  --muted: #E3D4B0; --muted-foreground: #4E4032;                 /* buffer tan · sepia note ink  DERIVED */
+  --accent: #E7E0CE; --accent-foreground: #1B1A17;               /* hover = a second screen      DERIVED */
+  --destructive: #8E3118; --destructive-foreground: #FCF8EE;     /* survey red darkened for text */
+  --success: #2F5C31; --warning: #6B4E0E; --info: #215A80;       /* vegetation / ochre / hydro   DERIVED */
+  --success-soft: #2F5C311F; --warning-soft: #6B4E0E21; --info-soft: #215A801F; --destructive-soft: #8E311820;
+  --agent: #5C2E80;                                              /* purple = proposed work, a published USGS convention */
+  --border: #C2B393; --input: #4E4032; --ring: #1B1A17;
+  --mark-bg: #D9C79E; --mark-rule: #F5EFE1; --plate: #E3D4B0;
+  --file-a: #9A6B4F; --file-b: #2C6F9B; --file-c: #1B1A17; --file-d: #C2472B;
+  --file-a-text: #6B4630; --file-b-text: #215A80; --file-c-text: #1B1A17; --file-d-text: #8E3118;
+  --paper: #EFE8D8; --buffer: #E3D4B0; --neatline: #1B1A17; --neatline-inner: #1B1A17A6; --chain-ink: #8E3118;
+  --graticule: #9A6B4F2B; --graticule-major: #9A6B4F59; --traverse: #5C2E807A;
+  --decl: -14deg;                                              /* the needle IS the mode indicator */
+  --graticule-bg:
+    repeating-linear-gradient(90deg, var(--graticule-major) 0 var(--bw), transparent var(--bw) var(--grid-major)),
+    repeating-linear-gradient(0deg,  var(--graticule-major) 0 var(--bw), transparent var(--bw) var(--grid-major)),
+    repeating-linear-gradient(90deg, var(--graticule) 0 var(--bw), transparent var(--bw) var(--grid)),
+    repeating-linear-gradient(0deg,  var(--graticule) 0 var(--bw), transparent var(--bw) var(--grid));
+  --ticks:
+    linear-gradient(var(--neatline),var(--neatline)) 0 0/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 0/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 0/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 0/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 100%/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 100%/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 100%/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 100%/var(--bw-2) var(--tick) no-repeat;
+  --scale-bg:
+    repeating-linear-gradient(90deg, var(--neatline) 0 var(--cell), transparent var(--cell) calc(var(--cell) * 2)) 0 0/100% 100% no-repeat,
+    conic-gradient(from 45deg, var(--neatline) 0 25%, transparent 25% 50%, var(--neatline) 50% 75%, transparent 75%) 0 0/var(--cell) 100% repeat;
+  --focus-ring: inset 0 0 0 var(--bw-2) var(--ring);
+  --key: none; --elev: none; --elev-sm: none;
+}
+/* ── SECOND EDITION — night-surveil. An authored edition, NOT an inversion ── */
+[data-theme="dark"] {
+  --background: #100E0A; --foreground: #EDE6D4;                 /* the night sheet · lamp on paper */
+  --card: #17140E; --card-foreground: #EDE6D4;
+  --popover: #1F1B12; --popover-foreground: #F2EEDF;
+  --primary: #E4DBC3; --primary-foreground: #141109;
+  --secondary: #221D14; --secondary-foreground: #EDE6D4;
+  --muted: #241F16; --muted-foreground: #B5A88E;
+  --accent: #2C2418; --accent-foreground: #F2EEDF;
+  --destructive: #E8836A; --destructive-foreground: #141109;
+  --success: #86C08A; --warning: #E4B85C; --info: #8FC2E8;
+  --success-soft: #86C08A14; --warning-soft: #E4B85C14; --info-soft: #8FC2E814; --destructive-soft: #E8836A14; /* ~8% tint: a glow at 15% would swallow its own label */
+  --agent: #B892E0;
+  --border: #3E3524; --input: #8A7A5C; --ring: #E4DBC3;
+  --mark-bg: #4A3E24; --mark-rule: #100E0A; --plate: #1C1810;
+  --file-a: #C79A78; --file-b: #7FB6DC; --file-c: #D9D2C0; --file-d: #E8836A;
+  --file-a-text: #C79A78; --file-b-text: #7FB6DC; --file-c-text: #EDE6D4; --file-d-text: #E8836A;
+  --paper: #100E0A; --buffer: #1C1810; --neatline: #E4DBC3; --neatline-inner: #E4DBC3A6; --chain-ink: #E8836A;
+  --graticule: #C79A7826; --graticule-major: #C79A7833; --traverse: #B892E080;
+  --decl: 14deg;                                               /* the second edition reads the other way */
+  --graticule-bg:
+    repeating-linear-gradient(90deg, var(--graticule-major) 0 var(--bw), transparent var(--bw) var(--grid-major)),
+    repeating-linear-gradient(0deg,  var(--graticule-major) 0 var(--bw), transparent var(--bw) var(--grid-major)),
+    repeating-linear-gradient(90deg, var(--graticule) 0 var(--bw), transparent var(--bw) var(--grid)),
+    repeating-linear-gradient(0deg,  var(--graticule) 0 var(--bw), transparent var(--bw) var(--grid));
+  --ticks:
+    linear-gradient(var(--neatline),var(--neatline)) 0 0/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 0/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 0/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 0/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 100%/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 0 100%/var(--bw-2) var(--tick) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 100%/var(--tick) var(--bw-2) no-repeat,
+    linear-gradient(var(--neatline),var(--neatline)) 100% 100%/var(--bw-2) var(--tick) no-repeat;
+  --scale-bg:
+    repeating-linear-gradient(90deg, var(--neatline) 0 var(--cell), transparent var(--cell) calc(var(--cell) * 2)) 0 0/100% 100% no-repeat,
+    conic-gradient(from 45deg, var(--neatline) 0 25%, transparent 25% 50%, var(--neatline) 50% 75%, transparent 75%) 0 0/var(--cell) 100% repeat;
+  --focus-ring: inset 0 0 0 var(--bw-2) var(--ring);
+  --key: none; --elev: none; --elev-sm: none;
+}
+/* ── GEOMETRY + THE LAB PLATE (literal, identical in both editions) ──────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 0px; --r-md: 0px; --r-sm: 4px; --r-xs: 2px;                 /* radius 0; the key cap survives at 4 */
+  --bw: 1px; --bw-2: 2px; --bw-3: 3px;                             /* hairline / neatline / station bar */
+  --grid: 24px; --grid-major: 96px; --tick: 18px; --neat-in: 5px; --cell: 22px;
+  --scale-h: 12px; --ls-name: .045em; --chain-gap: calc(var(--grid-major) - 1ch);
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --name: Oswald, Archivo, "Archivo Narrow", "Haettenschweiler", "Arial Narrow", system-ui, sans-serif;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px; --t64: 64px;
+  --ls-label: .06em;
+  --lab: #191510; --lab-fg: #EFE7D2; --lab-muted: #B0A184; --lab-rule: #3B3428; --lab-code: #DED3B8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: var(--lab); color: var(--lab-fg); font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; font-family: var(--name); }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: var(--lab-muted); margin: 0 0 10px; }
+.brief b { color: var(--lab-fg); }
+.brief code { font-family: var(--mono); font-size: var(--t13); color: var(--lab-code); }
+.moves { display: flex; gap: var(--gap-2); flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: var(--bw) solid var(--lab-rule); border-radius: var(--r); padding: 10px 12px; font-size: var(--t14); color: var(--lab-code); }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-muted); margin-bottom: 4px; }
+.sw { display: flex; gap: 2px; border: var(--bw) solid var(--lab-rule); border-radius: var(--r); overflow: hidden; }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-muted); margin: 0 0 12px; text-align: center; font-family: var(--name); }
+.surface { margin-bottom: 36px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-muted); margin: 0 0 8px; font-family: var(--name); }
+.desktop, .page { border-radius: var(--r); padding: var(--grid); }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: var(--bw-2) solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: var(--bw) solid var(--border); }
+.mode { display: inline-flex; align-items: center; gap: var(--gap); height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: var(--bw) solid var(--border); font-family: var(--name); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: var(--bw) solid transparent; border-radius: var(--r-sm); }
+.vr { width: var(--bw); height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: var(--bw) solid var(--border); border-bottom-width: var(--bw-2); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); font-family: var(--name); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); font-family: var(--mono); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; font-family: var(--name); }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: 8px var(--pad); border-left: var(--bw-3) solid transparent; }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: var(--ls-name); font-family: var(--name); }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t13); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: transparent; border-bottom: var(--bw-2) solid var(--mark-rule); color: inherit; border-radius: var(--r); padding: 0; }
+.row.foc { box-shadow: var(--focus-ring); }
+mark { background: var(--mark-bg); color: var(--foreground); border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: var(--bw) solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: var(--bw) solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: var(--bw) solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: var(--r-xs); border: var(--bw-2) solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: var(--bw) solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: var(--bw) solid var(--border); color: var(--foreground); font-size: var(--t12); font-family: var(--name); letter-spacing: var(--ls-label); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: var(--grid) var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: var(--r); background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: var(--r-xs); display: grid; place-items: center; font-style: normal; font-size: var(--t12); font-family: var(--mono); background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--agent); color: var(--card); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: var(--bw) solid var(--border); font-family: var(--name); letter-spacing: var(--ls-label); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: var(--bw) solid var(--border); font-size: var(--t14); font-weight: 600; font-family: var(--name); letter-spacing: var(--ls-name); }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: var(--bw) solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: var(--t12); }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: var(--bw) solid var(--border); }
+td { padding: 8px 12px; border-bottom: var(--bw) solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); font-family: var(--name); }
+.mgn { margin: 0; padding: 8px 12px 0; font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); color: var(--info); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--gap-2); padding: var(--gap) 12px 12px; border-top: var(--bw) solid var(--border); margin-top: var(--gap); }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: var(--grid); border: var(--bw-2) solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity — the trace reads as a traverse of marked stations */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); font-family: var(--name); letter-spacing: var(--ls-name); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: var(--bw-3); border-radius: var(--r); background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: var(--gap-3); font-size: var(--t12); border-collapse: collapse; border-left: var(--bw-2) dashed var(--traverse); }
+.tr td { padding: 6px var(--gap-2); border-bottom: var(--bw) solid var(--border); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--agent); }
+.ok::before, .er::before, .pe::before { content: "+"; display: inline-block; width: auto; height: auto; border-radius: var(--r); background: none; font-family: var(--mono); font-weight: 700; margin-right: 6px; }
+
+/* dialogs */
+.dlg { border: var(--bw-2) solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: var(--bw) solid var(--border); font-size: var(--t18); font-weight: 600; font-family: var(--name); letter-spacing: var(--ls-name); }
+.set { display: flex; align-items: center; gap: var(--gap); padding: var(--grid) var(--pad); border-bottom: var(--bw) solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; font-family: var(--name); letter-spacing: var(--ls-name); } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: var(--bw) solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); font-family: var(--name); letter-spacing: var(--ls-label); }
+.sw2 { width: 28px; height: 16px; border-radius: var(--r); background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: var(--r); background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: var(--bw-3); height: var(--bw-3); border-radius: var(--r); background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: var(--grid) var(--pad); border: var(--bw-2) solid var(--destructive); border-radius: var(--r); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); font-family: var(--name); letter-spacing: var(--ls-name); }
+.alert ul { margin: 0; padding-left: var(--gap-3); font-family: var(--mono); font-size: var(--t12); }
+
+/* ── QUAD IDIOM (appended) ────────────────────────────────────────────────── */
+.palette, .hero, .dlg { position: relative; }
+.palette::before, .hero::before, .dlg::before { content: ""; position: absolute; inset: var(--neat-in); background: var(--ticks); pointer-events: none; z-index: 2; }
+.palette::after, .hero::after, .dlg::after { content: ""; position: absolute; inset: var(--neat-in); border: var(--bw) solid var(--neatline-inner); pointer-events: none; z-index: 2; }
+.head, .alert { background-color: var(--card); background-image: var(--graticule-bg); }
+.alert { background-color: var(--destructive-soft); }
+.row.r-a { border-left-color: var(--file-a); } .row.r-a .k { color: var(--file-a-text); }
+.row.r-b { border-left-color: var(--file-b); } .row.r-b .k { color: var(--file-b-text); }
+.row.r-c { border-left-color: var(--file-c); } .row.r-c .k { color: var(--file-c-text); }
+.row.r-d { border-left-color: var(--file-d); } .row.r-d .k { color: var(--file-d-text); }
+.row.sel .k { color: var(--primary-foreground); }
+.chain { grid-column: 1 / -1; grid-row: 6; font-family: var(--mono); font-size: var(--t12); color: var(--chain-ink); letter-spacing: var(--chain-gap); white-space: pre; }
+.ndl { display: inline-block; flex: none; width: var(--bw-3); height: var(--bw-3); background: var(--chain-ink); clip-path: polygon(50% 0,62% 50%,50% 100%,38% 50%); transform: rotate(var(--decl)); }
+.needle { display: flex; align-items: center; gap: var(--gap); font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); color: var(--muted-foreground); }
+.needle .ndl { width: 20px; height: 20px; }
+.hero { min-height: 320px; display: grid; grid-template-columns: minmax(0,1fr) 244px; grid-template-rows: repeat(6,auto); align-content: start; gap: var(--gap) var(--gap-3); padding: var(--grid); margin-bottom: var(--gap-3); border: var(--bw-2) solid var(--neatline); border-radius: var(--r); background-color: var(--card); background-image: var(--graticule-bg); overflow: hidden; box-shadow: var(--elev); }
+.hero-kicker { grid-column: 1 / -1; grid-row: 1; }
+.hero-title { grid-column: 1; grid-row: 2; font-family: var(--name); font-size: var(--t64); line-height: .94; letter-spacing: .01em; text-transform: uppercase; margin: 0; color: var(--foreground); }
+.hero-thesis { grid-column: 1; grid-row: 3; max-width: 42ch; }
+.hero-field { grid-column: 1; grid-row: 4; align-self: end; gap: var(--bw-2); }
+.spec { font-family: var(--name); font-size: 84px; line-height: .86; color: var(--foreground); }
+.spec:nth-child(2) { font-family: var(--mono); font-size: var(--t64); color: var(--file-a-text); }
+.spec:nth-child(3) { color: var(--file-d); font-size: var(--t64); }
+.f { height: var(--grid-major); width: 30px; border: var(--bw) solid var(--neatline); }
+.f1 { background: var(--paper); } .f2 { background: var(--card); } .f3 { background: var(--buffer); }
+.f4 { background: var(--foreground); } .f5 { background: var(--file-b); } .f6 { background: var(--file-d); } .f7 { background: var(--file-a); }
+.plate { grid-column: 2; grid-row: 2 / span 5; display: grid; gap: var(--gap); align-content: start; padding: var(--gap); border: var(--bw) solid var(--neatline); background: var(--popover); }
+.lg-h { margin: 0; font-family: var(--name); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border-bottom: var(--bw) solid var(--neatline); padding-bottom: var(--bw); }
+.lg { display: grid; grid-template-columns: var(--bw-3) auto; gap: var(--bw) var(--gap); align-items: baseline; margin: 0; font-size: var(--t12); }
+.lg i { background: currentColor; border-radius: var(--r); height: var(--bw-3); width: var(--bw-3); align-self: center; }
+.lg b { font-family: var(--name); font-weight: 600; letter-spacing: var(--ls-name); color: var(--foreground); }
+.lg em { font-style: normal; color: var(--muted-foreground); }
+.lg.a { color: var(--file-a-text); } .lg.b { color: var(--file-b-text); } .lg.c { color: var(--file-c-text); } .lg.d { color: var(--file-d-text); }
+.scale { height: var(--scale-h); border: var(--bw) solid var(--neatline); background: var(--scale-bg); }
+.sc-l { display: flex; justify-content: space-between; margin: var(--bw) 0 0; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); letter-spacing: var(--ls-label); }
+.east { margin: 0; font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); color: var(--muted-foreground); }
+.contour { grid-column: 1; grid-row: 5; width: 100%; max-width: 320px; height: auto; }
+.contour path { fill: none; stroke: var(--file-a); stroke-width: 1.2; stroke-linecap: round; }
+.contour .ix { stroke-width: 2.2; } .contour .spot { fill: var(--file-a); stroke: none; }
+.contour text { fill: var(--file-a-text); font: 700 var(--t12)/1 var(--mono); letter-spacing: var(--ls-label); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>21 · Quadrangle — the USGS topographic sheet, where colour is a claim about the class of information</h1>
+  <p><b>Provenance</b> — the direction is USGS cartography, and it is in this lab for one reason: <b>it is the only system here whose colour logic the app already has.</b> USGS's published rule, in the Survey's <i>Topographic Map Symbols</i> General Information Product (<code>pubs.usgs.gov/gip/TopographicMapSymbols</code>) and in the US Topo cartographic specifications (2023), is that colour encodes the class of information, not mood: <i>“topographic contours in brown; lakes, streams, irrigation ditches and other hydrographic features in blue; roads in black and red.”</i> The same guide states verbatim that <i>“topographic contours are shown in brown by lines of different widths”</i> and that <i>“the contour interval is printed in the margin of each U.S. Geological Survey (USGS) map”</i> — that last sentence is where this mock's marginalia block comes from. Qyther already ships <code>--file-typescript/javascript/python/rust/go</code> as a file-class legend, so the identity is load-bearing rather than cosmetic — and the sheet's marginalia (scale, declination, contour interval) is a native metaphor for the chrome a palette has to show: mode, window height, token cost. USGS publishes <b>classes, not hexes</b>, so every numeric ink below is <b>DERIVED</b> by this lab: umber/contour <code>#9A6B4F</code>, hydro blue <code>#2C6F9B</code>, survey red <code>#C2472B</code>, cultural black <code>#1B1A17</code>, quad paper <code>#EFE8D8</code>, buffer-tan band <code>#E3D4B0</code>; the sheet tint, hover screen and collar stock are DERIVED tints of the paper, and <code>--agent</code> rides on the published purple class — the one USGS reserved for urban-renewal and <i>proposed</i>-feature amendments (the guide notes purple is no longer added in current revisions but is still on many sheets), which is precisely what a pending tool step is: marked on the plan, not yet on the ground. The dark half is the <b>night-surveil edition</b>: a black field with umber and hydro as glows. Say it plainly — tan is a light-only field, so the dark column is <b>an authored second edition, not an inversion</b> of the first. Adopting it means re-expressing every value in OKLCH, which <code>src/renderer/styles/tokens/colors.css</code> mandates; licences: Oswald and Archivo are <b>SIL OFL 1.1</b> (both verified), JetBrains Mono is OFL 1.1 and already this app's <code>--font-mono</code>; the USGS symbols manual is a US-Government work, no licence encumbers the rule.</p>
+  <p><b>Type plan</b> — map place-names are small, condensed, mixed-case and generously tracked: <code>--name</code> is <b>Oswald</b>, falling to <b>Archivo</b> (both OFL 1.1), then <code>Arial Narrow</code>/<code>Haettenschweiler</code> on any Windows box that has neither, then the system sans — the look survives the fallback because it is carried by the condensed <i>ratio</i> and the <code>+0.045em</code> tracking, not by a single face. Graticule, easting and station notes are JetBrains Mono. Rows 13 px, row titles 14 px, marginal notes 12 px; the real map habit of 11 px place-names sits <b>below this app's 12 px floor</b> (<code>tokens/typography.css</code>: “never add a size below 12px”), so it is not taken — the control's three 11 px literals are lifted to 12 px here. Selection, focus and the send control are drawn in cultural black, <b>never in a class ink</b>.</p>
+  <p><b>Geometry</b> — a <b>neatline</b>: a heavy outer frame with a hairline inner line inset 5 px and L-shaped corner ticks built from gradient bars, on a card of <b>radius 0</b>; the 4 px key-cap radius survives because key caps are the one legitimately rounded thing on the sheet. A 24 px graticule pitch with a heavier line every 96 px, drawn as two crossed <code>repeating-linear-gradient</code> pairs and <b>confined to the header band, the hero and the empty state</b> — never behind rows. <b>No shadow anywhere</b> (<code>--elev</code>/<code>--elev-sm</code>/<code>--key</code> = <code>none</code>): on a map nothing floats, so surfaces are separated by rules and screens, and each row carries a 3 px left station bar in its class ink. Border widths are tokens (<code>--bw</code> 1 / <code>--bw-2</code> 2 / <code>--bw-3</code> 3). Nothing in this mock animates — a survey sheet is not in a hurry — so no reduced-motion block is needed and none is present.</p>
+  <ul class="moves">
+    <li><b>Move 1 — the rule, enforced</b>Re-tint the five <code>--file-*</code> pairs in <code>src/renderer/styles/tokens/colors.css</code> + <code>semantic/theme.css</code> into <b>four</b> USGS classes — contour brown = code and stylesheets, hydro blue = prose, cultural black = structure/boundary, survey red = the governing document (<code>AGENTS.md</code>, specs) — each with a <code>.dark</code> half and <code>-text</code> siblings, then give <code>ResultItem</code>/<code>FileTypeIcons</code> a one-line class→ink map and a <code>--file-class</code> custom property so the row's station bar, icon and kind label are all written by that one property in one place. The five language inks collapse to four class inks: language stays in the <code>kind</code> label, not in the colour.</li>
+    <li><b>Move 2 — the sheet, in four tokens</b>Add <code>--paper</code>, <code>--buffer</code>, <code>--graticule</code> and <code>--graticule-major</code> to <code>tokens/colors.css</code> and register both halves in <code>semantic/theme.css</code>; set radius to <b>0</b> in <code>tokens/radius.css</code> (keeping <code>--radius-shortcut-key: 4px</code>) and shadows to <b>none</b> in <code>tokens/shadow.css</code>. <code>--graticule-bg</code>, <code>--ticks</code> and <code>--scale-bg</code> must be declared inside the <code>:root</code>/<code>.dark</code> blocks, not on <code>:root</code>, or the substitution is invalid where it is declared and the device silently vanishes.</li>
+    <li><b>Move 3 — marginalia as chrome</b>Name faces and tracking in <code>tokens/typography.css</code> (Oswald/Archivo stack, <code>--tracking-place: .045em</code>); vendor only the Oswald latin subset, ~60 KB — no multi-megabyte variable face, no blend mode. Markup: the neatline and corner ticks are two pseudo-elements on the <code>CommandPalette</code> card, the declination needle is a <code>clip-path</code> <code>&lt;i&gt;</code> in <code>ModeTabs</code> and <code>ThemeToggle</code>, the legend box and scale bar are the collar note for <code>SearchEmptyState</code> and <code>SettingsDialog</code>, and the <code>TaskMetrics</code> block gains a stated contour interval so the units are printed, not implied.</li>
+  </ul>
+  <p><b>Cost: MEDIUM.</b> Re-tint the five existing <code>--file-*</code> pairs into the four USGS classes with both halves and re-run the contrast gate (<code>node tmp/contrast-full.mjs --strict</code>); add <code>--paper</code>, <code>--buffer</code>, <code>--graticule</code>, <code>--graticule-major</code> to <code>tokens/colors.css</code> and <code>semantic/theme.css</code>; radius to 0 in <code>tokens/radius.css</code>; shadows to none in <code>tokens/shadow.css</code>; ~8 lines of component markup for the neatline, needle, legend and scale bar. The honest selling point: <b>no blend modes, no portal risk, no multi-megabyte font — the cheapest genuinely impressive option in the lab</b>, and the only one that gets <i>stronger</i> the more of the sheet you draw.</p>
+  <p><b>Biggest risk:</b> a graticule sitting directly under 13 px text measurably costs contrast, so it must never be behind rows — the header band, the hero and the not-ready empty state are its only homes here, and its alpha is capped by measurement, not by taste: at 35% umber on quad paper the worst text-over-line crossing is 4.78:1 (light) and at 20% it is 4.90:1 (night edition), so the night edition runs the lines fainter still — a glow sheet cannot spend contrast on grid ink. And the whole thing turns into novelty the instant colour is decoration: it is only defensible under the enforced rule <b>“ink = file class”</b>, which is why selection, hover, focus and the send control are cultural black. Legibility of the published inks, measured on quad paper: hydro blue 4.46:1, survey red 4.07:1, contour umber 3.75:1 — <b>under</b> the 4.5:1 a 12–14 px label needs — so the class inks are rules, station bars, swatches and glyphs, and every one of them carries a darkened (light) or lifted (dark) <code>-text</code> sibling for words: <code>#6B4630</code> 7.44:1, <code>#215A80</code> 6.67:1, <code>#8E3118</code> 7.28:1 on the sheet, all ≥4.5 on the buffer band too.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--paper)"></i><i style="background:var(--card)"></i><i style="background:var(--buffer)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--foreground)"></i><i style="background:var(--file-a)"></i><i style="background:var(--file-b)"></i><i style="background:var(--file-d)"></i><i style="background:var(--agent)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--paper)"></i><i style="background:var(--card)"></i><i style="background:var(--buffer)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--foreground)"></i><i style="background:var(--file-a)"></i><i style="background:var(--file-b)"></i><i style="background:var(--file-d)"></i><i style="background:var(--agent)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ FIRST EDITION — DAY ════════════════ -->
+<section class="col" data-theme="light">
+<h2>First edition · day sheet</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 21 &nbsp;+ + + +&nbsp; quadrangle 800 × 72</span>
+  <h3 class="hero-title">Quadrangle</h3>
+  <p class="hero-thesis">Inkwells, neatline, contour interval 400 tokens: colour here is not decoration, it is the class of the information, and the app already ships that legend.</p>
+  <p class="chain" aria-hidden="true">+ + + +</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i><i class="f f6"></i><i class="f f7"></i></div>
+  <div class="plate">
+    <p class="lg-h">Legend · ink = class</p>
+    <p class="lg a"><i style="background:var(--file-a)"></i><b>Contour brown</b><em>code · .ts .js .css</em></p>
+    <p class="lg b"><i style="background:var(--file-b)"></i><b>Hydro blue</b><em>prose · .md .txt</em></p>
+    <p class="lg d"><i style="background:var(--file-d)"></i><b>Survey red</b><em>governing · AGENTS.md</em></p>
+    <p class="lg c"><i style="background:var(--file-c)"></i><b>Cultural black</b><em>folders · binaries</em></p>
+    <p class="needle"><i class="ndl" aria-hidden="true"></i>Declination 14° W · day sheet</p>
+    <div class="scale" aria-hidden="true"></div>
+    <p class="sc-l"><span>0</span><span>400</span><span>800</span><span>1,200</span></p>
+    <p class="east">NE¼ SW¼ SEC. 14, T. 3 N., R. 4 W.</p>
+    <p class="east">CONTOUR INTERVAL 400 TOKENS</p>
+    <p class="east">SCALE 1:24,000 · 800 × 72 · PAD 12</p>
+  </div>
+  <svg class="contour" viewBox="0 0 280 150" role="img" aria-label="Brown contour lines with a spot elevation">
+    <path d="M4 134c40-12 54-34 92-42s62 10 90-12 60-28 98-22"/>
+    <path d="M4 116c42-14 58-38 96-46s60 12 88-10 58-26 92-20"/>
+    <path class="ix" d="M4 96c44-16 62-42 100-50s58 14 84-12 60-22 92-16"/>
+    <path d="M62 148c8-22 30-30 52-24s34 22 60 20 40-16 58-28"/>
+    <path class="ix" d="M88 148c6-16 24-24 42-18s30 20 54 16 38-14 56-24"/>
+    <path class="spot" d="M146 108l5-9 5 9z"/>
+    <text x="162" y="108">214</text>
+  </svg>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode"><i class="ndl" aria-hidden="true"></i>Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row r-d"><svg width="15" height="15" style="color:var(--file-d)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row r-c"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode"><i class="ndl" aria-hidden="true"></i>Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel r-a"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row r-b"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row r-c"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row r-d"><svg width="15" height="15" style="color:var(--file-d)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:var(--elev)">
+  <div class="head" style="height:56px"><span class="mode"><i class="ndl" aria-hidden="true"></i>Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <p class="mgn">Marginal note · contour interval 400 tokens</p>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:var(--t12);color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ SECOND EDITION — NIGHT-SURVEIL (authored, not inverted) ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Second edition · night-surveil</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 21 &nbsp;+ + + +&nbsp; quadrangle 800 × 72</span>
+  <h3 class="hero-title">Quadrangle</h3>
+  <p class="hero-thesis">Inkwells, neatline, contour interval 400 tokens: colour here is not decoration, it is the class of the information, and the app already ships that legend.</p>
+  <p class="chain" aria-hidden="true">+ + + +</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i><i class="f f6"></i><i class="f f7"></i></div>
+  <div class="plate">
+    <p class="lg-h">Legend · ink = class</p>
+    <p class="lg a"><i style="background:var(--file-a)"></i><b>Contour brown</b><em>code · .ts .js .css</em></p>
+    <p class="lg b"><i style="background:var(--file-b)"></i><b>Hydro blue</b><em>prose · .md .txt</em></p>
+    <p class="lg d"><i style="background:var(--file-d)"></i><b>Survey red</b><em>governing · AGENTS.md</em></p>
+    <p class="lg c"><i style="background:var(--file-c)"></i><b>Cultural black</b><em>folders · binaries</em></p>
+    <p class="needle"><i class="ndl" aria-hidden="true"></i>Declination 14° E · night edition</p>
+    <div class="scale" aria-hidden="true"></div>
+    <p class="sc-l"><span>0</span><span>400</span><span>800</span><span>1,200</span></p>
+    <p class="east">NE¼ SW¼ SEC. 14, T. 3 N., R. 4 W.</p>
+    <p class="east">CONTOUR INTERVAL 400 TOKENS</p>
+    <p class="east">SCALE 1:24,000 · 800 × 72 · PAD 12</p>
+  </div>
+  <svg class="contour" viewBox="0 0 280 150" role="img" aria-label="Umber contour lines glowing on a black field, with a spot elevation">
+    <path d="M4 134c40-12 54-34 92-42s62 10 90-12 60-28 98-22"/>
+    <path d="M4 116c42-14 58-38 96-46s60 12 88-10 58-26 92-20"/>
+    <path class="ix" d="M4 96c44-16 62-42 100-50s58 14 84-12 60-22 92-16"/>
+    <path d="M62 148c8-22 30-30 52-24s34 22 60 20 40-16 58-28"/>
+    <path class="ix" d="M88 148c6-16 24-24 42-18s30 20 54 16 38-14 56-24"/>
+    <path class="spot" d="M146 108l5-9 5 9z"/>
+    <text x="162" y="108">214</text>
+  </svg>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode"><i class="ndl" aria-hidden="true"></i>Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row r-d"><svg width="15" height="15" style="color:var(--file-d)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row r-c"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode"><i class="ndl" aria-hidden="true"></i>Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel r-a"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row r-b"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov r-a"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row r-c"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row r-d"><svg width="15" height="15" style="color:var(--file-d)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:var(--elev)">
+  <div class="head" style="height:56px"><span class="mode"><i class="ndl" aria-hidden="true"></i>Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <p class="mgn">Marginal note · contour interval 400 tokens</p>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:var(--t12);color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

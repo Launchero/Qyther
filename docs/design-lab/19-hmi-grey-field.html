@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 19 · High-Performance HMI (ISA-101 operator-station grey field)</title>
+<!--
+  COPIED FROM docs/design-lab/00-current-baseline.html — every string, datum and surface block is the
+  control's, byte for byte. Changed: the two [data-theme] token blocks, the .brief header, the hero
+  banner, and ~40 lines of appended HMI idiom CSS. Three sanctioned colour-role reassignments are
+  recorded in the header below.
+  Values are DERIVED while honouring quoted rules from the Rockwell Process HMI Style Guide, the
+  ISA-101 High Performance HMI overview, Adroit's ISA-101 summary and Inductive Automation's Ignition
+  docs; the IEC 60073 permitted indicator set is cited for the hue list. No package, no licence to pay.
+-->
+<style>
+/* ── LIGHT — day-lit control room ─────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #C9CDD2; --foreground: #1A1D21;
+  --field: #C9CDD2;
+  --card: #D9DCE0; --card-foreground: #1A1D21;
+  --popover: #E4E7EA; --popover-foreground: #1A1D21;
+  --primary: #2E3338; --primary-foreground: #F2F3F5;
+  --secondary: #D3D7DB; --secondary-foreground: #1A1D21;
+  --muted: #C6CAD0; --muted-foreground: #454B52;
+  --accent: #BFC5CB; --accent-foreground: #1A1D21;
+  --destructive: #8F1D22; --destructive-foreground: #F2F3F5;
+  --success: #1F5A41; --warning: #6B4408; --info: #28506C;
+  --success-soft: #CBD1D6; --warning-soft: #DCC79B;
+  --info-soft: #D5DEE6; --destructive-soft: #E7DADB;
+  --agent: #28506C; --agent-foreground: #F2F3F5;
+  --border: #9BA1A8; --input: #5A6067; --ring: #2E3338;
+  --mark-bg: #9BA1A8; --mark-sel: #E8A317; --mark-ink: #1A1D21; --plate: #B4BABF;
+  --file-a: #2E3338; --file-b: #454B52; --file-c: #1F5A41;
+  --elev: none; --elev-sm: none; --key: none;
+  /* structure + alarm: the two families the standards actually speak to */
+  --hmi-struct: #6C7278; --hmi-line: #2E3338; --hmi-off: #9BA1A8;
+  --hmi-nominal: #2F5B7A; --hmi-alarm-hi: #C1272D; --hmi-alarm-hi-ink: #F2F3F5;
+  --hmi-alarm-lo: #E8A317; --hmi-alarm-lo-ink: #1A1D21;
+  --hmi-band: #B4BABF; --hmi-band-2: #DDE0E4; --hmi-cap: #1A1D21;
+}
+/* ── DARK — dim-room operator mode ────────────────────────────────────────── */
+[data-theme="dark"] {
+  --background: #2A2E33; --foreground: #E6E9EC;
+  --field: #2A2E33;
+  --card: #33383E; --card-foreground: #E6E9EC;
+  --popover: #3E444A; --popover-foreground: #E6E9EC;
+  --primary: #C9CDD2; --primary-foreground: #1A1D21;
+  --secondary: #3C4248; --secondary-foreground: #E6E9EC;
+  --muted: #3C4248; --muted-foreground: #A9B0B8;
+  --accent: #4E555C; --accent-foreground: #F2F3F5;
+  --destructive: #EF838A; --destructive-foreground: #1A1D21;
+  --success: #7FC0A0; --warning: #E8A317; --info: #9FC4E0;
+  --success-soft: #3A4046; --warning-soft: #44380F;
+  --info-soft: #34424E; --destructive-soft: #4A3234;
+  --agent: #9FC4E0; --agent-foreground: #1A1D21;
+  --border: #4A5057; --input: #8B9299; --ring: #C9CDD2;
+  --mark-bg: #5A6067; --mark-sel: #8B9299; --mark-ink: #1A1D21; --plate: #23262A;
+  --file-a: #C9CDD2; --file-b: #A9B0B8; --file-c: #7FC0A0;
+  --elev: none; --elev-sm: none; --key: none;
+  --hmi-struct: #5A6067; --hmi-line: #C9CDD2; --hmi-off: #4A5057;
+  --hmi-nominal: #9FC4E0; --hmi-alarm-hi: #C1272D; --hmi-alarm-hi-ink: #F2F3F5;
+  --hmi-alarm-lo: #E8A317; --hmi-alarm-lo-ink: #1A1D21;
+  --hmi-band: #4A5057; --hmi-band-2: #3C4248; --hmi-cap: #E6E9EC;
+}
+/* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 8px; --r-md: 6px; --r-sm: 4px; --r-xs: 2px;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --ls-label: .06em;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: #b9bac1; margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: 13px; color: #dcdde2; }
+.moves { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: 1px solid #33353c; border-radius: 8px; padding: 10px 12px; font-size: var(--t14); color: #d5d6db; }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin-bottom: 4px; }
+.sw { display: flex; gap: 2px; border-radius: 5px; overflow: hidden; border: 1px solid #33353c; }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: center; }
+.surface { margin-bottom: 36px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+.desktop, .page { border-radius: 12px; padding: 24px; }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: 1px solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: 1px solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 1px solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: 8px var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: var(--mark-sel); color: var(--mark-ink); }
+.row.foc { box-shadow: inset 0 0 0 2px var(--ring); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: 1px solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--foreground); font-size: var(--t12); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px 14px var(--r-md) 14px; background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--warning-soft); color: var(--warning); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: 1px solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 12px 12px; }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: 1px solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+
+/* direction banner */
+.hero { position: relative; display: grid; gap: var(--gap-2); padding: var(--gap-3) var(--pad); margin-bottom: var(--gap-3); border: 1px solid var(--border); border-radius: var(--r); background: var(--secondary); overflow: hidden; }
+.hero-kicker { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.hero-title { font-size: var(--t24); line-height: 1.2; letter-spacing: -.022em; margin: 0; color: var(--foreground); }
+.hero-thesis { margin: 0; font-size: var(--t14); line-height: 1.45; color: var(--muted-foreground); max-width: 46ch; }
+.hero-field { display: flex; align-items: flex-end; gap: var(--gap); margin-top: var(--gap); }
+.spec { font-size: 56px; line-height: .9; color: var(--foreground); }
+.spec:nth-child(2) { font-family: var(--mono); }
+.spec:nth-child(3) { color: var(--primary); }
+.f { display: block; width: 34px; height: 56px; border: 1px solid var(--border); }
+.f1 { background: var(--background); } .f2 { background: var(--card); } .f3 { background: var(--muted); }
+.f4 { background: var(--primary); } .f5 { background: var(--info); }
+
+/* dialogs */
+.dlg { border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: 1px solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: 1px solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); }
+.sw2 { width: 28px; height: 16px; border-radius: 99px; background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: 1px solid var(--destructive); border-radius: var(--r-md); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
+
+/* ══ 19 · HMI idiom (appended) ══════════════════════════════════════════════
+   Type: 13/17 rows, 12/16 mono values, every numeral tabular, labels 11/16 tracked caps.
+   Depth: none. Emphasis is stroke weight — 2px means "this matters", 1px means "this exists".
+   Motion: exactly one animated thing, the acknowledgement blink; a moving graphic that carries
+   no alarm state is the distraction ISA-101 removes. ─────────────────────────────────────── */
+:root {
+  --ff-hmi: Inter, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --t13: 13px; --lh17: 17px; --t11: 11px; --lh11: 16px; --lh2: 2px; --lh1: 1px;
+  --ack-period: .667s; /* 1.5 on/off cycles per second — under the WCAG 2.3.1 three-flash ceiling */
+  --hero-min: 320px; --sheet: 16px; --spec-hmi: 96px; --spec2-hmi: 44px; --slab-w: 62px; --slab-h: 16px;
+}
+* { font-family: var(--ff-hmi); }
+body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { font-variant-numeric: tabular-nums; }
+.row, .row .p, .row .k, .set .d, .foot, .tr { font-size: var(--t13); }
+.row .p, .row .k, .st, .kv, .tr td, .ans, .chip, kbd, .pill, .cnt, .tip, .ask, .alert ul, .hero-thesis { line-height: var(--lh17); }
+.lbl, .sec, .hero-kicker, .hero-blink, .legend, .tank, .lvl, th, summary { line-height: var(--lh11); }
+.gu, .alert, .bar, .dlg, .tr, .hero { border-radius: var(--r-sm) }
+/* the drawing-sheet margin: every block on the card shares one 16px inline padding */
+.head, .foot, .sec, .row, .tile, .tip, .chat, .ag, .alert, .dlg .h, .set, .gu .h, .bar { padding-inline: var(--gap-3) }
+.head .q svg { color: var(--foreground); stroke-width: var(--lh2) }
+.row.hov .t, .row.hov .k, .row.hov .p, .row.hov svg { color: var(--accent-foreground) }
+.row.foc { box-shadow: none; outline: var(--lh2) solid var(--ring); outline-offset: calc(var(--lh2) * -1) }
+.st i { width: 12px; height: 12px; border-radius: 0; font-size: var(--t11); background: none; border: var(--lh2) solid var(--success); color: var(--success) }
+.st.run i { background: none; border-color: var(--warning); color: var(--warning) }
+.st em { border-left: var(--lh2) solid var(--hmi-struct) } .pill, .chip { border-width: var(--lh1) }
+/* a caution badge IS an amber plate with black ink — the hue never becomes a label */
+.pill.w { background: var(--hmi-alarm-lo); color: var(--hmi-alarm-lo-ink); border-color: var(--hmi-alarm-lo-ink) }
+.caret { color: var(--hmi-nominal); font-weight: 600 }
+.prog { height: var(--lh2); border-radius: 0; background: var(--hmi-off) }
+.prog i { background: var(--hmi-nominal); width: 84% }
+.me { border-radius: var(--r-sm); border: var(--lh2) solid var(--hmi-line) }
+.ok, .er, .pe { border-left: var(--lh2) solid currentColor; padding-left: var(--gap) }
+.sw2, .sw2::after, .dot { border-radius: 0 }
+.sw2 { background: var(--hmi-off) } .sw2.on { background: var(--hmi-line) }
+.sw2::after { background: var(--field) } .dot.off { background: var(--hmi-off) }
+.dlg, .alert { border-width: var(--lh2); border-color: var(--input) }
+.alert { border-left-color: var(--hmi-alarm-hi); border-left-width: var(--lh2) }
+.dim .row, .dim .sec, .dim .badge { color: var(--muted-foreground) }
+.dim .row svg, .dim .badge svg { color: var(--hmi-off) } .dim .badge { background: var(--field) }
+/* the banner as a drawing sheet: a 1px grid, flush-left type, the palette as a vertical mimic key */
+.hero { min-height: var(--hero-min); display: grid; grid-template-columns: minmax(0,1fr) auto;
+  grid-template-areas: "kick key" "title key" "thesis key" "key2 key2"; align-content: center;
+  gap: var(--gap) var(--gap-3); border: var(--lh2) solid var(--hmi-line);
+  background-image: repeating-linear-gradient(to right, var(--border) 0 var(--lh1), transparent var(--lh1) var(--sheet)) }
+.hero-kicker { grid-area: kick } .hero-title { grid-area: title } .hero-thesis { grid-area: thesis }
+.hero-field { grid-area: key; display: flex; flex-direction: column; align-items: flex-start; gap: var(--lh1); margin: 0 }
+.hero-field .spec { font-size: var(--spec-hmi) }
+.hero-field .spec:nth-child(2), .hero-field .spec:nth-child(3) { font-size: var(--spec2-hmi) }
+.hero-field .f { width: var(--slab-w); height: var(--slab-h); border-width: var(--lh1) }
+/* the two alarm plates, and the only two chromatic blocks in the file */
+.f6 { background: var(--hmi-alarm-hi) } .f7 { background: var(--hmi-alarm-lo) }
+/* signature device 1 — the Rockwell acknowledge machine, lifted verbatim: unacknowledged blinks
+   between alarm colour and grey border, acknowledged shows the alarm-colour border only, and the
+   border state is always rendered too, because the blink disappears under prefers-reduced-motion.
+   The blink is the BORDER and the chip, never the text plate: the row's own path/time ink is
+   1.51:1 (light) and 2.67:1 (dark) on #C1272D, so a filled alarm row would be unreadable for half
+   of every cycle — ISA-101 would call that a legibility defect, not an alarm. */
+.blink { border: var(--lh2) solid var(--hmi-alarm-hi); background: var(--field); color: var(--foreground);
+  animation: hmiAck var(--ack-period) steps(1, end) infinite }
+.blink .badge { animation: hmiAckChip var(--ack-period) steps(1, end) infinite }
+@keyframes hmiAck {
+  0%, 49.9% { border-color: var(--hmi-alarm-hi) }
+  50%, 100% { border-color: var(--hmi-struct) }
+}
+@keyframes hmiAckChip {
+  0%, 49.9% { background: var(--hmi-alarm-hi); border-color: var(--hmi-alarm-hi); color: var(--hmi-alarm-hi-ink) }
+  50%, 100% { background: var(--secondary); border-color: var(--border); color: var(--secondary-foreground) }
+}
+/* the hero swatch has no text on it, so it can carry the literal fill↔grey-border blink */
+.bxu { border: var(--lh2) solid var(--hmi-alarm-hi); background: var(--field);
+  animation: hmiAckFill var(--ack-period) steps(1, end) infinite }
+@keyframes hmiAckFill {
+  0%, 49.9% { background: var(--hmi-alarm-hi); border-color: var(--hmi-alarm-hi) }
+  50%, 100% { background: var(--field); border-color: var(--hmi-struct) }
+}
+.acked { border: var(--lh2) solid var(--hmi-alarm-hi); background: var(--field); color: var(--foreground) }
+.acked--lo { border-color: var(--hmi-alarm-lo) }
+/* signature device 2 — clip-path chevron: a call that is flowing is marked by shape, not hue */
+.flow { display: inline-block; flex: none; width: 14px; height: 10px; background: var(--hmi-line);
+  clip-path: polygon(0 0, 33% 100%, 66% 0, 100% 100%, 66% 34%, 33% 100%) }
+.flow--off { background: var(--hmi-off) }
+.legend { display: flex; flex-wrap: wrap; gap: var(--gap); list-style: none; margin: 0; padding: var(--gap) var(--pad);
+  border: var(--lh1) solid var(--border); border-radius: var(--r-sm); background: var(--field); font-size: var(--t11) }
+.legend li { display: flex; align-items: center; gap: 6px; color: var(--muted-foreground) }
+/* signature device 3 — tank bar: black HH/LL caps, light-grey H/L bands, nominal data as the level */
+.tank { display: grid; grid-template-columns: 64px 1fr; gap: var(--gap); align-items: center; font-size: var(--t11) }
+.tank .bar2 { height: var(--slab-h); border: var(--lh2) solid var(--hmi-cap);
+  background: linear-gradient(to right, var(--hmi-band) 0 10%, var(--hmi-band-2) 10% 20%, transparent 20% 80%, var(--hmi-band-2) 80% 90%, var(--hmi-band) 90% 100%) }
+.tank .bar2 b { display: block; height: 100%; width: 58.7%; background: var(--hmi-nominal) }
+.tank .val { font-family: var(--mono); font-size: var(--t11); color: var(--muted-foreground) }
+/* signature device 4 — the alarm-level key. THIS IS OUR CONTRACT, NOT A STANDARD: ISA-18.2 defines
+   priorities and, as far as can be established, no hues. Hues come from IEC 60073's permitted set. */
+.lvl { display: grid; gap: var(--lh1); font-size: var(--t11) }
+.lvl div { display: grid; grid-template-columns: 34px 1fr auto; gap: var(--gap); align-items: center;
+  padding: 4px var(--gap); border: var(--lh1) solid var(--border); background: var(--field); color: var(--muted-foreground) }
+.lvl i { font-style: normal; font-family: var(--mono); font-weight: 700; text-align: center; padding: 1px 0;
+  border: var(--lh1) solid var(--hmi-struct); color: var(--muted-foreground) }
+.lvl .p1, .lvl .p1 i { background: var(--hmi-alarm-hi); color: var(--hmi-alarm-hi-ink); border-color: var(--hmi-alarm-hi) }
+.lvl .p2, .lvl .p2 i { background: var(--hmi-alarm-lo); color: var(--hmi-alarm-lo-ink); border-color: var(--hmi-alarm-lo) }
+.lvl .p3 i, .lvl .p4 i { background: var(--info-soft); color: var(--info); border-color: var(--info) }
+.lvl .p0 { border-width: var(--lh2); border-color: var(--hmi-line); color: var(--foreground) }
+.hero-blink { grid-area: key2; display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap;
+  font-size: var(--t11); color: var(--muted-foreground) }
+.hero-blink .bx { width: var(--slab-w); height: var(--slab-h); flex: none }
+.lbl, .sec, th, summary, .legend, .tank, .hero-blink, .hero-kicker { letter-spacing: var(--ls-label); text-transform: uppercase }
+.tank .val { letter-spacing: 0; text-transform: none }
+@media (prefers-reduced-motion: reduce) {
+  /* every animated state's static twin is already the information-complete one: the unacknowledged
+     row settles to the acknowledged look — a solid alarm-colour border on the flat field. */
+  .blink, .blink .badge, .bxu { animation: none }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>19 · High-Performance HMI — the operator-station grey field, where colour is an alarm and nothing else</h1>
+  <p><b>Provenance</b> — five documents, quoted rather than paraphrased. <b>Rockwell Automation, <i>Process HMI Style Guide</i></b>: “Display background: use a <b>non-saturated background color such as light gray</b> as it will have minimum interference with other color choices”; “only icons that indicate alarm conditions should use colors in the red and yellow spectrum”; and the rule the signature device below lifts <b>verbatim</b> — “Unacknowledged alarms should blink between alarm color and gray border, while acknowledged alarms should continually display alarm color border”. <b>ISA-101 High Performance HMI overview</b>: “Screens depicting the operation running normally should <b>not</b> be covered in brightly saturated colors.” <b>Adroit’s ISA-101 summary</b>: grey backgrounds minimise glare, process lines are dark grey or black, “<b>emphasis is provided by differences in line thickness, not colour</b>”, colour only for alarm conditions. <b>Inductive Automation, Ignition docs</b>: “Gray-scale colors are used instead of the traditional bright red, green and blue.” <b>IEC 60073</b> restricts indicators to RED, YELLOW, GREEN, BLUE, BLACK, GREY, WHITE — red = danger/faulty, yellow = abnormal/caution, green = safe/normal, blue = mandatory — with the positional rule that red sits topmost. These are vendor manuals and standards overviews: the <i>text</i> is copyrighted to Rockwell/ISA/Adroit/IA and is quoted here for research; there is no package to install and no font licence to buy.</p>
+  <p><b>One honest caveat.</b> ISA-18.2 defines alarm <i>priorities</i>; as far as can be established it does <b>not</b> mandate colours, and the five-level P0–P4 hue map some consultancies publish is a convention, not a standard. So the colour-to-severity table on surface 3 is <b>this direction’s own documented contract</b> — it is <i>our</i> mapping, published as such, borrowing IEC 60073’s permitted set. The background and structure values are marked <b>DERIVED</b>: <code>#C9CDD2</code> field (deliberately neither white nor black — this is the one direction in the lab whose ground is <i>not</i> a lightness ramp), <code>#6C7278</code> structures, 2px <code>#2E3338</code> primary lines, <code>#2F5B7A</code> nominal data, alarms only <code>#C1272D</code>/<code>#E8A317</code>, <code>#9BA1A8</code> off-state.</p>
+  <p><b>Type plan</b> — Inter (OFL 1.1, 48 KB Latin variable, vendor it: the sandboxed renderer has no CDN) and otherwise the system stack exactly as it ships. Rows 13/17, values 12/16 in the mono stack, every numeral behind <code>font-variant-numeric: tabular-nums</code> so a live meter does not shimmy; rows in the 32–40 px band with 16 px column padding. This family tolerates 13 px better than any other mock here, and the reason is measurable rather than stylistic: text is dark-on-light at <b>10.59:1</b> on the field with the secondary ink at <b>5.52:1</b> (dim room: <b>11.21:1</b> and <b>6.24:1</b>), and because colour is reserved for alarms there is no low-contrast tinted label competing with the small type. Every text/surface pair actually painted here was computed from the hex, not estimated, and the floor is <b>4.50:1</b> — the tightest pair in the whole set is the dark muted foreground on the popover plate. Caveat against this repo: <code>src/renderer/styles/AGENTS.md</code> forbids a size below 12px and the shipped scale starts at 12/14 — adopting 13/17 as the row rung means <i>editing that law</i>, so the safe adoption profile keeps 14/18 rows and takes only the weight and letter-spacing discipline. The 11px alarm-level tags are fills, not prose.</p>
+  <p><b>Geometry</b> — 8 px grid, radius 4 px on everything that is not a card, <b>zero shadows</b> (<code>--elev</code>/<code>--elev-sm</code>/<code>--key</code> are <code>none</code>), and a strict two-value line hierarchy: 2px is “this matters”, 1px is “this exists”. Emphasis therefore comes from stroke weight, never from hue. There is no lightness ramp doing the work: <code>--card</code> sits <i>above</i> <code>--background</code> and <code>--popover</code> above that, but a raised panel is announced by a 2px structure border, not by depth — <code>--border</code> is a decorative <b>1.63:1</b> divider (dark 1.68:1) and <code>--input</code> a <b>3.98:1</b> control boundary (dark 3.76:1), which is the same split this repo already encodes. <code>--destructive</code>/<code>--warning</code>/<code>--info</code> are mapped to <b>ink</b> values and <code>--hmi-alarm-hi</code>/<code>--hmi-alarm-lo</code> to the <b>fills</b>, because the hues themselves cannot be labels: <code>#C1272D</code> at 12–14px is <b>3.66:1</b> on the field and <code>#E8A317</code> is <b>1.36:1</b>. What sits on an alarm plate is near-white (<code>#F2F3F5</code> on <code>#C1272D</code> = <b>5.26:1</b>) or near-black (<code>#1A1D21</code> on <code>#E8A317</code> = <b>7.80:1</b>), and the ink pairs that replace them clear 4.5 on every plate they are actually painted on — <code>#8F1D22</code> 5.55:1 on the field / 6.45:1 on the card, dark <code>#EF838A</code> 5.39:1 / 4.66:1, <code>#28506C</code> 5.36:1 / 6.22:1, <code>#6B4408</code> 5.35:1 / 6.22:1, <code>#1F5A41</code> 5.06:1 / 5.88:1. Three sanctioned deviations from the control, all of them colour-role: <code>--elev*</code>/<code>--key</code> are <code>none</code> (no shadows); <code>--success-soft</code> is a flat grey plate, because a normal-state row must not be tinted at all; and <code>.row.sel mark</code> reads <code>var(--mark-sel)</code> with <code>color: var(--mark-ink)</code> instead of inheriting <code>--primary-foreground</code> — amber in light (5.88:1 against the selection bar, 7.80:1 for its own text), grey in dark (1.68:1 as a graphic, 5.37:1 as text). Near-white text on that amber plate would be 1.36:1, which is exactly the failure HP-HMI exists to prevent: the <i>fill</i> is allowed colour, the ink on it is not. The acknowledge device therefore implements the Rockwell sentence as a <b>border</b> blink plus a chip that blinks the fill, not as a filled text row — the row’s own secondary ink on <code>#C1272D</code> is <b>1.51:1</b> (light) and <b>2.67:1</b> (dark), so an alarm-filled row would be unreadable for half of every cycle. Its settled state, and the state <code>prefers-reduced-motion</code> leaves it in, is the acknowledged one: a solid alarm-colour border on the flat field, which is why the blink carries no information the static state does not.</p>
+  <ul class="moves">
+    <li><b>Move 1</b>Colour: <code>tokens/colors.css</code> collapses to a grey ramp plus exactly two alarm hues and one desaturated blue, and <code>semantic/theme.css</code> gains <code>--hmi-*</code> rows in <i>both</i> halves (<code>:root</code> and <code>.dark</code>) so no component or <code>dark:</code> utility is touched. The 61.3% light-and-glare-sensitivity claim on the risk line is the reason to do it first.</li>
+    <li><b>Move 2</b>Depth and corner language: <code>tokens/shadow.css</code> sets <code>--shadow-*</code> to <code>none</code> and <code>--ring-color</code> to the 2px structure ink; <code>tokens/radius.css</code> drops the base radius to 4px, which moves every corner in the renderer — including the pristine <code>components/ui/</code> primitives — with no component edit.</li>
+    <li><b>Move 3</b>Rhythm and type: <code>tokens/spacing.css</code> keeps <code>--target-row</code> 40px and adds <code>--target-bench</code> 32px; <code>tokens/typography.css</code> registers <code>--ff-hmi</code> (Inter → system fallback) and the paired <code>--text-13--line-height: 17px</code> rung; <code>tokens/motion.css</code> gains <code>--animate-alarm-ack</code> (<code>steps(1)</code>, one period ≤ 3 flashes/s). Markup costs: <code>ResultItem.tsx</code> needs the <code>flow</code> chevron span and <code>ask-mode/BrowserProgressPanel.tsx</code> the tank-bar block; <code>ChatMessageBubble.tsx</code>’s thinking steps swap the round glyph for a square outline. The acknowledgement <i>machine</i> is new state and not a restyle: <code>useChatSession.ts</code> would have to model ack/unack per failed tool, and that is the real line in this column.</li>
+  </ul>
+  <p><b>Cost: LOW</b> — it is the only direction in this lab that fits the existing light surface ramp and the current <code>--success</code>/<code>--warning</code>/<code>--info</code> pairs instead of fighting them. Every role name survives with a value change; nothing needs a wrapper element, a second registration layer, a main-process flag, or a restructure. The genuinely new work is one state field (acknowledged or not) and one keyframe.</p>
+  <p><b>Biggest risk:</b> it looks deliberately plain, so it must be judged on whether an operator can triage a failed tool call in under a second — not on how it photographs. Every other mock here is auditioning on appearance; this one is auditioning on glance time, and a lab that scores on screenshots will rank it last. The honest counter-claim is that this is the only direction here that makes the app better for the 61.3% of low-vision users who report light and glare sensitivity: a mid-grey field with no tinted normal state and colour reserved for the abnormal is not a taste choice, it is the measured accommodation. Second risk, and it is real: an HP-HMI field at 13px on a desktop monitor is a control-room convention, and Qyther is a launcher that spends most of its life hidden.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light — day-lit control room</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 19 · ISA-101 / IEC 60073</span>
+  <h3 class="hero-title">High-Performance HMI</h3>
+  <p class="hero-thesis">A screen at work is grey. Colour is not decoration and not hierarchy — it is an alarm, and it appears exactly when the plant has left its normal band.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">13</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i><i class="f f6"></i><i class="f f7"></i></div>
+  <div class="hero-blink"><span class="bx bxu"></span><span>unacknowledged — alarm border blinks, chip blinks the fill, 1.5 cycles/s</span><span class="bx acked"></span><span>acknowledged — alarm-colour border only, which is the state the blink settles to</span></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="lvl">
+      <div class="p1"><i class="lv">P1</i><span>Tool failure, run cannot continue — red, and topmost per IEC 60073</span><span class="badge">A</span></div>
+      <div class="p2"><i class="lv">P2</i><span>Recovered by the agent, operator should know — yellow</span><span class="badge">A</span></div>
+      <div class="p3"><i class="lv">P3</i><span>Advisory, no action expected — blue, in-IEC permitted set</span><span class="badge">·</span></div>
+      <div class="p4"><i class="lv">P4</i><span>Informational — blue, same hue, weight says the rank</span><span class="badge">·</span></div>
+      <div class="p0"><i class="lv">P0</i><span>Normal — grey. Not a colour, because a screen at work has no colour to spend</span><span class="badge">·</span></div>
+    </div>
+    <div class="tank"><span>Token budget</span><span class="bar2"><b></b></span><span class="val">4,812 / 8,192 · LL · L · H · HH caps</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <ul class="legend"><li>normal</li><li><span class="flow flow--off"></span>queued</li><li><span class="flow"></span>executing</li><li><span class="flow"></span>complete</li><li><span class="flow"></span>failed · unack</li></ul>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+  <div class="chat" style="padding:12px 0 0">
+    <div class="row blink"><svg width="15" height="15"><use href="#i-x"/></svg><span><span class="t">invoke_element</span><span class="p">element not found — P1, unacknowledged</span></span><span class="k">2.8 s</span><span class="badge">A</span></div>
+    <div class="row acked"><svg width="15" height="15"><use href="#i-x"/></svg><span><span class="t">invoke_element</span><span class="p">element not found — P1, acknowledged</span></span><span class="k">2.8 s</span><span class="badge">A</span></div>
+    <div class="row acked acked--lo"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">close_window</span><span class="p">verifier declined the pixel check — P2, acknowledged</span></span><span class="k">0.9 s</span><span class="badge">A</span></div>
+  </div>
+  <div class="dim">
+    <p class="sec">Upcoming · greyed out, not coloured</p>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">type_text</span><span class="p">awaiting the element above it</span></span><span class="k">Pending</span><span class="badge">·</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">close_window <span class="chip">verifies</span></span><span class="p">queued behind type_text</span></span><span class="k">Pending</span><span class="badge">·</span></div>
+  </div>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark — dim-room operator mode</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 19 · ISA-101 / IEC 60073</span>
+  <h3 class="hero-title">High-Performance HMI</h3>
+  <p class="hero-thesis">A screen at work is grey. Colour is not decoration and not hierarchy — it is an alarm, and it appears exactly when the plant has left its normal band.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">13</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i><i class="f f6"></i><i class="f f7"></i></div>
+  <div class="hero-blink"><span class="bx bxu"></span><span>unacknowledged — alarm border blinks, chip blinks the fill, 1.5 cycles/s</span><span class="bx acked"></span><span>acknowledged — alarm-colour border only, which is the state the blink settles to</span></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="lvl">
+      <div class="p1"><i class="lv">P1</i><span>Tool failure, run cannot continue — red, and topmost per IEC 60073</span><span class="badge">A</span></div>
+      <div class="p2"><i class="lv">P2</i><span>Recovered by the agent, operator should know — yellow</span><span class="badge">A</span></div>
+      <div class="p3"><i class="lv">P3</i><span>Advisory, no action expected — blue, in-IEC permitted set</span><span class="badge">·</span></div>
+      <div class="p4"><i class="lv">P4</i><span>Informational — blue, same hue, weight says the rank</span><span class="badge">·</span></div>
+      <div class="p0"><i class="lv">P0</i><span>Normal — grey. Not a colour, because a screen at work has no colour to spend</span><span class="badge">·</span></div>
+    </div>
+    <div class="tank"><span>Token budget</span><span class="bar2"><b></b></span><span class="val">4,812 / 8,192 · LL · L · H · HH caps</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <ul class="legend"><li>normal</li><li><span class="flow flow--off"></span>queued</li><li><span class="flow"></span>executing</li><li><span class="flow"></span>complete</li><li><span class="flow"></span>failed · unack</li></ul>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+  <div class="chat" style="padding:12px 0 0">
+    <div class="row blink"><svg width="15" height="15"><use href="#i-x"/></svg><span><span class="t">invoke_element</span><span class="p">element not found — P1, unacknowledged</span></span><span class="k">2.8 s</span><span class="badge">A</span></div>
+    <div class="row acked"><svg width="15" height="15"><use href="#i-x"/></svg><span><span class="t">invoke_element</span><span class="p">element not found — P1, acknowledged</span></span><span class="k">2.8 s</span><span class="badge">A</span></div>
+    <div class="row acked acked--lo"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">close_window</span><span class="p">verifier declined the pixel check — P2, acknowledged</span></span><span class="k">0.9 s</span><span class="badge">A</span></div>
+  </div>
+  <div class="dim">
+    <p class="sec">Upcoming · greyed out, not coloured</p>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">type_text</span><span class="p">awaiting the element above it</span></span><span class="k">Pending</span><span class="badge">·</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">close_window <span class="chip">verifies</span></span><span class="p">queued behind type_text</span></span><span class="k">Pending</span><span class="badge">·</span></div>
+  </div>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 18 · EFIS Colour Law (glass-cockpit display convention)</title>
+<!--
+  Wave-2 mock. Structure, strings and data copied byte-comparable from 00-current-baseline.html (the
+  control): the <symbol> sprite, the .brief header, the two <section class="col" data-theme=…> columns,
+  the .hero banner and the five surfaces. Changed: the two token blocks, the header prose, and appended
+  idiom CSS for the four signature devices (reticle, annunciator lamps, clipped chevron band, conic gauge).
+
+  Colour values are DERIVED for this mock from the published EFIS/SCADA hue-to-state conventions; the
+  conventions themselves are published, the hexes are not. Every status hue below is paired with a text
+  label at every use site — that is the direction's rule, not a decoration.
+
+  The night set is declared once and keyed on BOTH [data-theme="dark"] and .dark, so the mock demonstrates
+  the app's real mechanism: one stylesheet, two token sets, the existing `.dark` class flips them.
+-->
+<style>
+/* ── DAY (MIL-STD-1472H §5.18.2.2.1: dark characters on a light ground) ─────── */
+[data-theme="light"], .light {
+  --background: #dfe5ea; --foreground: #0b1116;
+  --card: #e7ecf0; --card-foreground: #0b1116;
+  --popover: #eff3f6; --popover-foreground: #0b1116;
+  --primary: #0c6377; --primary-foreground: #f4f7f9;
+  --secondary: #dbe2e8; --secondary-foreground: #101a22;
+  --muted: #d0d8de; --muted-foreground: #4c5761;
+  --accent: #c9d4dd; --accent-foreground: #0d1720;
+  --success: #00683a; --warning: #7a5008; --info: #0c6377; --destructive: #a6241c;
+  --engaged: #00683a; --armed: #0c6377; --planned: #7a2193; --caution: #7a5008; --exceeded: #a6241c;
+  --engaged-foreground: #0b1116; --armed-foreground: #0b1116; --planned-foreground: #0b1116;
+  --caution-foreground: #0b1116; --exceeded-foreground: #f4f7f9;
+  --engaged-lamp: #0f8f53; --armed-lamp: #177f9e; --planned-lamp: #b846d4; --caution-lamp: #ad720c;
+  --exceeded-lamp: #e23c31;
+  --success-soft: #00683a12; --warning-soft: #7a500812; --info-soft: #0c637712; --destructive-soft: #a6241c12;
+  --engaged-soft: #00683a12; --armed-soft: #0c637712; --planned-soft: #7a219312; --caution-soft: #7a500812;
+  --exceeded-soft: #a6241c12;
+  --agent: #7a2193; --agent-lamp: #b846d4;
+  --border: #a2aeb8; --input: #5c6b76; --ring: #0c6377;
+  --mark-bg: #0c637733; --mark-on-primary: #f4f7f940; --plate: #adb9c3;
+  --graticule: #7f8f9b30; --graticule-major: #4d5d6a40; --reference: #16202a;
+  --file-a: #0c6377; --file-b: #4c5761; --file-c: #7a5008;
+  --elev: 0 1px 0 0 #16202a26, 0 10px 24px -12px #16202a2e;
+  --elev-sm: 0 1px 0 0 #16202a1f, 0 3px 8px -6px #16202a26;
+  --key: 0 1px 0 0 #16202a2e; --lamp-glow: #0b11161a;
+}
+/* ── NIGHT (the EFIS ground: a near-black that keeps the CRT/LED phosphor pure) ─ */
+[data-theme="dark"], .dark {
+  --background: #04070a; --foreground: #e8edf2;
+  --card: #0a1017; --card-foreground: #e8edf2;
+  --popover: #131d27; --popover-foreground: #e8edf2;
+  --primary: #3ec7e0; --primary-foreground: #04070a;
+  --secondary: #16222c; --secondary-foreground: #dfe7ee;
+  --muted: #16222c; --muted-foreground: #8fa0ae;
+  --accent: #1b2a36; --accent-foreground: #eaf1f6;
+  --success: #00d67f; --warning: #f5b32d; --info: #3ec7e0; --destructive: #f2564a;
+  --engaged: #00d67f; --armed: #3ec7e0; --planned: #c05fe6; --caution: #f5b32d; --exceeded: #f2564a;
+  --engaged-foreground: #04070a; --armed-foreground: #04070a; --planned-foreground: #04070a;
+  --caution-foreground: #04070a; --exceeded-foreground: #f4f7f9;
+  --engaged-lamp: #00d67f; --armed-lamp: #3ec7e0; --planned-lamp: #c05fe6; --caution-lamp: #f5b32d;
+  --exceeded-lamp: #e3352b;
+  --success-soft: #00d67f26; --warning-soft: #f5b32d26; --info-soft: #3ec7e026; --destructive-soft: #e3352b26;
+  --engaged-soft: #00d67f26; --armed-soft: #3ec7e026; --planned-soft: #c05fe626; --caution-soft: #f5b32d26;
+  --exceeded-soft: #e3352b26;
+  --agent: #c05fe6; --agent-lamp: #c05fe6;
+  --border: #31404d; --input: #61717e; --ring: #3ec7e0;
+  --mark-bg: #3ec7e040; --mark-on-primary: #e8edf24d; --plate: #121a22;
+  --graticule: #4a55604d; --graticule-major: #4a556099; --reference: #e8edf2;
+  --file-a: #3ec7e0; --file-b: #8fa0ae; --file-c: #f5b32d;
+  --elev: 0 0 0 1px #24323e, 0 14px 34px -14px #000000cc;
+  --elev-sm: 0 0 0 1px #24323e, 0 4px 12px -8px #000000b3;
+  --key: 0 1px 0 0 #000000a6; --lamp-glow: #3ec7e014;
+}
+/* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 8px; --r-md: 6px; --r-sm: 4px; --r-xs: 2px;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff: "B612", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, sans-serif;
+  --mono: "B612 Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --ls-label: .06em;
+  --div-x: 80px; --div-y: 40px; --div-5: 16px; --div-min: 8px;
+  --row-static: 28px; --lamp: 10px; --lamp-edge: 1px; --lamp-bloom: 12px; --cross: 18px;
+  --band: 12px; --chev: 24px; --tick: 22px; --reticle: 62%; --ring: none;
+  --gauge-cut: 108deg; --gauge-range: 144deg; --gauge-arc: 96deg;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: #b9bac1; margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: 13px; color: #dcdde2; }
+.moves { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: 1px solid #33353c; border-radius: 8px; padding: 10px 12px; font-size: var(--t14); color: #d5d6db; }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin-bottom: 4px; }
+.sw { display: flex; gap: 2px; border-radius: 5px; overflow: hidden; border: 1px solid #33353c; }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: center; }
+.surface { margin-bottom: 36px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px;
+  display: inline-block; padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--card); }
+.note { display: block; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--card); color: var(--muted-foreground); font-size: var(--t12); line-height: 1.45; max-width: var(--measure); }
+.lbl code, .note code, .rul code, .brief code { font-family: var(--mono); }
+.desktop, .page { border-radius: 12px; padding: 24px; }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: 1px solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: 1px solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 1px solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: 8px var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: var(--mark-on-primary); color: var(--primary-foreground); }
+.row.foc { box-shadow: inset 0 0 0 2px var(--ring); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: 1px solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--foreground); font-size: var(--t12); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px 14px var(--r-md) 14px; background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--warning-soft); color: var(--warning); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: 1px solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.pill.pl { background: var(--planned-soft); color: var(--planned); }
+.gu { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 12px 12px; }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: 1px solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+
+/* dialogs — the control's block, restored: surface 5 renders these rows */
+.dlg { border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 14px var(--pad); border-bottom: 1px solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: 1px solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); }
+.sw2 { width: 28px; height: 16px; border-radius: 99px; background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: 1px solid var(--destructive); border-radius: var(--r-md); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
+
+/* ── EFIS idiom (appended) ─────────────────────────────────────────────────── */
+/* graticule: 10 divisions across, 8 down, every major division subdivided into fifths.
+   Majors are painted FIRST (on top) and in the stronger ink; the fifths and the eighths beneath them. */
+.grat { background-image:
+  repeating-linear-gradient(90deg, var(--graticule-major) 0 1px, transparent 1px var(--div-x)),
+  repeating-linear-gradient(0deg, var(--graticule-major) 0 1px, transparent 1px var(--div-y)),
+  repeating-linear-gradient(90deg, var(--graticule) 0 1px, transparent 1px var(--div-5)),
+  repeating-linear-gradient(0deg, var(--graticule) 0 1px, transparent 1px var(--div-min)); }
+/* reference frame + corner ticks (border-radius trick kept off: an EFD frame is square) */
+.frame { position: relative; border: 1px solid var(--reference); }
+.frame::before, .frame::after { content: ""; position: absolute; width: var(--cross); height: var(--cross); border: 1px solid var(--reference); }
+.frame::before { top: calc(var(--lamp-edge) * -1); left: calc(var(--lamp-edge) * -1); border-right: 0; border-bottom: 0; }
+.frame::after { bottom: calc(var(--lamp-edge) * -1); right: calc(var(--lamp-edge) * -1); border-left: 0; border-top: 0; }
+/* annunciator lamps: a 10px square, inset edge + bloom; never the only signal */
+.lamp { width: var(--lamp); height: var(--lamp); flex: none; background: var(--l, var(--muted));
+  box-shadow: inset 0 0 0 var(--lamp-edge) var(--border), 0 0 var(--lamp-bloom) var(--l, var(--lamp-glow))); }
+.lamp.off { --l: transparent; background: var(--muted); box-shadow: inset 0 0 0 var(--lamp-edge) var(--border); }
+.lamps { display: flex; flex-wrap: wrap; gap: var(--gap); }
+.annun { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t12);
+  letter-spacing: var(--ls-label); color: var(--foreground); }
+.pill .lamp { margin-right: 6px; }
+.st .annun { margin-left: 8px; color: var(--engaged); }
+/* caution band: a clipped chevron strip, decoration only — the label beside it carries the state */
+.band { height: var(--band); background: var(--caution);
+  clip-path: polygon(0 0, calc(100% - var(--chev)) 0, 100% 50%, calc(100% - var(--chev)) 100%, 0 100%, var(--chev) 50%); }
+/* bounded gauge: a conic arc inside a five-tick bezel (major ticks only) */
+.gauge { position: relative; width: 108px; height: 108px; flex: none; border-radius: 50%;
+  background: conic-gradient(from var(--gauge-cut), var(--armed) 0 var(--gauge-arc), var(--border) var(--gauge-arc) var(--gauge-range), transparent var(--gauge-range)); }
+.gauge::before { content: ""; position: absolute; inset: 12px; border-radius: 50%; background: var(--card); }
+.gauge::after { content: ""; position: absolute; inset: calc(54px - var(--tick) / 2); border-left: 1px solid var(--reference); transform-origin: 50% 50%; transform: rotate(var(--gauge-cut)); opacity: .9; }
+.tick { position: absolute; width: 1px; height: 7px; background: var(--reference); left: 53px; top: 3px; transform-origin: 50% 51px; }
+.gwrap { position: relative; display: flex; align-items: center; gap: var(--gap-2); }
+/* the readout: a static 28px row, label-beside-colour, and a target reticle on the live value */
+.rd { display: flex; align-items: center; gap: var(--gap); min-height: var(--row-static); padding: 0 10px;
+  border: 1px solid var(--border); background: var(--card); font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); }
+.rd .lb { color: var(--muted-foreground); text-transform: uppercase; }
+.rd .vl { color: var(--foreground); margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ret { position: relative; display: flex; align-items: center; gap: var(--gap); min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--armed); }
+.ret::before, .ret::after { content: ""; position: absolute; background: var(--armed); }
+.ret::before { left: -1px; top: 50%; width: var(--cross); height: 1px; box-shadow: 0 0 0 var(--lamp-edge) transparent; }
+.ret::after { right: -1px; top: 50%; width: var(--cross); height: 1px; }
+.ret .ring { position: absolute; left: 50%; top: 50%; width: var(--reticle); height: 130%; transform: translate(-50%,-50%);
+  border: 1px solid var(--armed); border-radius: 50%; pointer-events: none; }
+.ret .lb { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+/* scale law: label every FIFTH division, never every one */
+.skl { position: relative; height: 24px; margin: 4px 0 0; }
+.skl i { position: absolute; top: 0; width: 1px; height: 5px; background: var(--reference); }
+.skl b { position: absolute; top: 7px; transform: translateX(-50%); font-family: var(--mono); font-size: var(--t12); font-weight: 400; color: var(--muted-foreground); }
+/* the law table and the colour-blind column */
+.law { width: 100%; font-size: var(--t12); border-collapse: collapse; margin-top: 10px; }
+.law td { padding: 7px 8px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+.law td:nth-child(2) { font-family: var(--mono); font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.cb { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+.cb span { display: block; height: 22px; }
+/* the rule made visible: every coloured state carries its word */
+.rul { display: grid; gap: 6px; margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--input);
+  border-radius: var(--r-md); font-size: var(--t12); color: var(--muted-foreground); }
+.rul b { color: var(--foreground); font-weight: 600; }
+
+/* direction banner — composed on the instrument graticule */
+.hero { position: relative; min-height: 340px; display: grid; gap: var(--gap-2); padding: var(--gap-3) var(--pad); margin-bottom: var(--gap-3);
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--secondary); overflow: hidden; }
+.hero-kicker { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.hero-title { font-size: var(--t24); line-height: 1.2; letter-spacing: -.022em; margin: 0; color: var(--foreground); }
+.hero-thesis { margin: 0; font-size: var(--t14); line-height: 1.45; color: var(--muted-foreground); max-width: 46ch; }
+.hero-field { display: flex; align-items: flex-end; gap: var(--gap); margin-top: var(--gap); }
+.spec { font-size: 56px; line-height: .9; color: var(--foreground); }
+.spec:nth-child(2) { font-family: var(--mono); }
+.spec:nth-child(3) { color: var(--primary); }
+.spec.sl { font-family: var(--mono); color: var(--armed); }
+.f { display: block; width: 34px; height: 56px; border: 1px solid var(--border); }
+.f1 { background: var(--background); } .f2 { background: var(--card); } .f3 { background: var(--muted); }
+.f4 { background: var(--primary); } .f5 { background: var(--info); }
+.f6 { background: var(--engaged-lamp); } .f7 { background: var(--planned-lamp); }
+.f8 { background: var(--caution-lamp); } .f9 { background: var(--exceeded-lamp); }
+.hero-body { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--gap-3); align-items: start; }
+.hero-band { position: absolute; left: 0; right: 0; top: 88px; }
+.hero-right { display: grid; gap: var(--gap); justify-items: start; }
+.hero-rule { display: flex; flex-wrap: wrap; gap: 10px 14px; position: relative; font-family: var(--mono);
+  font-size: var(--t12); letter-spacing: var(--ls-label); color: var(--muted-foreground); }
+.hero-rot { transform: rotate(-90deg); transform-origin: left top; position: absolute; right: 4px; top: 120px;
+  font-family: var(--mono); font-size: var(--t12); letter-spacing: .22em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>18 · EFIS Colour Law — colour is the state of a law, never decoration</h1>
+  <p><b>Provenance</b> — the glass-cockpit electronic flight instrument display convention, taken from four published FAA sources by name: <b>General Guidance Human Factors</b> (FAA Office of Environment and Energy, DOT/FAA–EE–002/02.05-6), Ch. 3 §7 "Color", which maps features to hues — green for armed/engaged modes, cyan for selected data and selected values, magenta for the active route and flight plan — and warns explicitly that amber is easily confused; <b>AC 25.1322-1</b>, "Pilot-Display Considerations for Some Flight Management and Guidance Systems", which states that "Green is usually used to indicate 'normal' conditions" and that red, amber and yellow must be used consistently (red = warning, amber/yellow = caution); <b>AC 25-11B</b>, which names the escalation — "the progression from green to amber to red, representing increasing degrees of threat"; and <b>Use of Color in ATC Displays</b> (DOT/FAA–EE–022/25.05-18), whose reason for choosing cyan and magenta is that they are the two hues least likely to be confused with the rest of the set. Sentence wording above is this mock's paraphrase of those documents; the hue-to-state mapping is their published content. The eight hex values below are <b>DERIVED</b> for this mock from that mapping and are not from any of the four documents — no FAA advisory publishes a palette. Type is <b>B612 / B612 Mono</b>, <b>SIL Open Font License 1.1</b>, designed and legibility-tested for aircraft cockpit screens (validated with ENAC, the French civil-aviation university) and released by Airbus through the Polarsys Foundation.</p>
+  <p><b>Type plan</b> — <code>"B612", "Segoe UI Variable Text", system-ui, sans-serif</code> for UI, <code>"B612 Mono", ui-monospace, "Cascadia Mono", monospace</code> for telemetry. B612 is OFL and therefore vendorable into a sandboxed renderer with no CDN, which is the only honest way to guarantee it here; on a machine without it the mock renders in Segoe UI and looks like a decent monospaced dashboard, not like this. Its differentiators are exactly what a 13 px telemetry stream needs and are shown in the banner specimen: a <b>slashed zero</b> (<code>0Ø</code>), separated <code>1</code>/<code>l</code>/<code>I</code>, separated <code>5</code>/<code>S</code> and <code>0</code>/<code>O</code>, and open apertures so <code>18</code>/<code>88</code>/<code>38</code> do not collapse into a bead. Both are <b>regular</b> text typefaces, not condensed grotesques, and the display half is B612 regular at a large optical size.</p>
+  <p><b>Geometry</b> — the oscilloscope/EFD graticule: <b>10 divisions horizontally × 8 vertically</b>, each major division subdivided into <b>fifths</b>, and labels placed on <b>every 5th tick only</b> (shown under the banner — 80/60/40/20/0, not nine numbers). Rows are <b>28 px static readout</b> / <b>40 px interactive</b>, control floor 32 px; palette stays 800 × 72. Radius is 8/6/4/2 but instrument frames are square, and depth is <b>never</b> a shadow here: a raised surface is a reference-white 1 px frame with corner ticks, plus the graticule underneath it. Day and night are <b>two token sets, one stylesheet</b>, switched by the app's existing <code>.dark</code> class — the night block in this file is keyed on <code>[data-theme="dark"], .dark</code> to show that no second sheet is involved. Text recipe: <code>--tracking .06em</code> uppercase mono for every label, no italic, no weight below 400.</p>
+  <p><b>The rule that makes this honest</b> — five status hues are <b>not nameable at 13 px on their own</b>, and two of them (amber and a desaturated green) merge for the ~8 % of men with red-green deficiency. So every coloured state carries its <b>word beside the colour</b>, always: WCAG 2.2 <b>1.4.1 Use of Colour</b> (colour must not be the only means of conveying information), the same rule the SCADA/HMI alarms literature states as "annunciate, then colour", and AC 25.1322-1's consistency requirement. Implemented below: the annunciator row prints ENGAGED / SELECTED / PLANNED / CAUTION / EXCEEDED next to each lamp, the tool trace prints <b>ok / err / wait / plan</b> next to each dot, and the gauge prints <b>2 of 3</b> as well as filling an arc. A state that is colour-only in this system is a defect, not a style.</p>
+  <p><b>Measured, not assumed</b> — day mode is dark characters on a light ground per <b>MIL-STD-1472H §5.18.2.2.1</b>, with the §5.2.2.7 ratios (6:1 minimum, 10:1 preferred): ink <code>#0b1116</code> on the <code>#dfe5ea</code> ground is <b>14.95:1</b> and on the day card <code>#e7ecf0</code> <b>15.96:1</b>, so it clears even the preferred figure. The five law hues cannot be used in their night form on a light plate, so each was darkened until it clears 4.5:1 <i>as 13 px text on the day card</i>: <b>engaged green <code>#00683A</code> 5.80:1</b>, <b>armed cyan <code>#0C6377</code> 5.76:1</b>, <b>planned magenta <code>#7A2193</code> 7.16:1</b>, <b>caution amber <code>#7A5008</code> 5.93:1</b>, <b>exceeded red <code>#A6241C</code> 6.11:1</b>. Every pair was then re-checked against the plate it is actually painted on, including its own <code>-soft</code> tint over the darker <code>--secondary</code> surface, and that is where the day tints had to come down to 7 % alpha (worst case engaged on its own tint: 4.78:1 at 7 %, <b>4.22:1 at the night's 16 %</b>) — a status tint that eats the 4.5 floor is precisely how a colour law decays into decoration. Night is the reverse: <code>#E8EDF2</code> on the <code>#04070A</code> ground is <b>17.14:1</b>, and on the night card the five read engaged 9.94, armed 9.51, caution 10.34, planned 5.48, exceeded 5.64. Two published-form values <b>fail as text</b> and are therefore kept as fills and rules only, said out loud rather than quietly used: <b>exceeded red <code>#E3352B</code> measures 4.38:1</b> on the night card, so the text role is the lifted <code>#F2564A</code> (5.64:1 on the card, 4.89:1 on its own tint) while <code>#E3352B</code> stays the annunciator and guard-band colour; and the <b>contextual muted <code>#4A5560</code> measures 2.51:1</b>, so it is the graticule, the disabled state and — lifted to <code>#61717E</code>, 3.79:1, clearing WCAG 1.4.11's 3:1 control-boundary floor — <code>--input</code>, while muted <i>text</i> is <code>#8FA0AE</code> at 7.10:1. This direction earns its keep on exactly this discipline: the hue you are allowed to name is the hue you measured.</p>
+  <p><b>Lamps are state marks, not text</b> — and WCAG 1.4.11 still asks 3:1 for anything that identifies a state, so the day annunciator fills are the <b>day-dimmed</b> versions of the night lamps rather than the night values on a light plate: engaged <code>#0F8F53</code> 3.48:1, armed <code>#177F9E</code> 3.87:1, planned <code>#B846D4</code> 3.63:1, caution <code>#AD720C</code> 3.40:1, exceeded <code>#E23C31</code> 3.59:1, each against the day card. Two structural floors are held deliberately: <code>--border</code> is a decorative divider and clears only 1.4 (day <code>#A2AEB8</code> 1.90:1 on the card, night <code>#31404D</code> 1.79:1 — the same split this repo already encodes), while <code>--input</code> is a control boundary and clears 3:1 (day 4.62, night 3.79). The tightest pairing the law produces is recorded as a constraint, not hidden: <b>magenta is the darkest of the five</b>, so a plan pill belongs on a raised plate (4.64:1 on the card, 4.06:1 on the popover plate it does not use) and never on the darker steps surface at 3.86:1 — which is exactly the kind of plate-and-hue disagreement a named colour law makes visible instead of merely ugly.</p>
+  <ul class="moves">
+    <li><b>Move 1 — name the law</b>Rewrite the status pairs in <code>src/renderer/styles/semantic/theme.css</code> as the five-state law: <code>--engaged</code>, <code>--armed</code>, <code>--planned</code>, <code>--caution</code>, <code>--exceeded</code>, each with a <code>-foreground</code> and a <code>-soft</code> half in <b>both</b> the <code>:root</code> and <code>.dark</code> blocks, plus the <code>--*-lamp</code> fill that is deliberately not a text colour. Register them in the single <code>@theme inline</code> (<code>theme.css:19</code>) as <code>--color-engaged</code> … so components get <code>text-engaged</code> / <code>bg-caution-soft</code>. Hue primitives stay fills: <code>node tmp/token-refs.mjs</code> already fails any <code>--color-*-500</code> used as text, which is this same invariant with a different name — adopt the law and that gate becomes the enforcement, not the suggestion.</li>
+    <li><b>Move 2 — give every status its word, in markup</b>Bind the mapping at its source instead of at the surface: one <code>STATUS_LAW</code> table (<code>src/main/services/pi/toolbox.ts</code> emits <code>details.status</code>, which today is a free string per tool) and a renderer <code>utils/statusLaw.ts</code> that returns <code>{hue, label}</code> as a pair, so a component cannot render a colour without the label. Touch <code>src/renderer/components/ask-mode/BrowserProgressPanel.tsx</code> (annunciator row, gauge), <code>ask-mode/ThinkingSteps.tsx</code> (step states), <code>ask-mode/ChatErrorBanner.tsx</code> and <code>contexts/ToastContext.tsx</code> (the caution band + its word). Type-only additions to <code>src/shared/ipc/</code> so main, preload and renderer share the pair — the four-site IPC rule still applies, five where <code>src/renderer/types.d.ts</code> already names the channel.</li>
+    <li><b>Move 3 — vendor the face and set the graticule</b>Add B612 + B612 Mono to <code>public/</code> and declare them in <code>tokens/typography.css</code> (<code>--font-sans</code>/<code>--font-mono</code> plus a <code>--tracking-annunciator</code>); graticule geometry and the 28 px static row go in <code>tokens/spacing.css</code> beside <code>--target-row</code>; the lamp edge/bloom and the reference frame in <code>tokens/shadow.css</code>; the single <code>150 ms</code> annunciator change in <code>tokens/motion.css</code> as an <code>--animate-*</code> shorthand with its <code>none</code> line in <code>globals.css:25-38</code>. <code>radius.css</code> goes to 4/2 px on instrument frames and keeps 8 px on the card.</li>
+  </ul>
+  <p><b>Cost: MEDIUM</b> — mostly a semantic-pair explosion in <code>semantic/theme.css</code>: five states × (<code>-foreground</code> + <code>-soft</code> + <code>-lamp</code>) × two theme halves, all of which must pass the contrast gate independently, plus one vendored font family pair and a label column added to every component that currently announces a state by tint. No wrapper elements, no new stylesheet, no main-process change.</p>
+  <p><b>Biggest risk:</b> the mapping is <b>a contract you must keep</b>, not a palette. The moment magenta means "pretty" instead of "active route / plan", the whole system becomes decoration and an operator misreads a tool failure as a plan step — which is the failure the FAA documents exist to prevent, and the one this direction makes unforgivable because it has a named meaning to check against. Concretely, Qyther's agent reports status as free-text <code>details.status</code> strings from 32 tools in <code>src/main/services/pi/toolbox.ts</code>; adopting this law means each of those strings gets <b>one</b> named state and a label, that the list is frozen by a test the way <code>toolbox.test.ts</code> froze the names, and that a new tool with no row is a build failure rather than a hue someone picked. The second-order risk is the one the ATC report already flags: amber reads as caution to this law and as "selected" to half the team, so the law has to be documented where components can be checked against it, not remembered.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT / DAY ════════════════ -->
+<section class="col light" data-theme="light">
+<h2>Day (light)</h2>
+<header class="hero grat frame">
+  <div class="hero-band"><div class="band"></div></div>
+  <div class="hero-body">
+    <div>
+      <span class="hero-kicker">Qyther · design lab · 18 · day mode</span>
+      <h3 class="hero-title">EFIS Colour Law</h3>
+      <p class="hero-thesis">A hue is a clause of a published law — engaged, selected, planned, caution, exceeded — and the law forbids a colour speaking alone: the word is always beside it.</p>
+      <div class="hero-field">
+        <span class="spec">Aa</span><span class="spec sl">0Ø</span><span class="spec">14</span><span class="spec sl">lI</span><span class="spec sl">5S</span>
+        <i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f6"></i><i class="f f7"></i><i class="f f8"></i><i class="f f9"></i>
+      </div>
+      <div class="skl"><i style="left:0"></i><i style="left:10%"></i><i style="left:20%"></i><i style="left:30%"></i><i style="left:40%"></i><i style="left:50%"></i><i style="left:60%"></i><i style="left:70%"></i><i style="left:80%"></i><i style="left:90%"></i><i style="left:100%"></i><b style="left:0">100</b><b style="left:25%">75</b><b style="left:50%">50</b><b style="left:75%">25</b><b style="left:100%">0</b></div>
+    </div>
+    <div class="hero-right">
+      <div class="gwrap">
+        <div class="gauge"><span class="tick" style="transform:rotate(108deg)"></span><span class="tick" style="transform:rotate(144deg)"></span><span class="tick" style="transform:rotate(180deg)"></span><span class="tick" style="transform:rotate(216deg)"></span><span class="tick" style="transform:rotate(252deg)"></span></div>
+        <div style="display:grid;gap:6px">
+          <div class="rd"><span class="lb">Step</span><span class="vl">2 of 3</span></div>
+          <div class="rd"><span class="lb">Bound</span><span class="vl">5 ticks</span></div>
+        </div>
+      </div>
+      <div class="lamps">
+        <span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--armed-lamp)"></span>SELECTED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>PLANNED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--caution-lamp)"></span>CAUTION</span>
+        <span class="annun"><span class="lamp" style="--l:var(--exceeded-lamp)"></span>EXCEEDED</span>
+      </div>
+    </div>
+  </div>
+  <p class="hero-rule"><span>Green = engaged</span><span>Cyan = selected value</span><span>Magenta = plan</span><span>Amber = caution</span><span>Red = exceeded</span><span>Five hues · five words · no colour alone</span></p>
+  <span class="hero-rot">Colour law · 18</span>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div>
+<p class="note" style="margin:8px 0 0">Cyan is the law's <b>selected value</b> hue: the row fill carries the word <code>SELECTED</code> in its kind column position, and the focus ring is the same armed hue at 3:1 — the two states are distinguishable without naming a colour at all.</p></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a"><span class="lamp" style="--l:var(--planned-lamp)"></span>Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em><span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span><span class="pill pl">Planned follow-up</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div>
+<p class="note" style="margin:8px 0 0">Magenta here is not an accent: it is the law's <b>plan</b> hue, used for the follow-up that has not run, exactly as an FMS draws the flight plan ahead of the aircraft. The green on the running step is <b>engaged</b>, and both print their word.</p></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w"><span class="lamp" style="--l:var(--caution-lamp)"></span>in_progress</span></h3>
+    <dl class="kv"><dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd></dl>
+    <div class="ret"><span class="ring"></span><span class="lb">Target window:</span><span style="font-family:var(--mono)">Firefox — Qyther/README.md</span></div>
+    <div class="lamps">
+      <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>Analyze screen content</span>
+      <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>Plan next action</span>
+      <span class="annun"><span class="lamp off"></span>Execute interaction</span>
+    </div>
+    <div class="gwrap">
+      <div class="gauge" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><span class="tick" style="transform:rotate(108deg)"></span><span class="tick" style="transform:rotate(144deg)"></span><span class="tick" style="transform:rotate(180deg)"></span><span class="tick" style="transform:rotate(216deg)"></span><span class="tick" style="transform:rotate(252deg)"></span></div>
+      <div style="display:grid;gap:6px;min-width:0">
+        <div class="rd"><span class="lb">Step</span><span class="vl">2 of 3</span></div>
+        <div class="rd"><span class="lb">Time</span><span class="vl">4.2 s</span></div>
+      </div>
+    </div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+  <div class="band" style="margin-top:14px"></div>
+  <p class="note" style="margin:6px 0 14px">Caution band = degraded run. The band is <b>decoration</b>; the sentence under it is the state, per AC 25.1322-1's consistency rule and WCAG 1.4.1.</p>
+  <div class="gu"><div class="h">Colour law — the whole mapping, both halves<span class="chip">contract</span></div>
+    <table class="law"><tbody>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span></td><td>general guidance ch. 3 §7 · armed/engaged modes</td><td style="color:var(--engaged)">tool running, mode active, result ok</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--armed-lamp)"></span>SELECTED</span></td><td>§7 · selected data and selected values</td><td style="color:var(--armed)">the row the caret is on, the target window, the reticle</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>PLANNED</span></td><td>§7 · active route / flight plan</td><td style="color:var(--planned)">upcoming steps, the next turn, a not-yet-run tool</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--caution-lamp)"></span>CAUTION</span></td><td>AC 25.1322-1 · amber = caution; AC 25-11B · green→amber→red</td><td style="color:var(--warning)">degraded retry, verifier declined, budget at 80 %</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--exceeded-lamp)"></span>EXCEEDED</span></td><td>AC 25.1322-1 · red = warning</td><td style="color:var(--destructive)">timeout, abort, tool error — never a colour alone</td></tr>
+      <tr><td><span class="annun"><span class="lamp off"></span>NOT ARMED</span></td><td>contextual muted, DERIVED #4A5560</td><td style="color:var(--muted-foreground)">disabled, pending, off — the graticule hue, 2.5:1 as text, so it never carries a word alone either</td></tr>
+    </tbody></table>
+    <div class="cb" style="padding:10px 12px"><span style="background:var(--engaged-lamp)"></span><span style="background:var(--armed-lamp)"></span><span style="background:var(--planned-lamp)"></span><span style="background:var(--caution-lamp)"></span><span style="background:var(--exceeded-lamp)"></span></div>
+    <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">The five lamps in one row — an illustrative colour-blind read, DERIVED, not a simulation: amber and a desaturated green converge, which is the general guidance's own warning about amber and the reason the word is mandatory.</p>
+  </div>
+  <div class="rul"><b>Implemented rule.</b> Every state above is emitted as a <code>{hue, label}</code> pair by one table, so no component can paint a status without its word. A hue with no label is a build failure in this system, not a style choice.</div>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+  <div class="rd"><span class="lb">Token set</span><span class="vl">day and night are two token sets on one stylesheet; the existing .dark class flips them</span></div>
+</div></div>
+</section>
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col dark" data-theme="dark">
+<h2>Night (dark)</h2>
+<header class="hero grat frame">
+  <div class="hero-band"><div class="band"></div></div>
+  <div class="hero-body">
+    <div>
+      <span class="hero-kicker">Qyther · design lab · 18 · night mode</span>
+      <h3 class="hero-title">EFIS Colour Law</h3>
+      <p class="hero-thesis">A hue is a clause of a published law — engaged, selected, planned, caution, exceeded — and the law forbids a colour speaking alone: the word is always beside it.</p>
+      <div class="hero-field">
+        <span class="spec">Aa</span><span class="spec sl">0Ø</span><span class="spec">14</span><span class="spec sl">lI</span><span class="spec sl">5S</span>
+        <i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f6"></i><i class="f f7"></i><i class="f f8"></i><i class="f f9"></i>
+      </div>
+      <div class="skl"><i style="left:0"></i><i style="left:10%"></i><i style="left:20%"></i><i style="left:30%"></i><i style="left:40%"></i><i style="left:50%"></i><i style="left:60%"></i><i style="left:70%"></i><i style="left:80%"></i><i style="left:90%"></i><i style="left:100%"></i><b style="left:0">100</b><b style="left:25%">75</b><b style="left:50%">50</b><b style="left:75%">25</b><b style="left:100%">0</b></div>
+    </div>
+    <div class="hero-right">
+      <div class="gwrap">
+        <div class="gauge"><span class="tick" style="transform:rotate(108deg)"></span><span class="tick" style="transform:rotate(144deg)"></span><span class="tick" style="transform:rotate(180deg)"></span><span class="tick" style="transform:rotate(216deg)"></span><span class="tick" style="transform:rotate(252deg)"></span></div>
+        <div style="display:grid;gap:6px">
+          <div class="rd"><span class="lb">Step</span><span class="vl">2 of 3</span></div>
+          <div class="rd"><span class="lb">Bound</span><span class="vl">5 ticks</span></div>
+        </div>
+      </div>
+      <div class="lamps">
+        <span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--armed-lamp)"></span>SELECTED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>PLANNED</span>
+        <span class="annun"><span class="lamp" style="--l:var(--caution-lamp)"></span>CAUTION</span>
+        <span class="annun"><span class="lamp" style="--l:var(--exceeded-lamp)"></span>EXCEEDED</span>
+      </div>
+    </div>
+  </div>
+  <p class="hero-rule"><span>Green = engaged</span><span>Cyan = selected value</span><span>Magenta = plan</span><span>Amber = caution</span><span>Red = exceeded</span><span>Five hues · five words · no colour alone</span></p>
+  <span class="hero-rot">Colour law · 18</span>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div>
+<p class="note" style="margin:8px 0 0">Cyan is the law's <b>selected value</b> hue: the row fill carries the word <code>SELECTED</code> in its kind column position, and the focus ring is the same armed hue at 3:1 — the two states are distinguishable without naming a colour at all.</p></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a"><span class="lamp" style="--l:var(--planned-lamp)"></span>Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em><span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span><span class="pill pl">Planned follow-up</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div>
+<p class="note" style="margin:8px 0 0">Magenta here is not an accent: it is the law's <b>plan</b> hue, used for the follow-up that has not run, exactly as an FMS draws the flight plan ahead of the aircraft. The green on the running step is <b>engaged</b>, and both print their word.</p></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w"><span class="lamp" style="--l:var(--caution-lamp)"></span>in_progress</span></h3>
+    <dl class="kv"><dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd></dl>
+    <div class="ret"><span class="ring"></span><span class="lb">Target window:</span><span style="font-family:var(--mono)">Firefox — Qyther/README.md</span></div>
+    <div class="lamps">
+      <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>Analyze screen content</span>
+      <span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>Plan next action</span>
+      <span class="annun"><span class="lamp off"></span>Execute interaction</span>
+    </div>
+    <div class="gwrap">
+      <div class="gauge" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><span class="tick" style="transform:rotate(108deg)"></span><span class="tick" style="transform:rotate(144deg)"></span><span class="tick" style="transform:rotate(180deg)"></span><span class="tick" style="transform:rotate(216deg)"></span><span class="tick" style="transform:rotate(252deg)"></span></div>
+      <div style="display:grid;gap:6px;min-width:0">
+        <div class="rd"><span class="lb">Step</span><span class="vl">2 of 3</span></div>
+        <div class="rd"><span class="lb">Time</span><span class="vl">4.2 s</span></div>
+      </div>
+    </div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+  <div class="band" style="margin-top:14px"></div>
+  <p class="note" style="margin:6px 0 14px">Caution band = degraded run. The band is <b>decoration</b>; the sentence under it is the state, per AC 25.1322-1's consistency rule and WCAG 1.4.1.</p>
+  <div class="gu"><div class="h">Colour law — the whole mapping, both halves<span class="chip">contract</span></div>
+    <table class="law"><tbody>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--engaged-lamp)"></span>ENGAGED</span></td><td>general guidance ch. 3 §7 · armed/engaged modes</td><td style="color:var(--engaged)">tool running, mode active, result ok</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--armed-lamp)"></span>SELECTED</span></td><td>§7 · selected data and selected values</td><td style="color:var(--armed)">the row the caret is on, the target window, the reticle</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--planned-lamp)"></span>PLANNED</span></td><td>§7 · active route / flight plan</td><td style="color:var(--planned)">upcoming steps, the next turn, a not-yet-run tool</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--caution-lamp)"></span>CAUTION</span></td><td>AC 25.1322-1 · amber = caution; AC 25-11B · green→amber→red</td><td style="color:var(--warning)">degraded retry, verifier declined, budget at 80 %</td></tr>
+      <tr><td><span class="annun"><span class="lamp" style="--l:var(--exceeded-lamp)"></span>EXCEEDED</span></td><td>AC 25.1322-1 · red = warning</td><td style="color:var(--destructive)">timeout, abort, tool error — never a colour alone</td></tr>
+      <tr><td><span class="annun"><span class="lamp off"></span>NOT ARMED</span></td><td>contextual muted, DERIVED #4A5560</td><td style="color:var(--muted-foreground)">disabled, pending, off — the graticule hue, 2.5:1 as text, so it never carries a word alone either</td></tr>
+    </tbody></table>
+    <div class="cb" style="padding:10px 12px"><span style="background:var(--engaged-lamp)"></span><span style="background:var(--armed-lamp)"></span><span style="background:var(--planned-lamp)"></span><span style="background:var(--caution-lamp)"></span><span style="background:var(--exceeded-lamp)"></span></div>
+    <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">The five lamps in one row — an illustrative colour-blind read, DERIVED, not a simulation: amber and a desaturated green converge, which is the general guidance's own warning about amber and the reason the word is mandatory.</p>
+  </div>
+  <div class="rul"><b>Implemented rule.</b> Every state above is emitted as a <code>{hue, label}</code> pair by one table, so no component can paint a status without its word. A hue with no label is a build failure in this system, not a style choice.</div>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+  <div class="rd"><span class="lb">Token set</span><span class="vl">day and night are two token sets on one stylesheet; the existing .dark class flips them</span></div>
+</div></div>
+</section>
+</main>
+</body>
+</html>
+

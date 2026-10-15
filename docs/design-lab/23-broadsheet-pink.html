@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 23 · Broadsheet Pink (Financial Times o-colors stock, newspaper grid)</title>
+<!--
+  Wave-2/3 mock. Structure, markup and every string are copied from 00-current-baseline.html so the five
+  surfaces stay byte-comparable; only the two token blocks, this header block and the idiom rules change.
+  Colour values quoted from @financial-times/o-colors 6.7.1, src/scss/_palette.scss. Contrast figures in
+  the header block were computed in this session from those hexes (WCAG 2.x relative luminance), i.e.
+  DERIVED, not published by the FT. No script, no webfont, no external reference.
+-->
+<style>
+/* ── LIGHT · the day paper: `paper` field, white plate, ink rules ───────────── */
+[data-theme="light"] {
+  --background: #fff1e5;              /* paper — the published reading field, NOT ft-pink */
+  --foreground: #333333;              /* ft-grey — the FT's body ink */
+  --card: #ffffff; --card-foreground: #333333;
+  --popover: #ffffff; --popover-foreground: #1a1a1a;
+  --primary: #990f3d; --primary-foreground: #ffffff;   /* claret: 7.62:1 on paper, white on it 8.43:1 */
+  --secondary: #f2dfce; --secondary-foreground: #333333;  /* wheat: 9.76:1 */
+  --muted: #e9d3bd; --muted-foreground: #333333;          /* DERIVED deeper wheat: 8.73:1 */
+  --accent: #eccfb2; --accent-foreground: #333333;        /* DERIVED wheat→pink: 8.50:1 */
+  --destructive: #cc0000; --destructive-foreground: #ffffff;  /* crimson: 5.32:1 on paper — clears AA */
+  --success: #006b36; --warning: #8a4708; --info: #0f5499;
+  /* jade #00994d is only 3.35:1 on paper and mandarin #ff8833 only 2.15:1, so both are darkened here
+     (DERIVED, lightness only) and the published hues survive as fills in --jade / --mandarin below. */
+  --jade: #00994d; --mandarin: #ff8833; --candy: #ff7faa; --lemon: #ffec1a; --sky: #cce6ff;
+  --success-soft: #d9e8dc; --warning-soft: #f0dfc8; --info-soft: #d6e2f0; --destructive-soft: #f8e6e6;  /* tint tuned so crimson ink reads 4.89:1 (#f2d9d9 was 4.40) */
+  --fill-ink: #000000;                  /* ink ON the published fills: 5.66 on jade, 8.82 on mandarin */
+  --agent: #593380;                     /* velvet: 8.58:1 on paper */
+  --border: #d9bda3; --input: #262a33; --ring: #0d7680;  /* teal rule: 4.84:1; slate control edge 12.98:1 */
+  --mark-bg: #ffec1a; --mark-ink: #17120f;              /* lemon highlighter, black ink 15.28:1 */
+  --mark-sel: #ffec1a; --mark-sel-ink: #17120f;
+  --plate: #cbb193;                     /* the desk the broadsheet lies on */
+  --masthead: #fcd0b1;                  /* ft-pink — 3px band only; 1.28:1 on paper, so never a rule */
+  --band-bg: #fcd0b1; --band-ink: #333333;   /* pink band + ft-grey ink = 8.90:1 */
+  --rule-strong: #000000; --hairline: #c9a883; --headline-ink: #000000;
+  --hairline-on-primary: #fcd0b1;       /* the column rule re-inked in ft-pink over the claret selection */
+  --file-a: #0f5499; --file-b: #333333; --file-c: #0d7680;
+  --elev: none; --elev-sm: none; --key: none;           /* no shadow anywhere: rules do the elevation */
+}
+/* ── DARK · authored, not inverted: the night edition on warm black newsprint ─ */
+[data-theme="dark"] {
+  --background: #17120f; --foreground: #f7ead9;         /* 15.69:1 */
+  --card: #1f1a16; --card-foreground: #f7ead9;
+  --popover: #26211c; --popover-foreground: #f7ead9;
+  --primary: #d95a78; --primary-foreground: #17120f;    /* DERIVED lifted claret: 5.03:1 on the paper */
+  --secondary: #251f1a; --secondary-foreground: #f2dfce;
+  --muted: #2b2420; --muted-foreground: #cbb7a3;        /* 7.88:1 */
+  --accent: #2f2821; --accent-foreground: #f7ead9;      /* 12.26:1 */
+  --destructive: #f0505c; --destructive-foreground: #17120f; /* lifted crimson 5.32:1; #cc0000 is 3.16:1 */
+  --success: #96cc28; --warning: #ff8833; --info: #cce6ff;
+  /* the night paper is where the published tertiary hues actually land: mandarin 7.81:1, wasabi 9.70:1,
+     sky 14.45:1 — all fail on `paper` and all clear here. Nothing was invented for this half. */
+  --jade: #96cc28; --mandarin: #ff8833; --candy: #ff7faa; --lemon: #ffec1a; --sky: #cce6ff;
+  --success-soft: #2a3320; --warning-soft: #3a2a16; --info-soft: #1e2b3a; --destructive-soft: #2e1717;  /* tint tuned so lifted crimson reads 4.80:1 (#3a1e1e was 4.34) */
+  --fill-ink: #17120f;                  /* ink ON the published fills: 9.70 on wasabi, 7.81 on mandarin */
+  --agent: #b08adf;                     /* DERIVED lifted velvet: 6.68:1 */
+  --border: #4a3d33; --input: #d6c1ab; --ring: #45b8c4;
+  --mark-bg: #6b5900; --mark-ink: #f7ead9; --mark-sel: #fcd0b1; --mark-sel-ink: #17120f;
+  --plate: #0d0a09;
+  --masthead: #fcd0b1; --rule-strong: #f2dfce; --hairline: #5b4c40; --headline-ink: #ffffff;
+  --band-bg: #fcd0b1; --band-ink: #17120f;   /* the same pink band, re-inked black: 13.10:1 (light ink on it is 1.20:1) */
+  --hairline-on-primary: #17120f;       /* the selection plate is light here, so the rule goes dark */
+  --file-a: #cce6ff; --file-b: #f2dfce; --file-c: #96cc28;
+  --elev: none; --elev-sm: none; --key: none;
+}
+/* ── GEOMETRY (identical in both themes; literals only — no theme token may be read here) ── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;                    /* radius 0, every corner */
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff-head: Oswald, Anton, "Haettenschweiler", "Arial Narrow", Impact, sans-serif;
+  --ff-body: "Playfair Display", "Bodoni Moda", "Libre Bodoni", "Bodoni MT", Didot, Georgia, serif;
+  --mono: "IBM Plex Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t22: 22px; --t26: 26px; --t44: 44px;
+  --lh: 20px;                        /* the vertical rhythm is the line-height, not a spacing token */
+  --ls-label: .10em; --ls-kicker: .16em;
+  --bw: 1px; --bw-2: 2px; --bw-3: 3px;
+  --page: #14100d; --page-ink: #efe2d2; --page-muted: #b3a08c; --page-rule: #3a2f26;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: var(--page); color: var(--page-ink); font-family: var(--ff-body); line-height: var(--lh); }
+h1 { font-family: var(--ff-head); font-size: var(--t26); margin: 0 0 8px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--page-ink); }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: var(--page-muted); margin: 0 0 10px; line-height: var(--lh); }
+.brief code { font-family: var(--mono); font-size: var(--t13); color: var(--page-ink); }
+.brief b { color: var(--page-ink); }
+.moves { display: flex; gap: var(--gap-2); flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: var(--bw) solid var(--page-rule); border-top: var(--bw-3) solid var(--page-ink); padding: 10px 12px; font-size: var(--t13); color: var(--page-ink); }
+.moves b { display: block; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--page-muted); margin-bottom: 4px; }
+.sw { display: flex; gap: 0; border: var(--bw) solid var(--page-rule); }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--page-muted); margin: 0 0 12px; text-align: center; }
+.surface { margin-bottom: 36px; border-top: var(--bw-3) double var(--page-rule); padding-top: var(--gap-2); }
+.lbl { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+.desktop, .page { border-radius: 0; padding: 24px; }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* ── signature device 1: hairline column rules. Every divided block is a real
+      newspaper column grid — border-inline-end on the grid children, never a card. ── */
+.palette { width: 100%; border: var(--bw) solid var(--rule-strong); border-top: var(--bw-3) solid var(--masthead); background: var(--card); color: var(--foreground); border-radius: 0; box-shadow: none; overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: var(--bw-2) solid var(--rule-strong); box-shadow: inset 0 calc(-1 * var(--bw-3)) 0 0 var(--hairline); }  /* bold-over-hairline masthead foot */
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; font-family: var(--ff-head); border-radius: 0; background: var(--rule-strong); color: var(--card); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t17); color: var(--foreground); line-height: var(--lh); }
+.q .ph { color: var(--muted-foreground); font-size: var(--t14); }
+.q svg { color: var(--foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--foreground); border: var(--bw) solid var(--hairline); }
+.vr { width: var(--bw); height: 24px; background: var(--rule-strong); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--foreground); background: var(--secondary); border: var(--bw) solid var(--rule-strong); border-radius: 0; box-shadow: var(--key); }
+.sec { display: flex; align-items: baseline; gap: var(--gap); padding: 8px var(--pad) 4px; font-family: var(--ff-head); font-size: var(--t17); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--headline-ink); border-bottom: var(--bw-3) double var(--rule-strong); }  /* ── device 2: double-rule section break */
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; font-family: var(--mono); border-radius: 0; background: var(--primary); color: var(--primary-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: var(--bw) solid var(--rule-strong); border-inline-start: var(--bw-3) solid var(--rule-strong); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; width: max-content; }
+.row { display: grid; grid-template-columns: 26px minmax(0,1.05fr) minmax(0,1.55fr) 78px 40px; align-items: center; gap: 0; min-height: var(--row-h); padding: 8px var(--pad); line-height: var(--lh); }
+.row > span:nth-child(2) { display: contents; }   /* title and path become two columns, not one stacked cell */
+.row svg { color: var(--foreground); }
+.row .t { font-family: var(--ff-head); font-size: var(--t14); letter-spacing: .02em; text-transform: uppercase; color: var(--foreground); border-inline-end: var(--bw) solid var(--hairline); padding-inline-end: 8px; min-width: 0; }
+.row .p { font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); border-inline-end: var(--bw) solid var(--hairline); padding-inline: 8px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row .k { font-family: var(--ff-body); font-size: var(--t13); color: var(--foreground); border-inline-end: var(--bw) solid var(--hairline); padding-inline-end: 8px; }
+.colhdr { display: grid; grid-template-columns: 26px minmax(0,1.05fr) minmax(0,1.55fr) 78px 40px; gap: 0; padding: 4px var(--pad); margin: 0; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--muted-foreground); border-bottom: var(--bw) solid var(--rule-strong); }
+.colhdr span { border-inline-end: var(--bw) solid var(--hairline); padding-inline-end: 8px; }
+.colhdr span:first-child { grid-column: 2; }   /* the four heads sit over the four text columns, not over the icon gutter */
+.colhdr span:last-child { border-inline-end: 0; padding-inline-end: 0; }
+.dateline { margin: 0; padding: 4px var(--pad); font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--foreground); border-block: var(--bw) solid var(--hairline); background: var(--secondary); }
+.row + .row { border-top: var(--bw) solid var(--hairline); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel .t, .row.sel .p, .row.sel .k { border-inline-end-color: var(--hairline-on-primary); }
+.row.sel mark { background: var(--mark-sel); color: var(--mark-sel-ink); }
+.row.foc { outline: var(--bw-2) solid var(--ring); outline-offset: calc(-1 * var(--bw-2)); }  /* focus is a 2px perimeter, not a glow */
+mark { background: var(--mark-bg); color: var(--mark-ink); border-radius: 0; padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; background: var(--popover); color: var(--popover-foreground); border: var(--bw) solid var(--rule-strong); box-shadow: none; }
+.tip { display: inline-block; margin: var(--gap) var(--pad) var(--pad); padding: 3px 8px; background: var(--popover); color: var(--popover-foreground); border: var(--bw) solid var(--rule-strong); box-shadow: none; font-family: var(--mono); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: 0; background: var(--secondary); color: var(--secondary-foreground); border: var(--bw) solid var(--rule-strong); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 0; border: var(--bw-2) solid var(--foreground); border-top-color: transparent; animation: tick 1s steps(4,end) infinite; }
+@keyframes tick { to { transform: rotate(360deg); } }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--band-bg); border-top: var(--bw-2) solid var(--rule-strong); font-size: var(--t12); color: var(--band-ink); }
+.foot span:first-child::after { content: " · continued on the following column"; font-family: var(--ff-head); letter-spacing: var(--ls-label); text-transform: uppercase; }  /* ── device 3: the "continued" label */
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; border: var(--bw) solid var(--rule-strong); color: var(--foreground); background: transparent; }
+.foot .ghost { color: var(--band-ink); border-color: var(--band-ink); }  /* the pink band re-inks its own controls */
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); line-height: var(--lh); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 0; background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); border-inline-start: var(--bw-3) solid var(--rule-strong); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: var(--bw) solid var(--hairline); border-inline-start: var(--bw-3) solid var(--rule-strong); background: var(--card); }
+.st { display: flex; align-items: center; gap: var(--gap); font-family: var(--ff-head); font-size: var(--t12); letter-spacing: .04em; text-transform: uppercase; color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: 0; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--jade); color: var(--fill-ink); }
+.st.run i { background: var(--mandarin); color: var(--fill-ink); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: 0; background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t14); line-height: var(--lh); color: var(--foreground); }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--secondary); padding: 1px 5px; border-inline: var(--bw) solid var(--hairline); }
+.ans::first-letter { float: inline-start; font-family: var(--ff-head); font-weight: 500; font-size: 3.2em; line-height: .78; margin-inline-end: .12em; color: var(--headline-ink); }  /* ── device 4: the 44px drop cap */
+.caret { font-family: var(--mono); color: var(--primary); animation: blink 1s steps(2,start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; background: var(--info-soft); color: var(--info); border: var(--bw) solid var(--rule-strong); }
+.pill.a { background: var(--rule-strong); color: var(--card); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: var(--bw) solid var(--rule-strong); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: var(--bw-3) double var(--rule-strong); font-family: var(--ff-head); font-size: var(--t17); letter-spacing: .02em; text-transform: uppercase; color: var(--headline-ink); }
+.chip { padding: 2px 7px; border-radius: 0; border: var(--bw) solid var(--rule-strong); background: var(--card); color: var(--foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t13); line-height: var(--lh); }
+th { text-align: left; padding: 7px 12px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--headline-ink); background: var(--secondary); border-bottom: var(--bw-2) solid var(--rule-strong); border-inline-end: var(--bw) solid var(--hairline); }
+td { padding: 8px 12px; border-bottom: var(--bw) solid var(--hairline); border-inline-end: var(--bw) solid var(--hairline); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: var(--bw) solid var(--rule-strong); background: var(--card); }
+summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--headline-ink); border-bottom: var(--bw-3) double var(--rule-strong); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; padding: 0 var(--pad); }
+.met div { border-inline-end: var(--bw) solid var(--hairline); padding: 8px 0; }
+.met div:last-child { border-inline-end: 0; }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); color: var(--foreground); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); font-family: var(--ff-head); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: var(--bw-2) solid var(--input); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t14); line-height: var(--lh); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); border-top: var(--bw) solid var(--hairline); padding-top: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: var(--bw) solid var(--rule-strong); background: var(--secondary); }
+.ag h3 { margin: 0; font-family: var(--ff-head); font-size: var(--t22); line-height: var(--lh); letter-spacing: .01em; text-transform: uppercase; color: var(--headline-ink); display: flex; align-items: baseline; gap: var(--gap); border-bottom: var(--bw-3) double var(--rule-strong); padding-bottom: 6px; }
+.kv { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 0 var(--gap); font-size: var(--t13); margin: 0; line-height: var(--lh); }
+.kv dt { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); border-inline-end: var(--bw) solid var(--hairline); }
+.kv dd { margin: 0; font-family: var(--mono); font-size: var(--t12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 10px; border: var(--bw) solid var(--rule-strong); background: var(--card); }
+.prog i { display: block; height: 100%; width: 66%; background: var(--jade); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t13); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: var(--bw) solid var(--hairline); border-inline-end: var(--bw) solid var(--hairline); }
+.tr td:last-child { border-inline-end: 0; }
+.tr td:first-child { font-family: var(--mono); font-size: var(--t12); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 0; background: currentColor; margin-right: 5px; }
+
+/* ── device 5: the masthead strip — bold over hair over the pink band ───────── */
+.hero { position: relative; display: grid; align-content: start; gap: var(--gap-2); min-height: 320px; padding: 0 var(--pad) var(--gap-3); margin-bottom: var(--gap-3); border: var(--bw) solid var(--rule-strong); border-top: var(--bw-3) solid var(--masthead); background: var(--background); color: var(--foreground); overflow: hidden; }
+.mast { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--gap); margin: 0 calc(-1 * var(--pad)); padding: 6px var(--pad); border-bottom: var(--bw-2) solid var(--rule-strong); box-shadow: inset 0 -4px 0 -3px var(--hairline); background: var(--band-bg); color: var(--band-ink); }
+.mast-word { grid-column: 2; font-family: var(--ff-head); font-weight: 500; font-size: var(--t26); letter-spacing: var(--ls-kicker); text-transform: uppercase; white-space: nowrap; }
+.mast::before, .mast::after { content: ""; border-top: var(--bw) solid var(--rule-strong); }
+.mast-no { position: absolute; inset-block-start: 3px; inset-inline-end: var(--pad); font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--band-ink); }
+.hero::after { content: "FIRST EDITION"; position: absolute; inset-block-start: 92px; inset-inline-end: -34px; transform: rotate(-8deg); font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--foreground); background: var(--secondary); border: var(--bw) solid var(--rule-strong); padding: 3px 40px; }
+[data-theme="dark"] .hero::after { content: "NIGHT EDITION"; color: var(--headline-ink); }
+.hero-kicker { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); padding-top: var(--gap-2); }
+.hero-title { font-family: var(--ff-head); font-weight: 500; font-size: var(--t26); line-height: 1.05; letter-spacing: .01em; text-transform: uppercase; margin: 0; color: var(--headline-ink); }
+.hero-thesis { margin: 0; font-family: var(--ff-body); font-size: var(--t17); line-height: 1.28; color: var(--foreground); max-width: 46ch; border-inline-start: var(--bw-3) solid var(--rule-strong); padding-inline-start: var(--gap); }
+.hero-field { display: flex; align-items: flex-end; gap: var(--gap); margin-top: var(--gap); border-top: var(--bw-3) double var(--rule-strong); padding-top: var(--gap-2); }
+.spec { font-family: var(--ff-head); font-size: var(--t44); line-height: .9; color: var(--headline-ink); }
+.spec:nth-child(2) { font-family: var(--mono); font-size: var(--t44); }
+.spec:nth-child(3) { color: var(--primary); }
+.f { display: block; width: 34px; height: 56px; border: var(--bw) solid var(--rule-strong); }
+.f1 { background: var(--masthead); } .f2 { background: var(--secondary); } .f3 { background: var(--primary); }
+.f4 { background: var(--info); } .f5 { background: var(--jade); }
+.hero-note { margin: 0; font-family: var(--mono); font-size: var(--t12); line-height: 1.5; color: var(--muted-foreground); max-width: 62ch; }
+.hero-note b { color: var(--foreground); }
+
+/* dialogs */
+.dlg { border: var(--bw) solid var(--rule-strong); background: var(--card); box-shadow: none; overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: var(--bw-3) double var(--rule-strong); font-family: var(--ff-head); font-size: var(--t22); letter-spacing: .02em; text-transform: uppercase; color: var(--headline-ink); }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: var(--bw) solid var(--hairline); line-height: var(--lh); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-family: var(--ff-head); font-size: var(--t14); letter-spacing: .02em; text-transform: uppercase; color: var(--foreground); } .set .d { font-family: var(--ff-body); font-size: var(--t13); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; border: var(--bw) solid var(--rule-strong); background: var(--secondary); color: var(--secondary-foreground); }
+.sw2 { width: 28px; height: 16px; border: var(--bw) solid var(--rule-strong); border-radius: 0; background: var(--card); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 0; background: var(--rule-strong); }
+.sw2.on { background: var(--secondary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 0; background: var(--jade); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: var(--bw) solid var(--rule-strong); border-inline-start: var(--bw-3) solid var(--destructive); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-family: var(--ff-head); font-size: var(--t17); letter-spacing: .02em; text-transform: uppercase; color: var(--destructive); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); line-height: var(--lh); }
+@media (prefers-reduced-motion: reduce) { .spin, .caret { animation: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>23 · Broadsheet Pink — the financial newspaper, specified from the FT's own token package</h1>
+  <p><b>Provenance</b> — every hue is quoted from the npm package <code>@financial-times/o-colors</code> <b>6.7.1</b>, file <code>src/scss/_palette.scss</code>, the FT's published palette, rather than recalled. Primary black <code>#000000</code>, white <code>#ffffff</code>, <b>ft-pink <code>#fcd0b1</code></b>, ft-grey <code>#333333</code>; secondary claret <code>#990f3d</code>, teal <code>#0d7680</code>, oxford <code>#0f5499</code>, slate <code>#262a33</code>, <b>paper <code>#fff1e5</code></b>; tertiary mandarin <code>#ff8833</code>, light-blue <code>#00a0dd</code>, crimson <code>#cc0000</code>, wheat <code>#f2dfce</code>, candy <code>#ff7faa</code>, wasabi <code>#96cc28</code>, jade <code>#00994d</code>, velvet <code>#593380</code>, lemon <code>#ffec1a</code>, sky <code>#cce6ff</code>. The package also carries <code>brand-ft-pink</code>, a <b>deprecated alias</b> — do not treat it as a second colour. State the correction plainly: the stock is <b><code>#fcd0b1</code></b>, not the <code>#F7E7E0</code> that circulates in "FT pink" palettes, and the reading field is <b><code>paper #fff1e5</code></b>. That distinction is the whole build: pink appears here only as the 3px masthead band and the footer strip, because a <code>#fcd0b1</code> background destroys the surface ramp — white on it is 1.11:1 and wheat on it 1.10:1, so card, popover and muted collapse into the page and there is nothing left to elevate. Why the paper is pink at all — Gobraithwaite's note on the FT's own history — is an accident of 1893 stock rather than a decision: the paper was printed on leftover pink stock previously used for the envelopes of a fireworks-fuse manufacturer, and the colour stayed because readers had begun to treat it as the mark of the genuine article. That is the honest reason a pink field cannot carry a UI ramp and only a band can: it was never chosen for contrast. <b>SECONDARY SOURCE</b> — the story is attribution, not a value; no primary FT document was fetched for it this session, and unlike every hex above it is not re-derivable from the package file. Licence: the palette is FT copyright published in a public npm package; every contrast ratio in this block is <b>DERIVED</b> in this session from those hexes by the WCAG relative-luminance formula, not published by the FT.</p>
+  <p><b>Type plan</b> — the FT's face is <b>Financier Text by Klim, drawn for the 2014 FT redesign and sold as a retail font: proprietary, not shippable</b>. The honest substitutes are all verified SIL OFL 1.1: <b>Oswald</b> or <b>Anton</b> for the condensed gothic headlines, and <b>Playfair Display</b>, <b>Libre Bodoni</b> or <b>Bodoni Moda</b> for the high-contrast news serif body and rows. Scale as planned: headline/deck/sub-deck <b>26 / 22 / 17</b> in Oswald 300–500 uppercase tracked, row titles <b>14</b>, rows <b>13</b>, meta and paths <b>12</b> mono, drop cap <b>44px</b> (= <code>3.2em</code> on 14px prose). No webfont is embedded in this mock: on a machine without Oswald the headline stack falls to Haettenschweiler → Arial Narrow → Impact (all condensed gothics, so the rhythm survives), and without Playfair the body falls to Bodoni MT → Didot → Georgia (all high-contrast serifs). A sandboxed renderer would have to vendor the OFL files; nothing here claims that is free.</p>
+  <p><b>Geometry</b> — radius <b>0</b> on every surface, shadow <b>off</b> (<code>--elev: none</code>, <code>--elev-sm: none</code>, <code>--key: none</code>): elevation is a warm lightness step plus a rule, never depth. 1px hairline column rules as <code>border-inline-end</code> on grid children — the row is a genuine four-column grid (icon | title | path | kind | key) with <code>display: contents</code> dissolving the title/path wrapper so the newspaper column rules can fall between them. <b>Double rules</b> (3px <code>double</code>) break sections; the masthead foot is <b>bold-over-hairline</b> (2px solid + an inset hairline). Line-height is a fixed <b>20px</b> everywhere, so the vertical rhythm is typographic rather than spacing-token. The row floor stays 40px and the control floor 32px — WCAG target size, not taste.</p>
+  <ul class="moves">
+    <li><b>Move 1 · colour, token override only</b>Rewrite the <code>:root</code> and <code>.dark</code> blocks in <code>src/renderer/styles/semantic/theme.css</code> to the quoted stock — <code>--background: paper #fff1e5</code>, <code>--card: #ffffff</code>, <code>--secondary: wheat #f2dfce</code>, <code>--muted: #e9d3bd</code> (DERIVED), <code>--primary: claret #990f3d</code>, <code>--ring: teal #0d7680</code>, <code>--input: slate #262a33</code> — plus two new published pairs, <code>--masthead: ft-pink #fcd0b1</code> and <code>--hairline</code>. Jade and mandarin cannot be lifted to text and stay fills, so <code>--success</code>/<code>--warning</code> are lightness-only derivatives, exactly the move <code>--file-*</code> already makes. No <code>components/ui/</code> edit.</li>
+    <li><b>Move 2 · flat + rule-driven</b><code>tokens/radius.css</code> to zero across the scale (it moves the pristine primitives too), <code>tokens/shadow.css</code> emptied to <code>none</code> for <code>--shadow-command-palette</code>, <code>--shadow-popover</code>, <code>--shadow-dialog</code>, <code>--shadow-tooltip</code>, <code>--shadow-shortcut-key</code>; <code>--border</code> stays a decorative tan at 1.61:1 while <code>--input</code> becomes full slate at 12.98:1 — the same decorative/control split, pushed further.</li>
+    <li><b>Move 3 · type and rhythm</b><code>tokens/typography.css</code> gains a condensed display stack and a high-contrast serif stack, and the six-rung scale becomes 12/13/14/17/22/26 with a paired 20px line-height on every rung; <code>tokens/spacing.css</code> keeps <code>--target-row</code> and <code>--target-min</code> and drops nothing else. Markup needs four additions, all listed under the surfaces below: the masthead strip, the column heads, the dateline rule, and one <code>::first-letter</code> drop cap on the settled answer paragraph.</li>
+  </ul>
+  <p style="max-width:none"><b>Cost:</b> MEDIUM-LOW — colours (a warm field with rules doing all the elevation), one display face, radius to 0, shadows off, and the primitives handled by token override with no <code>components/ui/</code> edits.</p>
+  <p><b>Biggest risk:</b> stated honestly — <b>two columns of 13px text do not fit 800 × 74 DIP</b>, so this direction is only truthful in expanded mode, and the compact card needs a designed reduced state (masthead plus the query on one line, no rows at all) rather than a clipped version of this one. The second half of the risk is the second theme: <b>there is no honest dark edition</b> — the FT publishes no dark palette, so the night paper below is authored, not inverted (warm black newsprint, wheat as ink, and the three tertiary hues that genuinely clear 4.5:1 there and fail on <code>paper</code>: mandarin 7.81:1, wasabi 9.70:1, sky 14.45:1). Judge it as the weak half: it is a convincing newspaper at a glance and it is one designer's guess, not a quoted source.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT · day paper ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light</h2>
+<header class="hero">
+  <div class="mast"><span class="mast-word">The Broadsheet</span><span class="mast-no">No. 23 · Stock #fcd0b1</span></div>
+  <span class="hero-kicker">Qyther · design lab · 23</span>
+  <h3 class="hero-title">Broadsheet Pink</h3>
+  <p class="hero-thesis">A page is a field of paper divided by rules. Nothing is raised, nothing is rounded, and hierarchy is bought with line weight and letter-spacing — the only colour is the ink and the one pink band above the fold.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+  <p class="hero-note">stock <b>#fcd0b1</b> ft-pink (band, footer) · field <b>#fff1e5</b> paper · ink <b>#333333</b> ft-grey · rules <b>#000000</b> over <b>#c9a883</b> · claret <b>#990f3d</b> carries selection at 7.62:1 · crimson ink 5.32:1 · lemon highlighter under black 15.28:1</p>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="dateline">EVERYTHING · 6 HITS · 12 MS</p>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <p class="colhdr"><span>File</span><span>Location</span><span>Kind</span><span>Key</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK · the night paper, authored not inverted ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark</h2>
+<header class="hero">
+  <div class="mast"><span class="mast-word">The Broadsheet</span><span class="mast-no">No. 23 · Stock #fcd0b1</span></div>
+  <span class="hero-kicker">Qyther · design lab · 23</span>
+  <h3 class="hero-title">Broadsheet Pink</h3>
+  <p class="hero-thesis">A page is a field of paper divided by rules. Nothing is raised, nothing is rounded, and hierarchy is bought with line weight and letter-spacing — the only colour is the ink and the one pink band above the fold.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+  <p class="hero-note">stock <b>#fcd0b1</b> ft-pink (band, footer) · field <b>#17120f</b> night paper (DERIVED) · ink <b>#f7ead9</b> 15.69:1 · rules <b>#f2dfce</b> over <b>#5b4c40</b> · lifted claret <b>#d95a78</b> carries selection at 5.03:1</p>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="dateline">EVERYTHING · 6 HITS · 12 MS</p>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <p class="colhdr"><span>File</span><span>Location</span><span>Kind</span><span>Key</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

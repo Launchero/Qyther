@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 22 · Cyanotype Plate (ISO 128 line classes on a Herschel sheet)</title>
+<!--
+  WAVE 2 · 22 — CYANOTYPE PLATE. Built on the 00-current-baseline.html template: same <symbol> sprite,
+  same .brief header, same two [data-theme] columns, same five surfaces, same strings and data.
+  Changed: the two token blocks, the header prose + h1, an appended idiom block, and two extra elements
+  inside each .hero (the title block and the dimension line) because a CSS grid of 1px rules cannot be
+  drawn from a pseudo-element. Every colour is a custom property; the line-weight and hatch gradients
+  are declared INSIDE each [data-theme] block, never at :root, because they interpolate theme inks.
+-->
+<style>
+/* ── LIGHT — the reverse sheet: a modern CAD plot, white field, Prussian lines ─────────────── */
+[data-theme="light"] {
+  --background: #EDF5F9; --foreground: #003153;
+  --card: #FFFFFF; --card-foreground: #003153;
+  --popover: #FFFFFF; --popover-foreground: #003153;
+  --primary: #003153; --primary-foreground: #EAF2F6;
+  --secondary: #EAF2F6; --secondary-foreground: #003153;
+  --muted: #EAF2F6; --muted-foreground: #3F6B88;
+  --accent: #DCE8F0; --accent-foreground: #003153;
+  --destructive: #A83A18; --destructive-foreground: #FFFFFF;
+  --success: #003153; --warning: #A8501F; --info: #2A5C7E;
+  --success-soft: #EAF2F6; --warning-soft: #EAF2F6;
+  --info-soft: #EAF2F6; --destructive-soft: #EAF2F6;
+  --agent: #A83A18;
+  --border: #A9C6D8; --input: #003153; --ring: #D7572F;
+  --mark-bg: #D7572F33; --plate: #D3E3EC;
+  --file-a: #003153; --file-b: #2A5C7E; --file-c: #D7572F;
+  --elev: none; --elev-sm: none; --key: none;
+  /* plate inks — DERIVED from Prussian blue #003153 (the printed value of pigment PB27) */
+  --plate-ink: #003153; --plate-line-wide: #003153; --plate-line-narrow: #2A5C7E;
+  --plate-annot: #2A5C7E; --plate-tick: #D7572F; --plate-ghost: #0031532b; --plate-zone: #2A5C7E;
+  /* gradients interpolate theme inks, so they live HERE, not at :root */
+  --plate-hatch: repeating-linear-gradient(45deg, var(--plate-ghost) 0 var(--wB), transparent var(--wB) 8px);
+  --plate-chain: repeating-linear-gradient(90deg, var(--plate-line-narrow) 0 14px, transparent 14px 20px, var(--plate-line-narrow) 20px 24px, transparent 24px 32px);
+  --plate-chain-v: repeating-linear-gradient(180deg, var(--plate-line-narrow) 0 14px, transparent 14px 20px, var(--plate-line-narrow) 20px 24px, transparent 24px 32px);
+  --plate-rail-ticks: repeating-linear-gradient(180deg, var(--plate-line-narrow) 0 var(--wB), transparent var(--wB) var(--zone));
+}
+/* ── DARK — the cyanotype plate: Prussian field, line-white A strokes ─────────────────────── */
+[data-theme="dark"] {
+  --background: #002E4F; --foreground: #EAF2F6;
+  --card: #003153; --card-foreground: #EAF2F6;
+  --popover: #0A4470; --popover-foreground: #EAF2F6;
+  --primary: #EAF2F6; --primary-foreground: #003153;
+  --secondary: #08395C; --secondary-foreground: #EAF2F6;
+  --muted: #08395C; --muted-foreground: #9FD0E8;
+  --accent: #0E4670; --accent-foreground: #EAF2F6;
+  --destructive: #F08A5F; --destructive-foreground: #06203A;
+  --success: #EAF2F6; --warning: #E9A17C; --info: #9FD0E8;
+  --success-soft: #06203A8c; --warning-soft: #06203A8c;
+  --info-soft: #06203A8c; --destructive-soft: #06203A99;
+  --agent: #D7572F;
+  --border: #3E7396; --input: #9FD0E8; --ring: #D7572F;
+  --mark-bg: #D7572F4d; --plate: #06203A;
+  --file-a: #9FD0E8; --file-b: #EAF2F6; --file-c: #D7572F;
+  --elev: none; --elev-sm: none; --key: none;
+  --plate-ink: #EAF2F6; --plate-line-wide: #EAF2F6; --plate-line-narrow: #9FD0E8;
+  --plate-annot: #9FD0E8; --plate-tick: #D7572F; --plate-ghost: #9FD0E859; --plate-zone: #9FD0E8;
+  --plate-hatch: repeating-linear-gradient(45deg, var(--plate-ghost) 0 var(--wB), transparent var(--wB) 8px);
+  --plate-chain: repeating-linear-gradient(90deg, var(--plate-line-narrow) 0 14px, transparent 14px 20px, var(--plate-line-narrow) 20px 24px, transparent 24px 32px);
+  --plate-chain-v: repeating-linear-gradient(180deg, var(--plate-line-narrow) 0 14px, transparent 14px 20px, var(--plate-line-narrow) 20px 24px, transparent 24px 32px);
+  --plate-rail-ticks: repeating-linear-gradient(180deg, var(--plate-line-narrow) 0 var(--wB), transparent var(--wB) var(--zone));
+}
+/* ── GEOMETRY (identical in both themes) ───────────────────────────────────────────────────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 8px; --r-md: 6px; --r-sm: 4px; --r-xs: 2px;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --ls-label: .06em;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: #b9bac1; margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: 13px; color: #dcdde2; }
+.moves { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: 1px solid #33353c; border-radius: 8px; padding: 10px 12px; font-size: var(--t14); color: #d5d6db; }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin-bottom: 4px; }
+.sw { display: flex; gap: 2px; border-radius: 5px; overflow: hidden; border: 1px solid #33353c; }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: center; }
+.surface { margin-bottom: 36px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+.desktop, .page { border-radius: 12px; padding: 24px; }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: 1px solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: 1px solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 1px solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: 8px var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: oklch(1 0 0 / .28); color: var(--primary-foreground); }
+.row.foc { box-shadow: inset 0 0 0 2px var(--ring); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: 1px solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--foreground); font-size: var(--t12); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px 14px var(--r-md) 14px; background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--warning-soft); color: var(--warning); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: 1px solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 12px 12px; }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: 1px solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+
+/* direction banner — wave 2 opens every mock with this; the control hosts the structure so the template carries it */
+.hero { position: relative; display: grid; gap: var(--gap-2); padding: var(--gap-3) var(--pad); margin-bottom: var(--gap-3); border: 1px solid var(--border); border-radius: var(--r); background: var(--secondary); overflow: hidden; }
+.hero-kicker { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.hero-title { font-size: var(--t24); line-height: 1.2; letter-spacing: -.022em; margin: 0; color: var(--foreground); }
+.hero-thesis { margin: 0; font-size: var(--t14); line-height: 1.45; color: var(--muted-foreground); max-width: 46ch; }
+.hero-field { display: flex; align-items: flex-end; gap: var(--gap); margin-top: var(--gap); }
+.spec { font-size: 56px; line-height: .9; color: var(--foreground); }
+.spec:nth-child(2) { font-family: var(--mono); }
+.spec:nth-child(3) { color: var(--primary); }
+.f { display: block; width: 34px; height: 56px; border: 1px solid var(--border); }
+.f1 { background: var(--background); } .f2 { background: var(--card); } .f3 { background: var(--muted); }
+.f4 { background: var(--primary); } .f5 { background: var(--info); }
+
+/* dialogs */
+.dlg { border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: 1px solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: 1px solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); }
+.sw2 { width: 28px; height: 16px; border-radius: 99px; background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: 1px solid var(--destructive); border-radius: var(--r-md); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
+
+/* ══ CYANOTYPE PLATE IDIOM ═══════════════════════════════════════════════════════════════════
+   Appended after the control block: the shared rules above are untouched, so a reader can diff
+   this file against 00 and see that only ink, weight and margins moved.
+   ISO 128 has five line classes. Three are built here with FIXED meaning and real width steps:
+   A continuous wide (--wA 2px) = the neatline, frame lines and visible outlines.
+   B continuous narrow (--wB 1px) = dimensions, leaders, hatching, table rules, zoning hairlines.
+   C dashed = provisional: export chips, pending rows, tooltips (a hidden line is a dashed line).
+   D chain = centre lines and the step rail. E zig-zag is deliberately absent — it breaks the 8px module.
+   NOMINAL WIDTHS ARE THE MIGRATION: 0.13/0.18/0.25/0.35/0.5/0.7/1.0/1.4 mm with "line thickness
+   should be not less than 0.25 mm" and borders "continuous wide, minimum 0.7 mm". mm→px is DERIVED
+   (the mm→px mapping is a paper concept; this file is not paper); 0.25 mm → --wB and 0.7 mm → --wA.
+   A uniform hairline over a navy field is a tint, not a plate — these two widths are the plate. */
+:root {
+  --wA: 2px;                /* class A, continuous wide — ISO 0.7 mm minimum, DERIVED */
+  --wB: 1px;                /* class B, continuous narrow — ISO 0.25 mm floor, DERIVED */
+  --mod: 8px;               /* the only module: every margin, tick and step is a multiple */
+  --rail: 24px;             /* ISO 5457 left filing margin: 20 mm, DERIVED, and 2× the other border */
+  --band: 20px;             /* the zone band along the top */
+  --zone: 32px;             /* zoning pitch = 4 × --mod */
+  --dim-a: 8px;             /* dimension arrowhead, clip-path triangle */
+  --ls-mono: .12em;         /* every mono label: title block, numerals, zone letters, caps */
+  --ts13: 13px; --ts17: 17px; --ts20: 20px; --ts24: 24px; --ts34: 34px; --ts68: 68px;
+  --tt: "Jost", Futura, "Century Gothic", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --caps: "JetBrains Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
+  --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;   /* radius 0 everywhere, one override, no component edits */
+}
+/* no material on a drawing: the --elev / --elev-sm / --key tokens are set to none in BOTH theme
+   blocks above, so every shadow the control composes from them is gone without touching a rule.
+   The one surviving box-shadow is .row.foc's inset, offset-free, blur-free focus ring. */
+.col, .hero, .palette, .dlg, .desktop, .page, .head, .mode, .q, .x, kbd, .sec, .cnt, .tile, .row, .row .t, .row .p, .badge,
+.ask, .tip, .foot, .ghost, .chat, .me, .steps, .st, .st i, .st em, .ans, .caret, .pill, .gu, .chip,
+th, td, .bar, .ta, .send, .ag, .kv, .prog, .prog i, .tr, .set, .btn, .sw2, .sw2::after, .dot, .spin,
+.alert, .alert h4, .alert ul, .lbl, .spec, .f, .dimline, .tblock, .tblock span { border-radius: 0; }
+
+/* the sheet: neatline in class A, filing rail in class B with hairline zoning ticks */
+.palette, .dlg { position: relative; padding-left: var(--rail); border: var(--wA) solid var(--plate-line-wide); border-radius: 0; }
+.palette::before, .dlg::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--rail);
+  background: var(--plate-rail-ticks); border-right: var(--wB) solid var(--plate-line-narrow); }
+.head { border-bottom: var(--wA) solid var(--plate-line-wide); }
+.foot { border-top: var(--wB) solid var(--plate-line-narrow); font-family: var(--caps); letter-spacing: var(--ls-mono); }
+.lbl { font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.mode, .badge, .cnt, .btn, .ghost, .chip { font-family: var(--caps); text-transform: uppercase; letter-spacing: var(--ls-mono); }
+.q svg, .x svg, .tile svg { color: var(--plate-ink); }   /* glyph strokes take the structural ink, not the label cyan;
+   .send svg is deliberately excluded — its glyph must stay --primary-foreground or it goes white-on-white in the plate */
+.mode, .tile, .badge, .btn, .ghost { border-color: var(--plate-line-wide); border-width: var(--wA); background: transparent; }
+kbd { border: var(--wB) solid var(--plate-line-wide); background: transparent; letter-spacing: var(--ls-mono); }
+.sec { font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.sec::after { content: ""; flex: 1; border-top: var(--wB) solid var(--border); }        /* class B leader to the neatline */
+.cnt { border: var(--wB) solid var(--plate-line-narrow); }
+.row { border-bottom: var(--wB) solid var(--border); } .row .t { font-size: var(--ts13); }
+.row .p, .row .k { letter-spacing: .04em; }
+.row.hov { background: var(--accent); } .row.hov .p { color: var(--plate-annot); }
+/* the selected row is a DIMENSIONED FEATURE, not a painted block: class A outlines above and below,
+   class-B hatch for the section fill, a vermillion witness tick at the feature edge, and its extent
+   (40 = --row-h) called out at the end of the row in mono caps. */
+.row.sel { position: relative; background: var(--plate-hatch); border-top: var(--wA) solid var(--plate-line-wide);
+  border-bottom: var(--wA) solid var(--plate-line-wide); }
+.row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--card-foreground); }
+.row.sel::before { content: ""; position: absolute; left: var(--gap); top: 4px; bottom: 4px; width: var(--wA); background: var(--plate-tick); }
+.row.sel::after { content: "\25C0 40 \25B6"; font-family: var(--caps); font-size: var(--t12); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.row.sel mark { background: var(--mark-bg); color: var(--card-foreground); border-bottom: var(--wB) solid var(--plate-tick); }
+mark { border-bottom: var(--wB) solid var(--plate-tick); }   /* a matched run is red-penned, not highlighted */
+.ask, .tip { border: var(--wB) solid var(--plate-line-wide); background: var(--card); font-family: var(--caps);
+  letter-spacing: var(--ls-mono); text-transform: uppercase; }
+.tip::before { content: ""; display: inline-block; width: var(--mod); margin-right: var(--gap); border-top: var(--wB) dashed var(--plate-line-narrow); }
+.chip { border: var(--wB) dashed var(--plate-line-narrow); background: transparent; font-size: var(--t12); }  /* class C = provisional */
+.spin { width: var(--mod); height: var(--mod); border-radius: 50%; border: var(--wA) solid var(--plate-line-narrow); border-top-color: var(--plate-tick); animation: plateSpin .9s linear infinite; }
+@keyframes plateSpin { to { transform: rotate(360deg); } }
+@keyframes plateBlink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* ask mode: the step rail is a class-D chain line, the answer is body ink, the caret is a plate block */
+.me { padding: var(--gap) var(--gap-3); border: 0; }
+.steps { position: relative; background: transparent; border: var(--wB) solid var(--plate-line-narrow); }
+.steps::before { content: ""; position: absolute; left: 18px; top: var(--gap); bottom: var(--gap); width: var(--wA); background: var(--plate-chain-v); }
+.st { font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.st i { width: var(--mod); height: var(--mod); font-size: var(--t12); background: var(--card); border: var(--wB) solid var(--plate-line-wide); color: var(--success); }
+.st.run i { background: var(--card); border-style: dashed; color: var(--warning); }
+.st em { background: transparent; border: var(--wB) dashed var(--plate-line-narrow); letter-spacing: var(--ls-mono); }
+.ans { color: var(--foreground); }
+.caret { color: var(--foreground); border-bottom: var(--wA) solid var(--plate-tick); animation: plateBlink 1.1s steps(1) infinite; }
+.pill { background: var(--info-soft); border: var(--wB) solid var(--plate-line-narrow); font-family: var(--caps);
+  letter-spacing: var(--ls-mono); text-transform: uppercase; font-weight: 400; }
+.pill.w { background: var(--warning-soft); } .pill.s { background: var(--success-soft); }
+.gu { background: var(--card); border: var(--wA) solid var(--plate-line-wide); }
+.gu .h { border-bottom: var(--wA) solid var(--plate-line-wide); font-family: var(--tt); font-size: var(--ts17); letter-spacing: .01em; }
+th { background: transparent; border-bottom: var(--wA) solid var(--plate-line-wide); font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+td { border-bottom: var(--wB) solid var(--plate-line-narrow); }
+details { background: transparent; border: var(--wB) solid var(--plate-line-narrow); }
+summary { font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.met { border-top: var(--wB) solid var(--border); }
+.met b { font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--foreground); }
+.met span { font-size: var(--t12); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.chat details > p { font-size: var(--t12) !important; }   /* the one !important: the inline 11px caveat is lifted to the 12px plate rung — there is no 11px rung here */
+.bar { border: var(--wA) solid var(--input); }
+.send { background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity: the progress bar is a hatched extent inside a class-A frame */
+.ag { background: transparent; border: var(--wB) solid var(--plate-line-narrow); }
+.ag h3 { font-family: var(--tt); font-size: var(--ts17); }
+.kv dt { font-family: var(--caps); letter-spacing: var(--ls-mono); text-transform: uppercase; }
+.prog { height: var(--mod); background: transparent; border: var(--wA) solid var(--plate-line-wide); }
+.prog i { background: var(--plate-hatch); border-right: var(--wA) solid var(--plate-line-wide); }
+.tr td { border-bottom: var(--wB) solid var(--border); } .tr td:first-child { letter-spacing: var(--ls-mono); }
+.ok, .er, .pe { font-family: var(--caps); letter-spacing: var(--ls-mono); text-transform: uppercase; }
+
+/* dialogs: buttons are notes, the switch is a well with a tick, the alert frame is class A */
+.dlg .h { border-bottom: var(--wA) solid var(--plate-line-wide); font-family: var(--tt); font-size: var(--ts20); text-transform: uppercase; letter-spacing: .06em; }
+.set { border-bottom: var(--wB) solid var(--plate-line-narrow); } .set .d { font-family: var(--caps); letter-spacing: var(--ls-mono); }
+.btn { background: transparent; border: var(--wA) solid var(--plate-line-wide); color: var(--foreground); font-size: var(--t12); }
+.btn:hover { background: var(--accent); }
+.sw2 { border: var(--wB) solid var(--plate-line-wide); background: transparent; width: var(--zone); }
+.sw2::after { background: var(--plate-line-wide); top: 2px; width: var(--mod); height: var(--mod); }
+.sw2.on { background: var(--plate-hatch); } .sw2.on::after { background: var(--plate-tick); left: 18px; }
+.dot { border-radius: 0; background: var(--plate-line-wide); } .dot.off { background: transparent; border: var(--wB) solid var(--muted-foreground); }
+.alert { border: var(--wA) solid var(--destructive); } .alert h4 { font-family: var(--tt); letter-spacing: .02em; }
+.alert ul li { letter-spacing: var(--ls-mono); }
+
+/* ── the banner, composed as a sheet: zone band, filing rail, chain centre line, dimension
+      leader with clip-path arrowheads, and a title block bottom-right ─────────────────────────── */
+.hero { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto auto 1fr auto auto;
+  gap: var(--gap) var(--gap-3); min-height: 320px; align-content: start;
+  padding: calc(var(--band) + var(--mod)) calc(var(--mod) * 3) calc(var(--mod) * 3) calc(var(--rail) + var(--gap-3));
+  background: var(--background); border: var(--wA) solid var(--plate-line-wide); }
+.hero::before { content: ""; position: absolute; left: 0; top: var(--band); bottom: 0; width: var(--rail);
+  background: var(--plate-rail-ticks); border-right: var(--wB) solid var(--plate-line-narrow); }
+.hero::after { content: "A \00B7 \00B7 B \00B7 \00B7 C \00B7 \00B7 D \00B7 \00B7 E \00B7 \00B7 F"; position: absolute;
+  left: 0; right: 0; top: 0; height: var(--band); display: flex; align-items: center; padding-left: var(--mod);
+  font-family: var(--caps); font-size: var(--t12); letter-spacing: var(--ls-mono); color: var(--plate-zone);
+  background: var(--plate-chain); border-bottom: var(--wB) solid var(--plate-line-narrow); }
+.hero-kicker { grid-area: 1 / 1; font-family: var(--caps); letter-spacing: var(--ls-mono); color: var(--plate-annot); }
+.hero-title { grid-area: 2 / 1; font-family: var(--tt); font-size: var(--ts24); line-height: 1; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--foreground); border-bottom: var(--wA) solid var(--plate-line-wide); padding-bottom: var(--gap); }
+.hero-thesis { grid-area: 3 / 1; align-self: start; font-size: var(--ts17); line-height: 1.5; color: var(--foreground); max-width: 40ch; }
+.hero-field { grid-area: 4 / 1 / 5 / 3; position: relative; align-self: end; gap: var(--mod); padding-top: var(--gap-3); }
+.hero-field::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: var(--wA); background: var(--plate-chain); }
+.spec { position: relative; font-family: var(--tt); font-size: var(--ts68); line-height: .84; color: var(--plate-line-wide); letter-spacing: -.01em; }
+.spec:nth-child(2) { font-family: var(--caps); font-size: var(--ts34); color: var(--plate-annot); letter-spacing: var(--ls-mono); }
+.spec:nth-child(3) { font-size: var(--ts34); color: var(--plate-tick); }
+.f { width: var(--zone); height: calc(var(--mod) * 7); border: var(--wB) solid var(--plate-line-wide); }
+.dimline { grid-area: 5 / 1 / 6 / 3; position: relative; height: var(--mod); margin-top: var(--gap);
+  border-left: var(--wB) solid var(--border); border-right: var(--wB) solid var(--border);
+  background: linear-gradient(var(--plate-line-narrow), var(--plate-line-narrow)) 0 50% / 100% var(--wB) no-repeat; }
+.dimline i { position: absolute; left: 50%; top: calc(var(--t12) / -2 + var(--wB)); transform: translateX(-50%);
+  font-style: normal; font-family: var(--caps); font-size: var(--t12); letter-spacing: var(--ls-mono);
+  color: var(--plate-annot); background: var(--background); padding: 0 var(--gap); }
+.dimline::before, .dimline::after { content: ""; position: absolute; top: calc(var(--dim-a) / -2); width: var(--dim-a); height: var(--dim-a);
+  background: var(--plate-tick); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.dimline::before { left: 0; transform: rotate(180deg); }
+.dimline::after { right: 0; }
+/* title block: a real CSS grid of 1px class-B rules inside a class-A frame, mono caps, .12em */
+.tblock { grid-area: 3 / 2; align-self: end; justify-self: end; display: grid; grid-template-columns: repeat(2, minmax(0, auto));
+  border: var(--wA) solid var(--plate-line-wide); background: var(--card); }
+.tblock span { display: grid; gap: 2px; padding: var(--gap) var(--gap-2); border: var(--wB) solid var(--plate-line-narrow); }
+.tblock b { font-family: var(--caps); font-size: var(--t12); font-weight: 400; letter-spacing: var(--ls-mono); text-transform: uppercase; color: var(--plate-annot); }
+.tblock i { font-family: var(--caps); font-style: normal; font-size: var(--t12); letter-spacing: var(--ls-mono); text-transform: uppercase; color: var(--foreground); }
+.tblock .wide { grid-column: 1 / -1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin, .caret { animation: none; }
+  *, *::before, *::after { animation-duration: 0ms !important; animation-delay: 0ms !important; transition-duration: 0ms !important; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>22 · Cyanotype Plate — the engineering drawing: line weight is meaning, and the sheet has a filing margin</h1>
+  <p><b>Provenance</b> — the direction is a real 1842 artefact, not a vibe: John Herschel's cyanotype process was invented to copy **mathematical tables**, and Anna Atkins' <i>British Algæ</i> is the book made with it, whose impressions the V&amp;A and the NYPL hold. The graphic law comes from three ISO standards, quoted from their published scope summaries because the texts themselves are paywalled (<b>spec-derived, not package-derived</b>): <b>ISO 128</b> designates the line classes — A continuous wide, B continuous narrow, C dashed, D chain, E zig-zag — with nominal widths 0.13 / 0.18 / 0.25 / 0.35 / 0.5 / 0.7 / 1.0 / 1.4 mm, "line thickness should be not less than 0.25 mm", and border lines as continuous wide at minimum 0.7 mm; <b>ISO 5457</b> sets the sheet: "the border shall be 20 mm wide on the left edge, including the frame. It can be used as a filing margin. All other borders are 10 mm wide"; <b>ISO 3098</b> gives lettering heights as a √2 series on paper, 2.5 to 20 mm. Prussian blue <code>#003153</code> is the printed value of pigment <b>PB27</b>, quoted from the Wikipedia article on the pigment; <code>#EAF2F6</code> line white, <code>#9FD0E8</code> annotation cyan, <code>#D7572F</code> tick vermillion and <code>#06203A</code> deep plate are <b>DERIVED</b>, and so is every mm→px mapping: this file is not paper. The light half is the <b>reverse sheet</b> — a white field with <code>#003153</code> lines, which is what a modern CAD plot actually looks like — not a tint of the dark half.</p>
+  <p><b>Type plan</b> — title block cells, dimension numerals and zone letters are uppercase <code>--caps</code> (JetBrains Mono, OFL 1.1, already shipped as <code>--font-mono</code> here) at 12 px with <code>letter-spacing: .12em</code>; plate titles are <b>Jost</b> (SIL OFL 1.1, verified) at 20 / 17, geometric, the face that reads as a drawing sheet; rows stay 13. Display specimen at 68. The size series is √2-stepped — 12 · 17 · 24 · 34 · 48 · 68 — the same ratio as ISO A-series paper, and the mapping to px is <b>DERIVED</b> because ISO 3098's rungs are millimetres. <b>There is no 11px rung</b>: the √2 series from 12 lands on 17, and every 11px the control ships (chips, metric labels, the caveat line) is lifted to 12, one of them by the only <code>!important</code> in the file because it sits in an inline style. Without Jost: Futura on macOS, Century Gothic on Windows with Office, then Segoe UI — a geometric sans either way, so the sheet still reads as a sheet. Mono without JetBrains Mono falls to Cascadia Mono / Consolas.</p>
+  <p><b>Geometry</b> — strict 8 px module (<code>--mod</code>), <b>radius 0</b>, <code>box-shadow: none</code> everywhere: separation is done by the A/B weight pair and the margins, never by elevation, because a drawing has no material. <code>--wA</code> 2px = class A = the neatline, frame lines, visible outlines and the selection's extent lines; <code>--wB</code> 1px = class B = dimensions, leaders, hatching, table rules and zoning hairlines; class C dashed = provisional things (export chips, the pending step, the tooltip's leader); class D chain = centre lines and the step rail. One uniform hairline over navy is a tint, and that sentence is the whole direction. The 20 mm / 10 mm margin law is a fat left rail (<code>--rail</code> 24px) carrying hairline zoning ticks against a 12px content padding — the load-bearing fact is the <b>2 : 1 ratio</b>, not a mm conversion. Palette stays 800 px wide, header 72, row floor 40; the selected row calls its own <code>40</code> out as a dimension. The only surviving shadow is <code>.row.foc</code>'s inset ring — no offset, no blur, so it is a line.</p>
+  <ul class="moves">
+    <li><b>Move 1</b>Add <code>--plate</code>, <code>--plate-ink</code>, <code>--plate-line-wide</code>, <code>--plate-line-narrow</code>, <code>--plate-annot</code>, <code>--plate-tick</code> and the hatch / chain / rail-tick gradients to <code>src/renderer/styles/tokens/colors.css</code>, with <b>both halves</b> in <code>semantic/theme.css</code> — and keep the gradients inside the <code>:root</code> / <code>.dark</code> blocks, never above them, since they interpolate <code>--plate-line-narrow</code> at computed-value time. <code>tokens/radius.css</code> sets every rung to 0 and <code>tokens/shadow.css</code> sets <code>--shadow-popover</code>, <code>--shadow-dialog</code>, <code>--shadow-tooltip</code>, <code>--shadow-toast</code>, <code>--shadow-shortcut-key</code> and <code>--shadow-inset</code> to <code>none</code>: Radix popovers arrive with <code>--shadow-popover</code> and 8px corners, so they must be fixed <b>through the tokens, not per component</b>, or the pristine <code>components/ui/</code> layer diverges from the plate.</li>
+    <li><b>Move 2</b><code>tokens/typography.css</code>: vendor Jost (OFL — a sandboxed renderer has no CDN), add <code>--font-display</code> and the √2 rungs, and <b>delete the three 11px aliases</b> <code>--text-2xs</code> / <code>--text-xs-custom</code> / <code>--text-11px</code>, which exist today only so an old <code>var()</code> cannot drop; grep them first, then promote the survivors to <code>--text-2xs</code>'s 12px floor. Mono labels gain <code>--tracking-plate: .12em</code>.</li>
+    <li><b>Move 3</b>The devices need markup, in one shared owner so it is authored once: a <code>&lt;span&gt;</code> leader inside each <code>.sec</code> section header (<code>ResultsList.tsx</code>), the title-block grid in <code>ask-mode/Transparency/TaskMetrics.tsx</code> and <code>CommandPaletteFooter.tsx</code>, the chain step rail in <code>ask-mode/ThinkingSteps.tsx</code>, the dimensioned selection + extent callout in <code>ResultItem.tsx</code>, and the hatch progress well in <code>ask-mode/BrowserProgressPanel.tsx</code>. <code>--input</code>'s 3:1 control-boundary floor still binds inside the plate, so <code>SearchBar.tsx</code>, <code>SettingsDialog.tsx</code> and <code>MCPToolModal.tsx</code> keep a class-A boundary even when the sheet is Prussian.</li>
+  </ul>
+  <p><b>Cost: MEDIUM</b> — six new tokens with both halves (<code>--plate</code>, <code>--plate-line-wide</code>, <code>--plate-line-narrow</code>, <code>--plate-ink</code>, plus annot/tick and the hatch/chain/rail gradients), radius to 0, the shadow tokens to <code>none</code>, a vendored OFL display face, the 11px aliases deleted, and the five markup sites above. The Radix popover warning is the real price: <code>--shadow-popover</code> and <code>--radius-lg</code> are what give a popover its lift, so the fix must land in the token layer once — patching components instead forks <code>components/ui/</code> and breaks <code>shadcn diff</code>. One further honest cost: every value here is <b>sRGB hex, not OKLCH</b>, because Prussian's printed value is published as hex — adopting this direction means either a hex island in <code>colors.css</code> against the repo's OKLCH mandate, or converting PB27 and losing the quotable number.</p>
+  <p><b>Biggest risk:</b> the plate is an <b>opaque dark field</b>, so the direction is dark-only unless the reverse sheet is authored properly — and the reverse sheet is the hard half, because <code>#9FD0E8</code> on white measures <b>1.66:1</b> and has no text role there at all, which is why the light half's annotation ink is a derived <code>#2A5C7E</code> (7.2:1). Second: the annotations are <b>information, not ornament</b> — a zone band, a chain line and a title block each cost the card vertical space, and a plate that shows more chrome than it shows result rows fights the 40px row target and the 32px control floor; the devices below are therefore all pseudo-elements on structure the app already has, and none of them is allowed to grow a row. Third: <code>#9FD0E8</code> on Prussian clears AA at <b>8.1:1</b> (6.1:1 on the raised popover), which makes it a <b>label colour, never a body colour</b> — body prose is <code>#EAF2F6</code> at 11.9:1 — and by the same law vermillion <code>#D7572F</code> fails as text in <b>both</b> halves (3.39:1 on Prussian, 3.97:1 on white), so it is a tick, a clip-path arrowhead, a <code>--ring</code> and a mark underline, and its text duties go to derived rungs <code>#F08A5F</code> / <code>#A83A18</code>. A plate that lets cyan set a paragraph is a wallpaper.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT — the reverse sheet ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 22</span>
+  <h3 class="hero-title">Cyanotype Plate</h3>
+  <p class="hero-thesis">A surface is not a material — it is a sheet, and the line that bounds it says what it means. ISO 128: <b>A</b> continuous wide for the neatline and every visible outline, <b>B</b> continuous narrow for dimensions, leaders and hatching, <b>D</b> chain for centre lines. Two weights, fixed meaning, no shadow: one uniform hairline over navy is a tint.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+  <div class="tblock"><span><b>DWG</b><i>22 · QYT</i></span><span><b>MODE</b><i>EXPANDED</i></span><span><b>HEIGHT</b><i>603</i></span><span><b>SESSION</b><i>04</i></span><span class="wide"><b>Lines</b><i>A 2 · B 1 · D chain</i></span></div>
+  <div class="dimline" aria-hidden="true"><i>800</i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK — the cyanotype plate ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 22</span>
+  <h3 class="hero-title">Cyanotype Plate</h3>
+  <p class="hero-thesis">A surface is not a material — it is a sheet, and the line that bounds it says what it means. ISO 128: <b>A</b> continuous wide for the neatline and every visible outline, <b>B</b> continuous narrow for dimensions, leaders and hatching, <b>D</b> chain for centre lines. Two weights, fixed meaning, no shadow: one uniform hairline over navy is a tint.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+  <div class="tblock"><span><b>DWG</b><i>22 · QYT</i></span><span><b>MODE</b><i>EXPANDED</i></span><span><b>HEIGHT</b><i>603</i></span><span><b>SESSION</b><i>04</i></span><span class="wide"><b>Lines</b><i>A 2 · B 1 · D chain</i></span></div>
+  <div class="dimline" aria-hidden="true"><i>800</i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

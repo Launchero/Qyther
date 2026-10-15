@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 25 · Retro-OS Bevel (Windows 95 chrome, honestly licensed)</title>
+<!--
+  MOCK 25 — the control's markup and content, re-skinned as Windows 95 chrome.
+  Specified from the shipped 98.css 0.1.21 dist/98.css (MIT, Copyright 2020 Jordan Scales), which ships
+  ZERO CSS custom properties: every value in the two [data-theme] blocks below is a literal hand-written
+  out of that file, not imported from it. The bundled "Pixelated MS Sans Serif" is NOT covered by the
+  code's licence (FontStruction by "lou", CC-BY-SA 3.0), so this mock uses Segoe UI and says so.
+  Bevel recipes, densities and the focus outline are verbatim; the 21-23px control heights are refused.
+  Markup and content are fixed; only the token blocks, the header block, .hero and the idiom rules change.
+-->
+<style>
+/* ── LIGHT — the real silver edition; every literal below is read out of 98.css 0.1.21 ── */
+[data-theme="light"] {
+  --background: #c0c0c0;            --foreground: #222;               /* silver face + #222 ink */
+  --card: #c0c0c0;                  --card-foreground: #222;
+  --popover: #dfdfdf;               --popover-foreground: #222;
+  --primary: #000080;               --primary-foreground: #fff;       /* navy = ::selection AND the title bar */
+  --secondary: #c0c0c0;             --secondary-foreground: #222;
+  --muted: #c0c0c0;                 --muted-foreground: #4d4d4d;      /* 98.css ships only gray #808080 = 2.2:1 on silver */
+  --accent: #dfdfdf;                --accent-foreground: #222;        /* hover is a lighter silver step, never a hue */
+  --destructive: #800000;           --destructive-foreground: #fff;   /* VGA maroon — 98.css ships no status roles at all */
+  --success: #005b00; --warning: #5a4500; --info: #000080;            /* darkened until each clears 4.5:1 on silver */
+  --success-soft: #005b0026; --warning-soft: #5a450026; --info-soft: #00008026; --destructive-soft: #80000026;
+  --agent: #800080;                                                   /* VGA purple */
+  --border: #808080;                  --input: #0a0a0a;                 --ring: #000;
+  --mark-bg: #ffff00;                 --mark-sel: #ffffff4d;            --plate: #008080;
+  --field: #fff;                      --titlebar-b: #1084d0;            --tb-fg: #fff;
+  --file-a: #000080;                  --file-b: #4d4d4d;                --file-c: #005b00;
+  /* four bevel steps, then the named recipes (offsets come from :root so the two halves stay identical) */
+  --bev-shadow: #0a0a0a; --bev-hi: #fff; --bev-face: #808080; --bev-lo: #dfdfdf;
+  --raised: inset var(--bev-a) var(--bev-shadow), inset var(--bev-b) var(--bev-hi), inset var(--bev-c) var(--bev-face), inset var(--bev-d) var(--bev-lo);
+  --raised-sm: inset var(--bev-a) var(--bev-face), inset var(--bev-b) var(--bev-hi);
+  --sunken: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-face), inset var(--bev-c) var(--bev-lo), inset var(--bev-d) var(--bev-shadow);
+  --sunken-sm: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-shadow);
+  --active: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-shadow), inset var(--bev-c) var(--bev-lo), inset var(--bev-d) var(--bev-face);
+  --default: var(--raised), 0 0 0 var(--bw) var(--bev-shadow);
+  --titlebar: linear-gradient(90deg, var(--primary), var(--titlebar-b));
+  --focus-dot: var(--bw) dotted var(--ring);
+  --sb-trough: repeating-linear-gradient(45deg, var(--bev-face) 0 1px, var(--bev-lo) 1px 2px);
+  --elev: var(--raised); --elev-sm: var(--raised-sm); --key: var(--raised-sm);
+}
+/* ── DARK — INVENTED EDITION. Win95 shipped no dark mode: nothing in this column is sourced. ── */
+[data-theme="dark"] {
+  --background: #26262b;            --foreground: #dfdfdf;            /* the silver face, darkened */
+  --card: #2b2b31;                  --card-foreground: #dfdfdf;
+  --popover: #33333a;               --popover-foreground: #eaeaea;
+  --primary: #2f2f6e;               --primary-foreground: #fff;       /* desaturated navy */
+  --secondary: #303037;             --secondary-foreground: #dfdfdf;
+  --muted: #222227;                 --muted-foreground: #a5a5b0;
+  --accent: #3a3a42;                --accent-foreground: #f0f0f2;
+  --destructive: #e07a7a;           --destructive-foreground: #16161a;
+  --success: #78c878; --warning: #d8b25a; --info: #7f9fd8;
+  --success-soft: #78c8782e; --warning-soft: #d8b25a2e; --info-soft: #7f9fd82e; --destructive-soft: #e07a7a2e;
+  --agent: #c58ad8;
+  --border: #3a3a40;                  --input: #5a5a62;                 --ring: #dfdfdf;  /* the dotted rect must invert */
+  --mark-bg: #4a3f00;                 --mark-sel: #dfdfdf59;            --plate: #0a0e12;
+  --field: #1a1a1e;                   --titlebar-b: #2f5f86;            --tb-fg: #f2f2f4;
+  --file-a: #7f9fd8;                  --file-b: #a5a5b0;                --file-c: #78c878;
+  /* only three bevel steps exist here, so the fourth ring repeats the mid */
+  --bev-shadow: #000; --bev-hi: #5a5a62; --bev-face: #3a3a40; --bev-lo: #3a3a40;
+  --raised: inset var(--bev-a) var(--bev-shadow), inset var(--bev-b) var(--bev-hi), inset var(--bev-c) var(--bev-face), inset var(--bev-d) var(--bev-lo);
+  --raised-sm: inset var(--bev-a) var(--bev-face), inset var(--bev-b) var(--bev-hi);
+  --sunken: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-face), inset var(--bev-c) var(--bev-lo), inset var(--bev-d) var(--bev-shadow);
+  --sunken-sm: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-shadow);
+  --active: inset var(--bev-a) var(--bev-hi), inset var(--bev-b) var(--bev-shadow), inset var(--bev-c) var(--bev-lo), inset var(--bev-d) var(--bev-face);
+  --default: var(--raised), 0 0 0 var(--bw) var(--bev-shadow);
+  --titlebar: linear-gradient(90deg, var(--primary), var(--titlebar-b));
+  --focus-dot: var(--bw) dotted var(--ring);
+  --sb-trough: repeating-linear-gradient(45deg, var(--bev-face) 0 1px, var(--bev-shadow) 1px 2px);
+  --elev: var(--raised); --elev-sm: var(--raised-sm); --key: var(--raised-sm);
+}
+/* ── GEOMETRY — radius 0 everywhere; the period's own densities recorded, then refused ─────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;                   /* Win95 has no radius, at any rung */
+  --bev-a: -1px -1px; --bev-b: 1px 1px; --bev-c: -2px -2px; --bev-d: 2px 2px;
+  --bw: 1px; --win-pad: 3px;
+  --tb-h: 26px; --menu-h: 22px; --status-h: 24px;
+  --sb-w: 16px; --sb-h: 17px;                                        /* 98.css scrollbar: 16 × 17 */
+  --hero-min: 320px; --spec-size: 110px; --spec-h: 118px; --list-max: 288px;
+  --p-btn-h: 23px; --p-btn-w: 75px; --p-field-h: 21px;               /* the period's controls — recorded, NOT shipped */
+  --pad: 8px; --gap: 4px; --gap-2: 8px; --gap-3: 12px; --measure: 44rem;
+  --ff: "Segoe UI", Tahoma, system-ui, sans-serif;                   /* the bitmap face is CC-BY-SA; see the header */
+  --mono: "Cascadia Mono", Consolas, "JetBrains Mono", ui-monospace, monospace;
+  --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --ls-label: .06em;
+  /* page frame — it sits outside every [data-theme] column, so these are chrome, not roles */
+  --chrome-bg: #14161a; --chrome-fg: #e8e8ea; --chrome-mut: #b0b2b9; --chrome-code: #dcdde2;
+  --chrome-line: #3a3d45; --chrome-dim: #8f929c; --chrome-r: 0px; --chrome-bw: 1px;
+  --chrome-pad: 32px; --chrome-pad-b: 96px; --chrome-gap: 12px; --chrome-sz: 26px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: var(--chrome-pad) var(--chrome-pad) var(--chrome-pad-b); background: var(--chrome-bg); color: var(--chrome-fg); font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 var(--chrome-gap); letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto var(--chrome-gap); }
+.brief p { max-width: 78ch; font-size: var(--t14); color: var(--chrome-mut); margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: 13px; color: var(--chrome-code); }
+.moves { display: flex; gap: var(--chrome-gap); flex-wrap: wrap; margin: var(--chrome-gap) 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: var(--chrome-bw) solid var(--chrome-line); border-radius: var(--chrome-r); padding: 10px var(--chrome-gap); font-size: var(--t14); color: var(--chrome-code); }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--chrome-dim); margin-bottom: 4px; }
+.sw { display: flex; gap: var(--gap); padding: var(--win-pad); background: var(--card); color: var(--foreground); }
+.sw i { width: var(--chrome-sz); height: var(--target); }
+.board { display: flex; gap: var(--chrome-pad); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--chrome-dim); margin: 0 0 var(--chrome-gap); text-align: center; }
+.surface { margin-bottom: var(--chrome-pad); }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--gap-2); }
+.desktop, .page { border-radius: var(--r); padding: var(--chrome-pad); }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: 1px solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: 1px solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 1px solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: 8px var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: var(--mark-sel); color: var(--primary-foreground); }
+.row.foc { box-shadow: inset 0 0 0 2px var(--ring); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: 1px solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--foreground); font-size: var(--t12); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px 14px var(--r-md) 14px; background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--warning-soft); color: var(--warning); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: 1px solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 12px 12px; }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: 1px solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+
+/* direction banner — a window-manager composition: title bar, caption buttons, specimen field, chip row, status bar */
+.hero { position: relative; display: grid; grid-template-rows: auto auto auto auto 1fr auto; gap: var(--gap-2); min-height: var(--hero-min); padding: var(--win-pad); margin-bottom: var(--chrome-pad); border: 0; border-radius: 0; background: var(--card); color: var(--foreground); box-shadow: var(--raised); overflow: hidden; }
+.hero::before { content: "Qyther \00b7 Command Palette"; display: flex; align-items: center; height: var(--tb-h); margin: calc(var(--win-pad) * -1) calc(var(--win-pad) * -1) 0; padding: 0 var(--pad); background: var(--titlebar); color: var(--tb-fg); font-size: var(--t14); font-weight: 700; }
+.f5::after { content: "_ \25A1 \2715"; position: absolute; top: var(--win-pad); right: var(--win-pad); display: flex; align-items: center; gap: 0; height: calc(var(--tb-h) - var(--gap)); padding: 0 var(--gap-3); letter-spacing: var(--gap-3); background: var(--card); color: var(--foreground); box-shadow: var(--raised-sm); font-family: var(--mono); font-size: var(--t12); font-weight: 700; }
+.hero::after { content: "For help, press F1"; display: block; margin: var(--gap-2) calc(var(--win-pad) * -1) calc(var(--win-pad) * -1); padding: var(--win-pad) var(--pad); background: var(--card); box-shadow: var(--sunken-sm); font-size: var(--t12); min-height: var(--status-h); }
+.hero-kicker { justify-self: start; font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--foreground); background: var(--card); box-shadow: var(--raised-sm); padding: var(--win-pad) var(--gap); }
+.hero-title { font-size: var(--t24); line-height: 1.2; letter-spacing: var(--ls-label); text-transform: uppercase; margin: 0; color: var(--foreground); }
+.hero-thesis { margin: 0; font-size: var(--t14); line-height: 1.5; color: var(--foreground); max-width: 62ch; background: var(--field); box-shadow: var(--sunken); padding: var(--gap); }
+.hero-field { display: flex; align-items: stretch; gap: var(--gap); flex-wrap: wrap; }
+.spec { font-size: var(--spec-size); line-height: 1; color: var(--foreground); background: var(--field); box-shadow: var(--sunken); padding: var(--gap) var(--gap-3); }
+.spec:nth-child(2) { font-family: var(--mono); }
+.spec:nth-child(3) { background: var(--card); box-shadow: var(--raised); color: var(--primary); }
+.f { display: block; width: 34px; height: auto; min-height: var(--spec-h); border: 0; box-shadow: var(--raised-sm); }
+.f1 { background: var(--field); } .f2 { background: var(--bev-lo); } .f3 { background: var(--bev-face); }
+.f4 { background: var(--primary); } .f5 { background: var(--titlebar-b); }
+
+/* dialogs */
+.dlg { border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: 1px solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: 1px solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); }
+.sw2 { width: 28px; height: 16px; border-radius: 99px; background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: 1px solid var(--destructive); border-radius: var(--r-md); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: var(--gap-3); font-family: var(--mono); font-size: var(--t12); }
+
+/* ══ RETRO-OS IDIOM — appended last so the cascade carries it; every value resolves to a token above ══ */
+[data-theme] { color: var(--foreground); }
+::selection { background: var(--primary); color: var(--primary-foreground); }
+.palette, .dlg { position: relative; border: 0; border-radius: 0; background: var(--card); color: var(--foreground); box-shadow: var(--raised); }
+.palette::before { content: "Qyther \00b7 Command Palette"; display: flex; align-items: center; height: var(--tb-h); padding: 0 var(--pad); background: var(--titlebar); color: var(--tb-fg); font-size: var(--t14); font-weight: 700; }
+.palette::after, .dlg .h::after { content: "_ \25A1 \2715"; display: flex; align-items: center; padding: 0 var(--gap-3); letter-spacing: var(--gap-3); background: var(--card); color: var(--foreground); box-shadow: var(--raised-sm); font-family: var(--mono); font-size: var(--t12); font-weight: 700; }
+.palette::after { position: absolute; top: var(--win-pad); right: var(--win-pad); height: calc(var(--tb-h) - var(--gap)); }
+.head { background: var(--card); border-bottom: var(--bw) solid var(--bev-face); }
+.q { background: var(--field); box-shadow: var(--sunken); padding: var(--win-pad) var(--gap); }
+.mode, .badge, .ask, .chip, kbd, .x, .btn, .ghost, .tile { border: 0; border-radius: 0; background: var(--card); color: var(--foreground); box-shadow: var(--raised-sm); min-height: var(--target); }
+.mode, .badge, .ask, .chip, kbd { padding: 0 var(--gap); }
+.btn:active, .ghost:active, .tile:active, .chip:active, .send:active { box-shadow: var(--active); }
+.send { border: 0; border-radius: 0; background: var(--card); color: var(--foreground); box-shadow: var(--default); }
+.cnt { border: 0; border-radius: 0; background: var(--bev-lo); color: var(--foreground); box-shadow: var(--sunken-sm); }
+.tip { border: 0; border-radius: 0; background: var(--card); color: var(--foreground); box-shadow: var(--sunken-sm); }
+.sec { color: var(--foreground); }
+.lbl { display: table; background: var(--card); color: var(--foreground); box-shadow: var(--raised-sm); padding: var(--win-pad) var(--gap); }
+.foot { background: var(--card); border-top: 0; box-shadow: var(--sunken-sm); padding: var(--win-pad) var(--gap); min-height: var(--status-h); }
+.foot > span { background: var(--card); box-shadow: var(--sunken-sm); padding: var(--win-pad) var(--gap); }
+.palette > div:not(.head):not(.foot):not(.chat) { max-height: var(--list-max); overflow-y: scroll; }
+.palette > div:not(.head):not(.foot):not(.chat)::before { content: "File Edit View Go To Favorites Help"; display: block; word-spacing: var(--gap-3); min-height: var(--menu-h); padding: var(--win-pad) var(--pad); margin-bottom: var(--gap); background: var(--card); border-bottom: var(--bw) solid var(--bev-face); font-size: var(--t14); }
+.row.foc { box-shadow: none; outline: var(--focus-dot); outline-offset: calc(var(--bw) * -2); }
+.me, .steps, .bar, details, .gu, .ag, .alert, .sw { border: 0; border-radius: 0; }
+.me, .steps, .bar, details, .alert { background: var(--field); color: var(--foreground); box-shadow: var(--sunken); }
+.gu, .ag { background: var(--card); box-shadow: var(--raised); }
+.gu .h, .dlg .h { border-bottom: var(--bw) solid var(--bev-face); }
+.dlg .h { background: var(--titlebar); color: var(--tb-fg); border-bottom: 0; }
+.sw { box-shadow: var(--sunken); } .sw i { box-shadow: var(--raised-sm); }
+th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(--bev-lo); color: var(--foreground); }
+.prog { height: var(--p-field-h); border-radius: 0; padding: var(--win-pad); background: var(--field); box-shadow: var(--sunken); }
+.prog i { border-radius: 0; background: repeating-linear-gradient(90deg, var(--primary) 0 9px, var(--field) 9px 11px); }
+.st i, .dot, .spin, .sw2, .sw2::after, .ok::before, .er::before, .pe::before { border-radius: 0; }
+.st i { box-shadow: var(--raised-sm); }
+.spin { position: relative; border: 0; background: var(--field); box-shadow: var(--sunken-sm); }
+.spin::after { content: ""; position: absolute; inset: var(--bw); background: var(--primary); }
+.sw2 { background: var(--field); box-shadow: var(--sunken-sm); }
+.sw2::after { top: var(--bw); left: var(--bw); background: var(--card); box-shadow: var(--raised-sm); }
+.sw2.on { background: var(--field); } .sw2.on::after { left: 13px; background: var(--primary); }
+.alert h4 { color: var(--destructive); }
+.alert { position: relative; padding-left: var(--chrome-pad); }
+.alert::before { content: "\2716"; position: absolute; top: var(--pad); left: var(--gap-2); color: var(--destructive); font-size: var(--t18); }
+::-webkit-scrollbar { width: var(--sb-w); height: var(--sb-h); background: var(--bev-face); }
+::-webkit-scrollbar-track { background: var(--sb-trough); box-shadow: var(--sunken-sm); }
+::-webkit-scrollbar-thumb { background: var(--card); box-shadow: var(--raised); }
+::-webkit-scrollbar-button { display: block; width: var(--sb-w); height: var(--sb-h); background: var(--card); box-shadow: var(--raised-sm); }
+::-webkit-scrollbar-corner { background: var(--bev-face); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>25 · Retro-OS Bevel — Windows 95 chrome, honestly licensed</h1>
+  <p><b>Provenance</b> — specified from the shipped <code>98.css</code> 0.1.21 <code>dist/98.css</code> (MIT, "Copyright 2020 Jordan Scales"), read rather than recalled. The finding that decides the adoption cost: <b>98.css ships zero CSS custom properties</b> — every value in it is a literal, so there is nothing to import and the token layer above had to be written by hand out of its palette: <code>silver #c0c0c0</code>, <code>#dfdfdf</code>, <code>#0a0a0a</code>, <code>gray</code>, <code>navy #000080</code>, text <code>#222</code>, links <code>#0000ff</code>, fields <code>#fff</code>. The licence trap sits next door: <b>the font is not covered by the code's licence.</b> The bundled "Pixelated MS Sans Serif" is a FontStruction by "lou" under <b>CC-BY-SA 3.0</b>, so shipping that woff2 carries attribution and share-alike obligations on that asset alone. Same family, all MIT code: <code>7.css</code> 0.21.1 (Windows 7), <code>xp.css</code> 0.2.6, <code>nes.css</code> 2.3.0.</p>
+  <p><b>Type plan</b> — <code>Segoe UI</code> at 11-12 px (12 px here, this repo's own floor), Tahoma second: both already on Windows 10/11, nothing to vendor, nothing to licence. Mono drops to Cascadia Mono / Consolas. The admission that goes with it: without the bitmap face the style reads as a grey form, not as the period. Type is the look, and type is the one thing the licence will not hand over.</p>
+  <p><b>Geometry</b> — radius <b>0</b> at every rung, window padding 3 px, title bar <code>linear-gradient(90deg, navy, #1084d0)</code>, scrollbar 16 × 17 px, focus <code>outline: 1px dotted #000</code> with no rings anywhere. Bevel recipes verbatim: raised <code>inset -1px -1px #0a0a0a, inset 1px 1px #fff, inset -2px -2px gray, inset 2px 2px #dfdfdf</code>; sunken (input, tree view, <code>pre</code>) <code>inset -1px -1px #fff, inset 1px 1px gray, inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a</code>; the active state inverts the four pairs; the default button adds a fifth ring — which is why the send control here is silver with an extra black ring and not the accent. Period density is recorded as <code>--p-btn-h: 23px / --p-btn-w: 75px / --p-field-h: 21px</code> and then <b>refused</b>: 21-23 px is under WCAG 2.5.8's 24 px AA target minimum and under this app's own <code>--target-min: 32px</code>, so every control keeps 32 px while wearing the bevel — the one place this lab deliberately departs from its source. Two further hand-corrections: <code>gray</code> #808080 as secondary text on silver measures about 2.2:1, so <code>--muted-foreground</code> is darkened to <code>#4d4d4d</code>, and the dark half is an <b>invented edition</b> (field <code>#1a1a1e</code>, bevels <code>#000 / #3a3a40 / #5a5a62</code>, a desaturated navy gradient) because Win95 shipped no dark mode — nothing in the right-hand column is sourced.</p>
+  <ul class="moves">
+    <li><b>Move 1</b><code>src/renderer/styles/tokens/shadow.css</code> gains four named recipes — <code>--bevel-raised</code>, <code>--bevel-sunken</code>, <code>--bevel-raised-sm</code>, <code>--bevel-default-ring</code> — because a bevel is a shadow, not a border; <code>--elev</code> and <code>--elev-sm</code> then simply point at them and no component learns a new property.</li>
+    <li><b>Move 2</b><code>src/renderer/styles/tokens/radius.css</code> goes to <code>0</code> at every rung and <code>semantic/theme.css</code> takes the silver palette. Note the coupling: every pristine <code>components/ui/</code> primitive arrives carrying <code>rounded-*</code> and <code>shadow-sm</code>, so the look is flipped <b>through the token layer</b> — those utilities compile onto the <code>--radius</code> and <code>--shadow</code> tokens, and editing the primitives would break the shadcn update path <code>ui/AGENTS.md</code> protects.</li>
+    <li><b>Move 3</b>Three new roles and one new mechanism: <code>--field</code> (a sunken text field is not <code>--background</code>), the four <code>--bev-*</code> steps and a <code>--titlebar</code> gradient; plus <code>::-webkit-scrollbar</code> at 16 px — real in Electron, absent in Firefox — and <code>outline: 1px dotted</code> focus, which leaves <code>--ring</code> declared and used by nothing.</li>
+  </ul>
+  <p><b>Cost:</b> tokens plus four named shadow recipes plus three new roles; no markup, no build step, no runtime. What it actually buys is the cheapest legible status model in the lab — a pressed control is a bevel that inverted, not a colour. The real cost is the one it cannot pay: the licensed look needs a licensed face.</p>
+  <p><b>Biggest risk:</b> it reads as pastiche unless the density is honoured — and the period's density (21-23 px controls, 16 px scrollbars, 11 px type) is a target-size regression this app must not ship. Keep 32 px controls and it is a bevel-skinned modern UI, not Windows 95; ship the real sizes and it fails WCAG 2.5.8. That contradiction is the finding, not a detail to smooth over.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light · the real silver edition (98.css)</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 25</span>
+  <h3 class="hero-title">Retro-OS Bevel</h3>
+  <p class="hero-thesis">A surface has no colour of its own, only edges: two light and two dark, one pixel and two — and everything that is not an edge is silver.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark · invented edition (Win95 had none)</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 25</span>
+  <h3 class="hero-title">Retro-OS Bevel</h3>
+  <p class="hero-thesis">A surface has no colour of its own, only edges: two light and two dark, one pixel and two — and everything that is not an edge is silver.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

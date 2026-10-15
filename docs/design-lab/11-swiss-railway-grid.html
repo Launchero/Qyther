@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 11 · Railway Grid (SBB/CFF/FFS LYNE + the Vignelli Canon)</title>
+<!--
+  Copied from the control, docs/design-lab/00-current-baseline.html: same <symbol> sprite, same .brief
+  shape, same two [data-theme] columns, same .hero, same five surfaces, same strings and same data.
+  Changed: the two token blocks, the header prose, the hero composition, one appended idiom block, and
+  three markup marks the direction cannot be drawn without — data-mode="" on 12 plates (3 palettes, 2
+  dialogs, 1 hero per column), a .no ordinal cell on all 20 result rows, and the class-less wrapper span
+  on those same rows now resolving to display: contents so title and path become two grid cells. Plus the
+  hero's named-grey ramp and its 0.75x-3x scale ruler. Strings, rows and data are otherwise byte-copy.
+  Colour values are quoted from github.com/sbb-design-systems/lyne-design-tokens designTokens/color.ts;
+  module and rule/radius families from spacing.ts and border.ts; the size rungs from typo.ts.
+-->
+<style>
+/* ── LIGHT ─────────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: var(--lyne-field);            /* #ffffff */
+  --foreground: var(--lyne-ink);              /* #000000 */
+  --card: var(--lyne-field); --card-foreground: var(--lyne-ink);
+  --popover: var(--lyne-field); --popover-foreground: var(--lyne-ink);
+  --primary: var(--lyne-red); --primary-foreground: var(--lyne-field);
+  --secondary: var(--lyne-cloud); --secondary-foreground: var(--lyne-ink);
+  --muted: var(--lyne-cloud); --muted-foreground: var(--lyne-anthracite);
+  --accent: var(--lyne-silver); --accent-foreground: var(--lyne-ink);
+  --destructive: var(--lyne-red125); --destructive-foreground: var(--lyne-field);
+  --success: var(--lyne-success); --warning: var(--lyne-warning); --info: var(--lyne-blue);   /* first two DERIVED */
+  --warning-foreground: var(--lyne-ink);   /* #b06e00 is 4.14:1 as text — it is a plate, black sits on it at 5.08:1 */
+  --success-foreground: var(--lyne-field); /* the green is a plate in both themes: white on #0b7a3b is 5.37:1 */
+  --success-soft: var(--lyne-cloud); --warning-soft: var(--lyne-warning);
+  --info-soft: var(--lyne-cloud); --destructive-soft: var(--lyne-field);
+  --agent: var(--lyne-royal-light);
+  --border: var(--lyne-aluminium); --input: var(--lyne-granite); --ring: var(--lyne-ink);
+  --mark-bg: var(--lyne-red); --mark-fg: var(--lyne-field);
+  --plate: var(--lyne-cloud);
+  --file-a: var(--lyne-blue); --file-b: var(--lyne-anthracite); --file-c: var(--lyne-royal-light);
+  --elev: none; --elev-sm: none; --key: none;
+  --band: var(--lyne-ink); --band-foreground: var(--lyne-field);
+  --rule: var(--lyne-cloud); --ord: var(--lyne-granite); --grid-line: var(--lyne-silver);
+  --sel: var(--lyne-red);
+  --foot-bg: var(--lyne-midnight); --foot-fg: var(--lyne-field); --foot-line: var(--lyne-iron);
+}
+/* ── DARK ──────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --background: var(--lyne-ink);             /* #000000 */
+  --foreground: var(--lyne-field);
+  --card: var(--lyne-midnight); --card-foreground: var(--lyne-field);
+  --popover: var(--lyne-charcoal); --popover-foreground: var(--lyne-field);
+  --primary: var(--lyne-red85); --primary-foreground: var(--lyne-ink);
+  --secondary: var(--lyne-charcoal); --secondary-foreground: var(--lyne-field);
+  --muted: var(--lyne-charcoal); --muted-foreground: var(--lyne-storm);
+  --accent: var(--lyne-iron); --accent-foreground: var(--lyne-field);
+  --destructive: var(--lyne-red85); --destructive-foreground: var(--lyne-ink);
+  --success: var(--lyne-success); --warning: var(--lyne-warning); --info: var(--lyne-royal);
+  --warning-foreground: var(--lyne-ink);
+  --success-foreground: var(--lyne-field);
+  --success-soft: var(--lyne-charcoal); --warning-soft: var(--lyne-warning);
+  --info-soft: var(--lyne-charcoal); --destructive-soft: var(--lyne-midnight);
+  --agent: var(--lyne-royal);
+  --border: var(--lyne-iron); --input: var(--lyne-storm); --ring: var(--lyne-field);
+  --mark-bg: var(--lyne-red85); --mark-fg: var(--lyne-ink);
+  --plate: var(--lyne-ink);
+  --file-a: var(--lyne-aluminium); --file-b: var(--lyne-graphite); --file-c: var(--lyne-platinum);
+  --elev: none; --elev-sm: none; --key: none;
+  --band: var(--lyne-field); --band-foreground: var(--lyne-ink);
+  --rule: var(--lyne-iron); --ord: var(--lyne-graphite); --grid-line: var(--lyne-charcoal);
+  --sel: var(--lyne-red85);
+  --foot-bg: var(--lyne-charcoal); --foot-fg: var(--lyne-field); --foot-line: var(--lyne-iron);
+}
+/* ── GEOMETRY + TYPE (identical in both themes) ────────────────────────────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 2px;              /* border.ts: 0 structural, 2 on chips */
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s12: 48px;
+  --rule-thin: 1px; --rule-strong: 4px; --rule-focus: 2px;
+  --ord-w: 40px; --icon-w: 24px; --band-h: 22px; --scale-h: 40px;
+  --ff: SBB, Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --t32: 32px; --t40: 40px; --t48: 48px; --t56: 56px; --t64: 64px;   /* 2x / 2.5x / 3x / 3.5x / 4x rungs */
+  --ls-label: .06em;
+  /* colour.ts, quoted. Greys are NAMED, not ramped indices. */
+  --lyne-field: #ffffff; --lyne-ink: #000000;
+  --lyne-red: #eb0000; --lyne-red85: #ff3838; --lyne-red125: #c60018; --lyne-red150: #a20013;
+  --lyne-midnight: #151515; --lyne-charcoal: #212121; --lyne-iron: #444444; --lyne-anthracite: #5a5a5a;
+  --lyne-granite: #686868; --lyne-metal: #766767; --lyne-storm: #a8a8a8; --lyne-graphite: #b7b7b7;
+  --lyne-cement: #bdbdbd; --lyne-platinum: #cdcdcd; --lyne-aluminium: #d2d2d2; --lyne-silver: #dcdcdc;
+  --lyne-cloud: #e5e5e5;
+  --lyne-blue: #2d327d; --lyne-royal-light: #06348b; --lyne-royal: #0053ef;
+  /* DERIVED — SBB publishes no green and no amber. These two are ours. */
+  --lyne-success: #0b7a3b; --lyne-warning: #b06e00;
+  --lab-page: #101010; --lab-ink: #f2f2f2; --lab-mute: #b7b7b7; --lab-soft: #8a8a8a;
+  --lab-line: #3a3a3a; --lab-code: #e5e5e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: var(--lab-page); color: var(--lab-ink); font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 78ch; font-size: var(--t14); color: var(--lab-mute); margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: var(--t13); color: var(--lab-code); }
+.moves { display: flex; gap: var(--s3); flex-wrap: wrap; margin: var(--s3) 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: var(--rule-thin) solid var(--lab-line); border-radius: var(--r); padding: 10px var(--s3); font-size: var(--t14); color: var(--lab-code); }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-soft); margin-bottom: var(--s1); }
+.sw { display: flex; gap: 2px; border-radius: var(--r); overflow: hidden; border: var(--rule-thin) solid var(--lab-line); }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: var(--s8); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-soft); margin: 0 0 var(--s3); text-align: center; }
+.surface { margin-bottom: var(--s12); }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--s2); }
+.desktop, .page { border-radius: var(--r); padding: var(--s6); }
+.desktop { background: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell */
+.palette { width: 100%; border: var(--rule-thin) solid var(--border); border-top: var(--rule-strong) solid var(--band); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: var(--rule-thin) solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: var(--rule-thin) solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: var(--rule-thin) solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: var(--rule-thin) solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: var(--s2) var(--pad) var(--s1); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--accent); color: var(--accent-foreground); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px var(--s3); border: var(--rule-thin) solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: var(--s2) var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t13); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: oklch(1 0 0 / .28); color: var(--primary-foreground); }
+.row.foc { box-shadow: inset 0 0 0 var(--rule-focus) var(--ring); }
+mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--s2); margin-right: 6px; border-radius: var(--r-xs); background: var(--popover); color: var(--popover-foreground); border: var(--rule-thin) solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: 3px var(--s2); border-radius: var(--r-xs); background: var(--popover); color: var(--popover-foreground); border: var(--rule-thin) solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-xs); background: var(--secondary); color: var(--secondary-foreground); border: var(--rule-thin) solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: var(--s2) var(--pad); background: var(--muted); border-top: var(--rule-thin) solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-xs); border: var(--rule-thin) solid var(--border); color: var(--foreground); font-size: var(--t12); }
+
+/* ask mode */
+.chat { display: grid; gap: var(--gap-3); padding: var(--s4) var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: var(--r); background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px var(--s3); border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st i { width: 14px; height: 14px; border-radius: var(--r); display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st.run i { background: var(--warning-soft); color: var(--warning-foreground); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t18); line-height: 30px; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--s2); border-radius: var(--r-xs); font-size: var(--t12); font-weight: 600; background: var(--info-soft); color: var(--info); border: var(--rule-thin) solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); }
+.pill.w { background: var(--warning-soft); color: var(--warning-foreground); }
+.pill.s { background: var(--success-soft); color: var(--success); }
+.gu { border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px var(--s3); border-bottom: var(--rule-thin) solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-xs); border: var(--rule-thin) solid var(--border); background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); font-size: var(--t12); }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+th { text-align: left; padding: 7px var(--s3); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-bottom: var(--rule-thin) solid var(--border); }
+td { padding: var(--s2) var(--s3); border-bottom: var(--rule-thin) solid var(--border); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--secondary); }
+summary { padding: var(--s2) var(--s3); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--s3); padding: 0 var(--s3) var(--s3); }
+.met b { display: block; font-family: var(--mono); font-size: var(--t14); }
+.met span { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: var(--s3); border: var(--rule-strong) solid var(--input); border-radius: var(--r); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-xs); background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); } .kv dd { margin: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: var(--r); background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: var(--s3); font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px var(--s2); border-bottom: var(--rule-thin) solid var(--rule); }
+.tr td:first-child { font-family: var(--mono); }
+.ok { color: var(--success); } .er { color: var(--destructive); } .pe { color: var(--muted-foreground); }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: var(--r); background: currentColor; margin-right: 5px; }
+
+/* dialogs */
+.dlg { border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: var(--rule-thin) solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: var(--s3) var(--pad); border-bottom: var(--rule-thin) solid var(--border); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 var(--s3); border-radius: var(--r-xs); border: var(--rule-thin) solid var(--input); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); }
+.sw2 { width: 28px; height: 16px; border-radius: var(--r); background: var(--input); position: relative; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: var(--r); background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: var(--r); background: var(--success); } .dot.off { background: var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: var(--s4) var(--pad); border: var(--rule-thin) solid var(--border); border-radius: var(--r); background: var(--destructive-soft); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
+
+/* ── IDIOM — LYNE / railway-grid rules appended to the control above ───────── */
+.palette::before, .dlg::before, .hero::before { content: attr(data-mode); display: flex; align-items: center; justify-content: flex-end; min-height: var(--band-h); padding: 0 var(--s3); background: var(--band); color: var(--band-foreground); font-family: var(--mono); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; }
+.head .mode { order: 9; margin-left: auto; height: auto; padding: 0; border: 0; background: none; color: var(--foreground); }
+.row { grid-template-columns: var(--ord-w) var(--icon-w) minmax(0,auto) minmax(0,1fr) auto auto; align-items: baseline; column-gap: var(--s2); padding: var(--s2) var(--s3); border-bottom: var(--rule-thin) solid var(--rule); }
+.row > span:not([class]) { display: contents; }
+.row .no { font-size: var(--t12); color: var(--ord); }
+.row .p { justify-self: end; text-align: right; }
+.row.sel { background: none; border-bottom: var(--rule-strong) solid var(--sel); }
+.row.sel .t, .row.sel .no, .row.sel .p, .row.sel .k, .row.sel svg { color: var(--foreground); }
+.row.sel .p, .row.sel .k, .row.sel .no { color: var(--ord); }
+.row.sel svg { color: var(--muted-foreground); }
+.foot { background: var(--foot-bg); color: var(--foot-fg); border-top: 0; letter-spacing: var(--ls-label); text-transform: uppercase; }
+.foot .ghost { color: var(--foot-fg); border-color: var(--foot-line); background: none; }
+.st i { background: var(--success); color: var(--success-foreground); }
+.st.run i { background: var(--warning); color: var(--warning-foreground); }
+.pill.w { color: var(--warning-foreground); }
+.pill.s { background: var(--success); color: var(--success-foreground); border-color: var(--success); }
+.tr .ok { color: var(--foreground); } .tr .ok::before { background: var(--success); }
+.dlg { border-top: var(--rule-strong) solid var(--band); }
+.alert { border-left: var(--rule-strong) solid var(--destructive); }
+.hero { position: relative; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,336px); grid-template-areas: "band band" "kick spec" "title spec" "thesis spec" "ramp ramp" "scale scale"; gap: var(--s2) var(--s5); align-content: start; min-height: 348px; padding: var(--s3) var(--s5) var(--s5); margin-bottom: var(--gap-3); border: var(--rule-thin) solid var(--border); border-top: var(--rule-strong) solid var(--band); background-color: var(--card); background-image: repeating-linear-gradient(to right, var(--grid-line) 0 var(--rule-thin), transparent 1px var(--s10)), repeating-linear-gradient(to bottom, var(--grid-line) 0 var(--rule-thin), transparent 1px var(--s10)); overflow: hidden; }
+.hero::before { grid-area: band; margin: calc(-1 * var(--s3)) calc(-1 * var(--s5)) var(--s1); }
+.hero-kicker { grid-area: kick; align-self: center; }
+.hero-title { grid-area: title; align-self: start; font-size: var(--t40); line-height: 44px; letter-spacing: -.015em; margin: 0; color: var(--foreground); }
+.hero-thesis { grid-area: thesis; margin: 0; font-size: var(--t18); line-height: 30px; color: var(--foreground); max-width: 46ch; }
+.hero-field { grid-area: spec; display: grid; gap: var(--s2); margin: 0; }
+.spec { font-size: var(--t48); line-height: 52px; letter-spacing: -.02em; color: var(--foreground); }
+.spec:nth-child(2) { font-size: var(--t32); line-height: 36px; color: var(--foreground); }
+.spec:nth-child(3) { font-size: var(--t32); line-height: 36px; color: var(--lyne-red); }
+.f { display: inline-block; width: 52px; height: 40px; border: var(--rule-thin) solid var(--border); border-radius: var(--r); }
+.hero-ramp { grid-area: ramp; display: flex; flex-wrap: wrap; gap: var(--s1); margin-top: var(--s3); }
+.hero-ramp span { display: grid; gap: var(--s1); width: 62px; }
+.hero-ramp i { height: 34px; border: var(--rule-thin) solid var(--border); }
+.hero-ramp b { font-family: var(--mono); font-size: var(--t12); font-weight: 400; color: var(--muted-foreground); }
+.hero-scale { grid-area: scale; display: flex; align-items: flex-end; gap: var(--s3); height: var(--scale-h); border-bottom: var(--rule-thin) solid var(--border); margin-bottom: var(--s2); }
+.hero-scale i { font-style: normal; color: var(--foreground); }
+.hero-scale b { display: block; font-family: var(--mono); font-size: var(--t12); font-weight: 400; color: var(--ord); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>11 · Railway Grid — the departure board is the interface</h1>
+  <p><b>Provenance</b> — the Swiss Federal Railways <b>LYNE</b> design system, tokens taken from <code>github.com/sbb-design-systems/lyne-design-tokens</code>: <code>designTokens/color.ts</code> (field <code>#ffffff</code> / <code>#000000</code>; red family <code>#eb0000</code>, <code>red85 #ff3838</code>, <code>red125 #c60018</code>, <code>red150 #a20013</code>; the <em>named</em> grey ramp <code>midnight #151515</code>, <code>charcoal #212121</code>, <code>iron #444444</code>, <code>anthracite #5a5a5a</code>, <code>granite #686868</code>, <code>metal #766767</code>, <code>storm #a8a8a8</code>, <code>graphite #b7b7b7</code>, <code>cement #bdbdbd</code>, <code>platinum #cdcdcd</code>, <code>aluminium #d2d2d2</code>, <code>silver #dcdcdc</code>, <code>cloud #e5e5e5</code>; secondary <code>blue #2d327d</code>, <code>royalLight #06348b</code>, <code>royalDark #0053ef</code>), <code>typo.ts</code> (size multipliers of 16px), <code>spacing.ts</code> (strict 4px module) and <code>border.ts</code> (widths 1-4px, radii 2/4/8/12/16/32). That repository declares an MIT licence in its own LICENSE file — <strong>not re-verified in this session</strong>, so treat the licence as reported, not checked. The underlying doctrine is the <strong>Vignelli Canon</strong> (vignelli.org), a copyrighted text cited here as argument, not as a value source. <code>#0b7a3b</code> and <code>#b06e00</code> are <strong>DERIVED</strong> — SBB publishes no green and no amber.</p>
+  <p><b>Contrast, stated rather than assumed</b> — <code>#eb0000</code> on white measures 4.63:1 and on black 4.51:1: <em>legal as text at the 13px floor with zero headroom</em>, so a red label is permitted but carries no margin for a sub-pixel-antialiased 125% display. This mock therefore spends red on rules, plates and the caret and never on a 12px label, and on the dark field the red is <code>#ff3838</code> — 5.11:1 on <code>#151515</code>, computed here. <code>graphite #b7b7b7</code> is 1.78:1 on white: too dim for a numeral, so the ordinal column is <code>granite #686868</code> (5.57:1) in light and stays <code>#b7b7b7</code> (10.2:1) on midnight, and graphite itself is kept as a hairline/plate colour. The derived amber <code>#b06e00</code> is 4.14:1 on white, which fails 4.5:1 — it is a <em>plate with black text</em> (5.08:1), never a label. The blues <code>#06348b</code>/<code>#0053ef</code> only reach 2.2:1/2.7:1 on the midnight card, so dark-mode icons go monochrome — which is what the railway does anyway.</p>
+  <p><b>Type plan</b> — the stack SBB actually ships is <code>SBB, Inter, "Helvetica Neue", Helvetica, Arial, sans-serif</code>: <strong>Inter is literally the railway's first fallback</strong>, which is the honest answer for a system with no embedded webfont. The <code>SBB</code> house face has no licence in the token repository — <strong>UNVERIFIED and unusable</strong>, and nothing here claims Helvetica as the designed-for face. On this machine, with the lab's no-external-fonts rule, everything renders in Helvetica Neue → Arial → system sans. Scale is a multiplier of 16px: 0.75x 12 / 0.8125x 13 / 0.875x 14 / 1x 16 / 1.125x 18 / 1.25x 20 / 1.5x 24 / 2x 32 / 2.5x 40 / 3x 48 / 3.5x 56 / 4x 64. This mock uses <strong>13/18 for rows, 12/16 mono for paths, 32 for the header, 18/30 for the answer and a 40px ordinal</strong>. <code>--mono</code> is this repo's own JetBrains stack — LYNE publishes no mono face, so that role is DERIVED.</p>
+  <p><b>Geometry</b> — <code>spacing.ts</code> is a strict 4px module, so every gap above is <code>--s1…--s12</code>. <code>border.ts</code> offers widths 1-4px and radii 2/4/8/12/16/32; the <em>hard</em> end of that range is taken: 4px structural rules (the black band, the input boundary, the selected row), 1px <code>cloud</code> dividers between rows, <strong>radius 0 on the card and 2px on chips</strong>, and <code>box-shadow: none</code> everywhere — <code>--elev</code>, <code>--elev-sm</code> and <code>--key</code> are literally <code>none</code>. Hierarchy is carried by the band, the hairline grid, the two-column row and the one red rule, not by lightness steps.</p>
+  <ul class="moves">
+    <li><b>Move 1 — colours</b>Give <code>src/renderer/styles/tokens/colors.css</code> the named grey ramp (midnight…cloud) and the red family (<code>--color-red-85</code>, <code>-125</code>, <code>-150</code>) as <code>@theme</code> primitives; then repoint <code>semantic/theme.css</code> <code>:root</code> to field/ink and <code>.dark</code> to midnight/charcoal. The surface ramp (<code>--background</code> &lt; <code>--card</code> &lt; <code>--popover</code>) collapses to one field plus rules, which is the direction's whole claim.</li>
+    <li><b>Move 2 — flat geometry</b><code>src/renderer/styles/tokens/radius.css</code> becomes <code>--radius: 0</code> with a single 2px chip rung, and <code>tokens/shadow.css</code> drops every elevation token to <code>none</code>. Because <code>@theme</code> registers both namespaces, this moves the pristine <code>components/ui/</code> primitives too, with no component edit.</li>
+    <li><b>Move 3 — the board markup</b>The 40px ordinal column and the right-aligned path column are a grid change in <code>src/renderer/components/ResultItem.tsx</code> plus its wrapper span becoming <code>display: contents</code>; <code>--container-header-height</code> and the black band need a top strip in <code>CommandPalette.tsx</code>; and the 13/18/32/40 rungs with their own leading pairs are new <code>--text-*</code> entries in <code>tokens/typography.css</code>.</li>
+  </ul>
+  <p><b>Cost</b> — about token-only, with three component marks. <code>tokens/colors.css</code> gains the named greys and reds, <code>radius.css</code> → 0/2, <code>shadow.css</code> → none, <code>typography.css</code> gains the 2x/3x/4x rungs each with their own leading pair, and <code>motion.css</code> is untouched because the direction ships no easing of its own here. What is not a token: the ordinal column and the right-aligned path column need markup in <code>src/renderer/components/ResultItem.tsx</code>, plus a band row in <code>CommandPalette.tsx</code>.</p>
+  <p><b>Biggest risk</b> — removing the grey selection pill takes away the affordance arrow-key scanning depends on. A single 4px red rule under a row is a weaker target than a filled row: it cannot be seen in peripheral vision, it vanishes if a row scrolls to the clip edge, and every state <code>useKeyboard</code> can reach (selected, hover, focus) now competes on one hairline-dense row. Second-order: a 64px display rung cannot fit the 72px compact bar, so the 4x rung in the type law is unusable in the palette's own default mode.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light</h2>
+<header class="hero" data-mode="FILES · departure board">
+  <span class="hero-kicker">Qyther · design lab · 11</span>
+  <h3 class="hero-title">Railway Grid</h3>
+  <p class="hero-thesis">A surface is not a plane of colour, it is a field bounded by rules. One black band says this is the machine, one 4px red line says this row is chosen, and nothing floats because nothing has to.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></span></div>
+  <div class="hero-ramp">
+    <span><i style="background:var(--lyne-midnight)"></i><b>midnight</b></span>
+    <span><i style="background:var(--lyne-charcoal)"></i><b>charcoal</b></span>
+    <span><i style="background:var(--lyne-iron)"></i><b>iron</b></span>
+    <span><i style="background:var(--lyne-anthracite)"></i><b>anthracite</b></span>
+    <span><i style="background:var(--lyne-granite)"></i><b>granite</b></span>
+    <span><i style="background:var(--lyne-metal)"></i><b>metal</b></span>
+    <span><i style="background:var(--lyne-storm)"></i><b>storm</b></span>
+    <span><i style="background:var(--lyne-graphite)"></i><b>graphite</b></span>
+    <span><i style="background:var(--lyne-cement)"></i><b>cement</b></span>
+    <span><i style="background:var(--lyne-platinum)"></i><b>platinum</b></span>
+    <span><i style="background:var(--lyne-aluminium)"></i><b>aluminium</b></span>
+    <span><i style="background:var(--lyne-silver)"></i><b>silver</b></span>
+    <span><i style="background:var(--lyne-cloud)"></i><b>cloud</b></span>
+    <span><i style="background:var(--lyne-red)"></i><b>red</b></span>
+    <span><i style="background:var(--lyne-red85)"></i><b>red 85</b></span>
+    <span><i style="background:var(--lyne-red125)"></i><b>red 125</b></span>
+    <span><i style="background:var(--lyne-red150)"></i><b>red 150</b></span>
+    <span><i style="background:var(--lyne-success)"></i><b>DERIVED</b></span>
+    <span><i style="background:var(--lyne-warning)"></i><b>DERIVED</b></span>
+    <span><i style="background:var(--lyne-blue)"></i><b>blue</b></span>
+    <span><i style="background:var(--lyne-royal)"></i><b>royal</b></span>
+  </div>
+  <div class="hero-scale">
+    <span><b>0.75×</b><i style="font-size:var(--t12)">12</i></span>
+    <span><b>0.8125×</b><i style="font-size:var(--t13)">13</i></span>
+    <span><b>0.875×</b><i style="font-size:var(--t14)">14</i></span>
+    <span><b>1×</b><i style="font-size:var(--t16)">16</i></span>
+    <span><b>1.125×</b><i style="font-size:var(--t18)">18</i></span>
+    <span><b>1.25×</b><i style="font-size:var(--t20)">20</i></span>
+    <span><b>1.5×</b><i style="font-size:var(--t24)">24</i></span>
+    <span><b>2×</b><i style="font-size:var(--t32)">32</i></span>
+    <span><b>2.5×</b><i style="font-size:var(--t40)">40</i></span>
+    <span><b>3×</b><i style="font-size:var(--t48)">48</i></span>
+  </div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette" data-mode="FILES">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><span class="no">01</span><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">02</span><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">03</span><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><span class="no">04</span><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette" data-mode="FILES · 6 RESULTS">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><span class="no">01</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">02</span><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><span class="no">03</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><span class="no">04</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">05</span><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><span class="no">06</span><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" data-mode="ASK · DESKTOP" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg" data-mode="SETTINGS"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" data-mode="MCP · 3 SERVERS" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark</h2>
+<header class="hero" data-mode="FILES · departure board">
+  <span class="hero-kicker">Qyther · design lab · 11</span>
+  <h3 class="hero-title">Railway Grid</h3>
+  <p class="hero-thesis">A surface is not a plane of colour, it is a field bounded by rules. One white band says this is the machine, one 4px red line says this row is chosen, and nothing floats because nothing has to.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></span></div>
+  <div class="hero-ramp">
+    <span><i style="background:var(--lyne-midnight)"></i><b>midnight</b></span>
+    <span><i style="background:var(--lyne-charcoal)"></i><b>charcoal</b></span>
+    <span><i style="background:var(--lyne-iron)"></i><b>iron</b></span>
+    <span><i style="background:var(--lyne-anthracite)"></i><b>anthracite</b></span>
+    <span><i style="background:var(--lyne-granite)"></i><b>granite</b></span>
+    <span><i style="background:var(--lyne-metal)"></i><b>metal</b></span>
+    <span><i style="background:var(--lyne-storm)"></i><b>storm</b></span>
+    <span><i style="background:var(--lyne-graphite)"></i><b>graphite</b></span>
+    <span><i style="background:var(--lyne-cement)"></i><b>cement</b></span>
+    <span><i style="background:var(--lyne-platinum)"></i><b>platinum</b></span>
+    <span><i style="background:var(--lyne-aluminium)"></i><b>aluminium</b></span>
+    <span><i style="background:var(--lyne-silver)"></i><b>silver</b></span>
+    <span><i style="background:var(--lyne-cloud)"></i><b>cloud</b></span>
+    <span><i style="background:var(--lyne-red)"></i><b>red</b></span>
+    <span><i style="background:var(--lyne-red85)"></i><b>red 85</b></span>
+    <span><i style="background:var(--lyne-red125)"></i><b>red 125</b></span>
+    <span><i style="background:var(--lyne-red150)"></i><b>red 150</b></span>
+    <span><i style="background:var(--lyne-success)"></i><b>DERIVED</b></span>
+    <span><i style="background:var(--lyne-warning)"></i><b>DERIVED</b></span>
+    <span><i style="background:var(--lyne-blue)"></i><b>blue</b></span>
+    <span><i style="background:var(--lyne-royal)"></i><b>royal</b></span>
+  </div>
+  <div class="hero-scale">
+    <span><b>0.75×</b><i style="font-size:var(--t12)">12</i></span>
+    <span><b>0.8125×</b><i style="font-size:var(--t13)">13</i></span>
+    <span><b>0.875×</b><i style="font-size:var(--t14)">14</i></span>
+    <span><b>1×</b><i style="font-size:var(--t16)">16</i></span>
+    <span><b>1.125×</b><i style="font-size:var(--t18)">18</i></span>
+    <span><b>1.25×</b><i style="font-size:var(--t20)">20</i></span>
+    <span><b>1.5×</b><i style="font-size:var(--t24)">24</i></span>
+    <span><b>2×</b><i style="font-size:var(--t32)">32</i></span>
+    <span><b>2.5×</b><i style="font-size:var(--t40)">40</i></span>
+    <span><b>3×</b><i style="font-size:var(--t48)">48</i></span>
+  </div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette" data-mode="FILES">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><span class="no">01</span><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">02</span><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">03</span><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><span class="no">04</span><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette" data-mode="FILES · 6 RESULTS">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><span class="no">01</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">02</span><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><span class="no">03</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><span class="no">04</span><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><span class="no">05</span><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><span class="no">06</span><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" data-mode="ASK · DESKTOP" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg" data-mode="SETTINGS"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" data-mode="MCP · 3 SERVERS" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

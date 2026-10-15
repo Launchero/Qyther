@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 14 · Diagonal Plate and Overprint (constructivism as an interface)</title>
+<!--
+  Mock 14. The markup, the five surfaces and every string are the control's, untouched; only the token
+  blocks, the brief, the banner CSS and ~40 idiom rules changed.
+  Palette is DERIVED, not sourced: posters are photographed, not spec'd. Lissitzky, "Beat the Whites with
+  the Red Wedge" (1919) fixes the red; MoMA acc. 125.2015 (Ivan Picelj silkscreen after Lissitzky, 1969)
+  fixes the diagonal plate and the overprint. The dark half is an INVENTED EDITION — authored here.
+  Contrast computed for this file, not quoted: #d8232a on #f4efe6 = 4.37:1 (FAILS 4.5:1 at 13px, so red
+  is area/rule/plate only); #f0464c on #141312 = 5.02:1; #1c3f94 on #f4efe6 = 8.39:1; ink on paper 16.5:1;
+  #8f1216 on #141312 = 2.0:1, which is why the dark edition has to lift the alarm ink.
+-->
+<style>
+/* ── LIGHT — paper proof: kraft paper, black ink, one red and one blue screen ink.
+      Every literal colour in this mock lives in the two blocks below; role names are the control's, so
+      this block diffs line-for-line against src/renderer/styles/semantic/theme.css. ──────────────── */
+[data-theme="light"] {
+  --background: #f4efe6; --foreground: #111111;              /* ink on paper 16.5:1 */
+  --card: #faf6ee; --card-foreground: #111111;
+  --popover: #fffdf8; --popover-foreground: #111111;
+  --primary: #d8232a; --primary-foreground: #ffffff;          /* the red WEDGE. Paper #f4efe6 on it measures 4.37:1 and FAILS 13px text; stock white on it is 5.01:1 — that one token choice is what lets the wedge carry a row */
+  --secondary: #e7ddcb; --secondary-foreground: #111111;      /* kraft, the input well */
+  --muted: #e7ddcb; --muted-foreground: #575046;              /* 6.94:1 on paper */
+  --accent: #1c3f94; --accent-foreground: #f4efe6;            /* screen blue = the hover plate, 8.39:1 */
+  --destructive: #8f1216; --destructive-foreground: #f4efe6;  /* deep red, alarm TEXT (8.09:1 on paper) */
+  --success: #111111; --warning: #8f1216; --info: #1c3f94;    /* two inks: "done" is plain ink, never a third hue */
+  --success-soft: #11111114; --warning-soft: #8f121624; --info-soft: #1c3f9421; --destructive-soft: #d8232a2b;
+  --agent: #d8232a;                                            /* the agent pill rides the plate ink, so it is caps + a 3px rule, not a tint */
+  --border: #cfc3ad; --input: #6a6255; --ring: #1c3f94;       /* --input 5.25:1 (WCAG 1.4.11); --ring 8.39:1 (2.4.11) */
+  --mark-bg: #d8232a38;                                        /* overprint tint under live text: 5.7:1 still */
+  --plate: #d9cdb8;                                            /* the desk is kraft, the poster is paper */
+  --file-a: #1c3f94; --file-b: #111111; --file-c: #8f1216;     /* the file legend is the whole palette */
+  --print-red: #d8232a; --print-blue: #1c3f94;                /* screen inks, area-only, used on the paper plate */
+  --plate-hi: #f4efe6; --band-hi: #f0464c; --blue-on-ink: #5b8def; /* lifted copies for the ink banner plate: 16.5:1 / 3.9:1 area */
+  --elev: 4px 4px 0 0 var(--foreground);                       /* no blur anywhere: depth is a hard offset plate */
+  --elev-sm: 2px 2px 0 0 var(--foreground);
+  --key: 0 2px 0 0 var(--foreground);
+  --misreg: 2px 0 var(--band-hi), -2px 0 var(--blue-on-ink);   /* misregistration: two offset presses, display size only */
+  --misreg-sm: 1px 0 var(--band-hi), -1px 0 var(--blue-on-ink);/* 40px section headers; at 13px it is mud — see the brief */
+  --halftone: radial-gradient(var(--band-hi) 1px, rgba(0, 0, 0, 0) 1.6px);
+  --overprint: rgba(28, 63, 148, .38);                          /* the blue screen laid over the red band */
+  --band-blend: multiply;                                      /* subtractive overprint, valid because the header ground is PAPER */
+  --rule-ink: var(--foreground); --bar: var(--primary);        /* plates and meters, drawn not bordered */
+}
+/* ── DARK — INVENTED EDITION, authored in this file. No constructivist poster was printed on a black
+      ground, so there is nothing to source: the field goes ink, the ink goes paper, and both screen inks
+      are lifted until the pairs clear 4.5:1. Same role names, so the two blocks still diff as a pair. ── */
+[data-theme="dark"] {
+  --background: #141312; --foreground: #f4efe6;               /* paper on ink 16.2:1 */
+  --card: #1d1b19; --card-foreground: #f4efe6;
+  --popover: #26231f; --popover-foreground: #f4efe6;
+  --primary: #f0464c; --primary-foreground: #141312;           /* the wedge, lifted: 5.02:1 on the field */
+  --secondary: #24211e; --secondary-foreground: #f4efe6;
+  --muted: #24211e; --muted-foreground: #b8b0a2;              /* 8.6:1 on the field */
+  --accent: #4a7ce0; --accent-foreground: #131211;            /* hover plate: ink on blue 4.64:1 — paper on it would be 3.49 */
+  --destructive: #ff5a55; --destructive-foreground: #141312;   /* #8f1216 on this field is 2.0:1, so the alarm ink MUST lift */
+  --success: #f4efe6; --warning: #ff5a55; --info: #6f9bee;
+  --success-soft: #f4efe61f; --warning-soft: #ff5a5529; --info-soft: #6f9bee29; --destructive-soft: #ff5a552e;
+  --agent: #f0464c;
+  --border: #4a453d; --input: #9b9182; --ring: #6f9bee;        /* --input 6.9:1, --ring 6.7:1 — 3:1 floors cleared */
+  --mark-bg: #f0464c4d;
+  --plate: #0d0c0b;                                            /* the desk sinks, the poster stays paper-bright */
+  --file-a: #6f9bee; --file-b: #f4efe6; --file-c: #ff5a55;
+  --print-red: #d8232a; --print-blue: #1c3f94;                /* the sourced screen inks, area-only on the paper banner plate */
+  --plate-hi: #141312; --band-hi: #d8232a; --blue-on-ink: #1c3f94;
+  --elev: 4px 4px 0 0 var(--foreground);
+  --elev-sm: 2px 2px 0 0 var(--foreground);
+  --key: 0 2px 0 0 var(--foreground);
+  --misreg: 2px 0 var(--band-hi), -2px 0 var(--blue-on-ink);
+  --misreg-sm: 1px 0 var(--band-hi), -1px 0 var(--blue-on-ink);
+  --halftone: radial-gradient(var(--band-hi) 1px, rgba(0, 0, 0, 0) 1.6px);
+  --overprint: rgba(28, 63, 148, .55);
+  --band-blend: screen;   /* the dark ground cannot take multiply — light inks go through screen instead */
+  --rule-ink: var(--foreground); --bar: var(--primary);
+}
+/* ── GEOMETRY (identical in both themes) — no token here may reference a theme-scoped colour: a var()
+      is substituted on the element that declares it, so a :root value built from --primary would be
+      invalid at :root and silently vanish in every descendant. Sizes, angles and pitches only. ────── */
+:root {
+  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;            /* constructivism has no corners */
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --ff: "Overpass", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: "Overpass Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --display: "Big Shoulders Display", "Big Shoulders", "Arial Narrow", Impact, var(--ff);
+  --stencil: "Saira Stencil One", "Arial Narrow", var(--display);
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --t40: 40px; --t56: 56px; --t96: 96px;                      /* 40/40 headers, 96px banner wedge */
+  --ls-label: .1em;                                          /* tracked caps, every label role */
+  --ls-cut: -.02em;                                          /* condensed display tracking */
+  --plate-w: 3px; --plate-gut: 4px; --band-a: -8deg; --band-w: 148px; --band-y: 40%;
+  --band-tall: 62%; --band-l: -12%; --band-r: -12%; --hero-pad-t: 32px; --hero-pad-r: 24px;
+  --hero-pad-b: 56px; --hero-pad-l: 20px; --hero-min: 320px; --stencil-gap: 22px;
+  --halftone-pitch: 4px 4px; --halftone-a: .08; --op-a: .55; --field-l: 30%; --field-w: 58%; --band-soft: .55;
+  --gutter-l: 16px; --gutter-r: 150px;
+  --well-pad: 4px 8px; --row-pad-l: 18px; --row-h-pad: 2px 10px; --row-w-pad: 1px 6px; --tip-pad: 2px 7px;
+  --gutter-page: 32px; --gutter-page-b: 96px; --plate-pad: 24px;
+  --lh-body: 26px; --lh-lead: 44px; --spec-a: 40px; --kv-col: 120px;
+  --prog-w: var(--t12); --prog-2of3: 66%; --sw-w: 34px; --sw-h: 20px; --knob: 16px; --knob-on: 16px; --dot: 10px; --dot-off: 9px; --icon-col: 28px;
+  /* PAGE CHROME — the desk the posters are photographed on. Declared here, not in the [data-theme]
+     blocks, because <body> is the ancestor of both columns and has no theme of its own; a value here
+     that referenced a theme-scoped token would be invalid at computed-value time and vanish.
+     #f0464c on #17181c measures 4.80:1, so the brief's own labels can be red at 14px. */
+  --page-desk: #17181c; --page-ink: #e8e0d2; --page-band: #f0464c; --page-well: #221f1c; --page-rule: #d8232a;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: var(--gutter-page) var(--gutter-page) var(--gutter-page-b); background: var(--page-desk); color: var(--page-ink); font-family: var(--ff); }
+h1 { font-size: var(--t40); line-height: var(--t40); margin: 0 0 var(--gap-2); letter-spacing: var(--ls-cut); text-transform: uppercase; font-family: var(--display); font-weight: 700; text-shadow: var(--misreg-sm); }
+.brief { max-width: 1720px; margin: 0 auto var(--gap-3); }
+.brief p { max-width: 78ch; font-size: var(--t14); line-height: var(--t17); color: var(--page-ink); margin: 0 0 var(--gap); }
+.brief b { font-family: var(--display); text-transform: uppercase; letter-spacing: var(--ls-label); font-size: var(--t14); color: var(--page-band); }
+.brief code { font-family: var(--mono); font-size: var(--t13); color: var(--page-ink); background: var(--page-well); padding: var(--row-w-pad); }
+.moves { display: flex; gap: var(--gap-2); flex-wrap: wrap; margin: var(--gap-2) 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: 0; border-left: var(--plate-w) solid var(--page-rule); padding: var(--gap) var(--pad); font-size: var(--t14); line-height: var(--t17); color: var(--page-ink); background: var(--page-well); }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--page-band); margin-bottom: var(--plate-gut); font-family: var(--display); }
+.sw { display: flex; gap: var(--plate-gut); border-radius: 0; overflow: hidden; border: 0; background: var(--page-ink); padding: var(--plate-gut); }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: var(--gap-3); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--page-band); margin: 0 0 var(--gap-2); text-align: center; font-family: var(--display); }
+.surface { margin-bottom: var(--hero-pad-t); }
+.lbl { font-family: var(--display); font-weight: 700; font-size: var(--t40); line-height: var(--t40); letter-spacing: var(--ls-cut); text-transform: uppercase; color: var(--page-ink); text-shadow: var(--misreg-sm); margin: 0 0 var(--gap); }
+.desktop, .page { border-radius: var(--r); padding: var(--plate-pad); }
+.desktop { background-color: var(--plate); }
+.page { background: var(--background); color: var(--foreground); }
+
+/* palette shell — the card is a paper plate, the rules are 3px ink, the wedge is red and never a label */
+.palette { width: 100%; border: var(--plate-w) solid var(--rule-ink); background: var(--card); color: var(--foreground); box-shadow: var(--elev); overflow: hidden; }
+.head { position: relative; isolation: isolate; height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad); border-bottom: 0; overflow: clip; background-color: var(--card); }
+.head::before { content: ""; position: absolute; z-index: -2; left: var(--band-l); right: var(--band-r); top: var(--band-y); height: var(--band-w); background: var(--print-red); transform: rotate(var(--band-a)); mix-blend-mode: var(--band-blend); }
+.head::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: var(--plate-w); background: var(--rule-ink); }
+.mode { position: relative; z-index: 2; display: inline-flex; align-items: center; height: var(--row-h); padding: var(--well-pad); background: var(--foreground); color: var(--background); font-family: var(--display); font-weight: 700; font-size: var(--t13); line-height: var(--t16); letter-spacing: var(--ls-label); text-transform: uppercase; border: 0; }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 0; }
+.vr { width: var(--plate-w); height: 24px; background: var(--rule-ink); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-size: var(--t12); color: var(--background); background: var(--foreground); border: 0; box-shadow: var(--key); }
+.sec { position: relative; overflow: clip; display: flex; align-items: center; gap: var(--gap); padding: var(--gap-2) var(--pad) var(--gap); font-size: var(--t12); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); font-family: var(--display); }
+.sec::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: var(--plate-w); background: var(--rule-ink); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; background: var(--foreground); color: var(--background); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: var(--gap) var(--pad); border: var(--plate-w) solid var(--rule-ink); background: var(--card); color: var(--foreground); font-size: var(--t14); width: max-content; }
+.row { position: relative; display: grid; grid-template-columns: var(--icon-col) minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: var(--gap) var(--pad); }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t13); line-height: var(--t17); font-weight: 500; letter-spacing: var(--ls-cut); }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--accent); padding-left: var(--row-h-pad); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.hov svg { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); padding-left: var(--row-pad-l); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel::before { content: ""; position: absolute; left: var(--plate-gut); top: 0; bottom: 0; width: var(--plate-w); background: var(--rule-ink); }
+.row.sel mark { background: var(--background); color: var(--foreground); padding: var(--row-w-pad); }
+.row.foc { box-shadow: inset 0 0 0 var(--plate-w) var(--ring); }
+mark { background: var(--mark-bg); color: inherit; padding: var(--row-w-pad); }
+.ask { position: relative; z-index: 2; display: inline-flex; align-items: center; height: 22px; padding: 0 var(--gap); margin-right: var(--gap); background: var(--popover); color: var(--popover-foreground); border: var(--plate-w) solid var(--rule-ink); font-size: var(--t12); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; }
+.tip { display: inline-block; margin: 0 var(--pad) var(--pad); padding: var(--tip-pad); background: var(--popover); color: var(--popover-foreground); border: var(--plate-w) solid var(--rule-ink); font-family: var(--mono); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; background: var(--foreground); color: var(--background); border: 0; font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: var(--plate-w) solid var(--foreground); border-top-color: transparent; }
+.foot { position: relative; overflow: clip; display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: var(--gap) var(--pad); background: var(--muted); border-top: 0; font-size: var(--t12); color: var(--muted-foreground); }
+.foot::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: var(--plate-w); background: var(--rule-ink); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 var(--gap); border: var(--plate-w) solid var(--rule-ink); color: var(--foreground); background: var(--card); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; }
+
+/* ask mode — the answer leads with a 40px condensed line; the gutter is asymmetric, so the chat column is 16/34 */
+.chat { display: grid; gap: var(--gap-3); padding: var(--gap-3) var(--gutter-r) var(--gap-3) var(--gutter-l); }
+.me { justify-self: end; max-width: 76%; padding: var(--gap) var(--pad); background: var(--foreground); color: var(--background); font-size: var(--t14); line-height: var(--t17); }
+.steps { display: grid; gap: var(--gap); padding: var(--gap) var(--pad); border: var(--plate-w) solid var(--rule-ink); background: var(--card); }
+.st { display: flex; align-items: center; gap: var(--gap); font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); color: var(--foreground); }
+.st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--rule-ink); color: var(--background); }
+.st.run i { background: var(--primary); color: var(--primary-foreground); }
+.st em { margin-left: auto; font-style: normal; padding: var(--row-w-pad); background: var(--foreground); color: var(--background); font-family: var(--mono); letter-spacing: var(--ls-label); text-transform: uppercase; }
+.ans { font-family: var(--ff); font-size: var(--t17); line-height: var(--lh-body); color: var(--foreground); }
+.ans::first-line { font-family: var(--display); font-weight: 700; font-size: var(--t40); line-height: var(--lh-lead); text-transform: uppercase; letter-spacing: var(--ls-cut); color: var(--primary); }
+.ans code { font-family: var(--mono); font-size: var(--t14); color: var(--background); background: var(--foreground); padding: var(--row-w-pad); }
+.caret { font-family: var(--mono); color: var(--foreground); text-shadow: var(--misreg-sm); }   /* ink, not the wedge: a 17px glyph on red would be the 4.37:1 fail */
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--gap); font-family: var(--display); font-size: var(--t12); line-height: var(--t16); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; background: var(--secondary); color: var(--foreground); border: 0; }
+.pill.a { background: var(--foreground); color: var(--background); }
+.pill.w { background: var(--warning); color: var(--background); }
+.pill.s { background: var(--card); color: var(--foreground); border: var(--plate-w) solid var(--rule-ink); }
+.gu { border: var(--plate-w) solid var(--rule-ink); background: var(--popover); overflow: hidden; }
+.gu .h { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: var(--gap) var(--pad); border-bottom: var(--plate-w) solid var(--rule-ink); font-family: var(--display); font-weight: 700; font-size: var(--t18); line-height: var(--t24); letter-spacing: var(--ls-cut); text-transform: uppercase; background-color: var(--card); color: var(--foreground); }
+.gu .h::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--overprint); mix-blend-mode: var(--band-blend); }
+.chip { padding: var(--row-w-pad); border: var(--plate-w) solid var(--rule-ink); background: var(--card); color: var(--foreground); font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); }
+table { width: 100%; border-collapse: collapse; font-size: var(--t13); line-height: var(--t17); }
+th { text-align: left; padding: var(--gap) var(--pad); font-size: var(--t12); line-height: var(--t16); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--foreground); background: var(--muted); border-bottom: var(--plate-w) solid var(--rule-ink); font-family: var(--display); }
+td { padding: var(--gap) var(--pad); border-bottom: var(--plate-w) solid var(--border); color: var(--foreground); } tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); text-align: right; }
+details { border: var(--plate-w) solid var(--rule-ink); background: var(--secondary); color: var(--foreground); }
+summary { padding: var(--gap) var(--pad); font-size: var(--t12); line-height: var(--t16); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--foreground); font-family: var(--display); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--gap-2); padding: 0 var(--pad) var(--gap); }
+.met b { display: block; font-family: var(--mono); font-size: var(--t18); }
+.met span { font-size: var(--t12); line-height: var(--t16); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: var(--pad); border: var(--plate-w) solid var(--input); background: var(--secondary); box-shadow: none; }
+.bar .ta { min-height: 48px; color: var(--foreground); font-size: var(--t17); line-height: var(--t24); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); }
+
+/* agent activity — verbs are mono 12/16; a failed call is an ink plate with a knocked-out word, never colour alone */
+.ag { display: grid; gap: var(--gap-2); padding: var(--gap-2) var(--gutter-r) var(--gap-2) var(--gutter-l); border: var(--plate-w) solid var(--rule-ink); background: var(--secondary); }
+.ag h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--t20); line-height: var(--t24); letter-spacing: var(--ls-cut); text-transform: uppercase; color: var(--foreground); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: var(--kv-col) 1fr; gap: var(--gap); font-size: var(--t12); line-height: var(--t16); margin: 0; }
+.kv dt { color: var(--muted-foreground); letter-spacing: var(--ls-label); text-transform: uppercase; font-family: var(--mono); } .kv dd { margin: 0; font-family: var(--mono); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: var(--prog-w); background: var(--card); border: var(--plate-w) solid var(--rule-ink); overflow: hidden; }
+.prog i { display: block; height: 100%; width: var(--prog-2of3); background: var(--bar); }
+.tr { width: 100%; margin-top: var(--gap-2); border-collapse: collapse; }
+.tr td { padding: var(--gap) var(--pad); border-bottom: var(--plate-w) solid var(--border); font-size: var(--t13); line-height: var(--t17); color: var(--foreground); }
+.tr td:first-child { font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); }
+.ok { color: var(--foreground); font-weight: 700; } .er { color: var(--background); background: var(--destructive); padding: var(--row-w-pad); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; } .pe { color: var(--muted-foreground); font-weight: 700; }
+.ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: var(--dot); height: var(--dot); margin-right: var(--plate-gut); }
+.ok::before { background: var(--rule-ink); }
+.er::before { width: var(--dot); height: var(--dot); background: var(--background); }
+.pe::before { width: var(--dot-off); height: var(--dot-off); border: var(--plate-w) solid var(--muted-foreground); }
+
+/* direction banner — an ink plate cut by a red wedge; every device below is one of the three the
+   direction is actually made of (rotated plate, halftone screen, overprint). See the hazard note in the brief. */
+.hero { position: relative; isolation: isolate; display: grid; align-content: start; gap: var(--gap-2); min-height: var(--hero-min); padding: var(--hero-pad-t) var(--hero-pad-r) var(--hero-pad-b) var(--hero-pad-l); margin-bottom: var(--hero-pad-t); border: var(--plate-w) solid var(--rule-ink); background-color: var(--foreground); color: var(--background); box-shadow: var(--elev); overflow: clip; }
+.hero::before { content: ""; position: absolute; z-index: -2; inset: calc(var(--band-tall) * -1) var(--band-r); background: var(--print-red); transform: rotate(var(--band-a)); }
+.hero::after { content: ""; position: absolute; z-index: -1; left: var(--band-l); right: var(--band-r); top: var(--band-y); height: var(--band-w); background: var(--overprint); transform: rotate(var(--band-a)); }
+.hero-kicker { position: relative; z-index: 1; font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--plate-hi); }
+.hero-title { position: relative; z-index: 1; font-family: var(--display); font-weight: 700; font-size: var(--t96); line-height: var(--t96); letter-spacing: var(--ls-cut); text-transform: uppercase; margin: 0; max-width: var(--measure); color: var(--background); text-shadow: var(--misreg); }
+.hero-thesis { position: relative; z-index: 1; margin: 0; font-family: var(--ff); font-size: var(--t17); line-height: var(--lh-body); color: var(--plate-hi); max-width: 40ch; }
+.hero-field { position: relative; justify-self: end; display: flex; align-items: flex-end; gap: var(--gap); margin-top: var(--gap); }
+.hero-field::before { content: ""; position: absolute; left: calc(var(--field-l) * -1); top: calc(var(--gap) * -1); width: var(--field-w); height: var(--band-w); background: var(--halftone); background-size: var(--halftone-pitch); opacity: var(--op-a); }
+.hero-field::after { content: "RED WEDGE"; position: relative; font-family: var(--stencil); font-size: var(--t24); line-height: var(--t24); letter-spacing: var(--ls-label); color: var(--background); margin-right: var(--stencil-gap); }
+.spec { position: relative; font-size: var(--t56); line-height: var(--t56); color: var(--background); }
+.spec:nth-child(1) { font-family: var(--display); font-weight: 700; font-size: var(--spec-a); line-height: var(--spec-a); text-transform: uppercase; }
+.spec:nth-child(2) { font-family: var(--mono); font-size: var(--t40); line-height: var(--t40); color: var(--band-hi); }
+.spec:nth-child(3) { color: var(--blue-on-ink); font-size: var(--t40); line-height: var(--t40); }
+.f { position: relative; display: block; width: var(--sw-w); height: var(--t56); border: 0; box-shadow: inset 0 0 0 var(--plate-w) var(--background); }
+.f1 { background: var(--background); } .f2 { background: var(--card); } .f3 { background: var(--muted); }
+.f4 { background: var(--print-red); } .f5 { background: var(--print-blue); }
+
+/* dialogs — controls are plates at the 32px floor; on/off is solid-vs-ring, never hue alone */
+.dlg { border: var(--plate-w) solid var(--rule-ink); background: var(--card); color: var(--foreground); box-shadow: var(--elev); overflow: clip; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: var(--gap-2) var(--pad); border-bottom: var(--plate-w) solid var(--rule-ink); font-family: var(--display); font-weight: 700; font-size: var(--t20); line-height: var(--t24); letter-spacing: var(--ls-cut); text-transform: uppercase; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: var(--gap-2) var(--pad); border-bottom: var(--plate-w) solid var(--border); color: var(--foreground); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); line-height: var(--t17); font-weight: 700; } .set .d { font-size: var(--t12); line-height: var(--t16); color: var(--muted-foreground); font-family: var(--mono); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 var(--gap); border: var(--plate-w) solid var(--input); background: var(--card); color: var(--foreground); font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); letter-spacing: var(--ls-label); text-transform: uppercase; }
+.sw2 { width: var(--sw-w); height: var(--sw-h); background: var(--input); border: var(--plate-w) solid var(--rule-ink); position: relative; }
+.sw2::after { content: ""; position: absolute; top: var(--plate-gut); left: var(--plate-gut); width: var(--knob); height: var(--knob); background: var(--card); }
+.sw2.on { background: var(--bar); } .sw2.on::after { left: var(--knob-on); }
+.dot { width: var(--dot); height: var(--dot); background: var(--success); border: var(--plate-w) solid var(--rule-ink); } .dot.off { width: var(--dot-off); height: var(--dot-off); background: transparent; border: var(--plate-w) solid var(--muted-foreground); }
+.alert { display: grid; gap: var(--gap-2); padding: var(--gap-3) var(--pad); border: var(--plate-w) solid var(--rule-ink); border-left: var(--pad) solid var(--destructive); background: var(--destructive-soft); color: var(--foreground); }
+.alert h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--t18); line-height: var(--t24); letter-spacing: var(--ls-cut); text-transform: uppercase; color: var(--foreground); }
+.alert ul { margin: 0; padding-left: var(--gap-3); font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); color: var(--foreground); }
+
+/* ── IDIOM (appended) ─ the last pass costs nothing, because it paints what sits BEHIND the plate:
+   the column field, the desk and the brief are page chrome, not app surfaces, so the wedge and the
+   halftone can live there and stay out of the 30-row scanning rhythm entirely. ─────────────────── */
+:root { --measure: 68ch; }                                     /* the banner headline's measure; 17px prose still caps at 44rem via .hero-thesis */
+.col { position: relative; isolation: isolate; }
+.col::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: var(--band-y); height: var(--band-w); background: var(--print-red); transform: rotate(var(--band-a)); opacity: var(--band-soft); }
+.col::after { content: ""; position: absolute; z-index: -1; left: var(--field-l); top: var(--band-tall); width: var(--field-w); height: var(--band-w); background: var(--halftone); background-size: var(--halftone-pitch); opacity: var(--halftone-a); }
+.desktop { position: relative; isolation: isolate; }          /* isolation is not decoration: without it the blend bands paint the desktop */
+.desktop::before { content: ""; position: absolute; z-index: -1; inset: 0; background: var(--halftone); background-size: var(--halftone-pitch); opacity: var(--halftone-a); }
+.brief { position: relative; isolation: isolate; }
+.brief::before { content: ""; position: absolute; z-index: -1; right: var(--gutter-page); top: var(--band-y); width: var(--band-w); height: var(--band-w); background: var(--page-rule); transform: rotate(var(--band-a)); opacity: var(--band-soft); }
+.row.hov .ask { box-shadow: var(--elev-sm); }
+mark { background-size: var(--halftone-pitch); }              /* at 4px the screen reads as tint, not as dots — under 13px glyphs it moirés */
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>14 · Diagonal Plate — constructivism as an interface</h1>
+  <p><b>Provenance</b> — El Lissitzky, <i>Beat the Whites with the Red Wedge</i> (1919, van Abbemuseum), for the wedge, and MoMA acc. <b>125.2015</b>, Ivan Picelj's silkscreen after Lissitzky (1969), for the diagonal plate and the overprint. A poster is photographed, never spec'd: there is no published token file for constructivism, so this palette is <b>DERIVED</b> — paper <code>#f4efe6</code>, ink <code>#111111</code>, red <code>#d8232a</code>, deep red <code>#8f1216</code>, screen blue <code>#1c3f94</code>, read off the two artefacts' ink density. The dark half is an <b>INVENTED EDITION</b>: no constructivist poster was printed on a black ground, so field <code>#141312</code>, ink <code>#f4efe6</code> and both lifted inks (<code>#f0464c</code>, <code>#6f9bee</code>) are authored here and labelled as authored. Licence question does not arise for the graphics; the type is <b>OFL 1.1</b>, verified at <code>google/fonts/main/ofl/bigshouldersdisplay/OFL.txt</code>, <code>ofl/sairastencilone/OFL.txt</code> and <code>ofl/overpass/OFL.txt</code>. Computed in this file, not quoted: red on paper is <b>4.37:1</b>, so it FAILS 4.5:1 as 13px text and appears only as area, rule or plate; the lifted red on the dark field is 5.02:1; blue on paper 8.39:1; ink on paper 16.5:1. The one place the wedge has to carry a 13px row is the selection, and paper-white on it is 4.37 — so <code>--primary-foreground</code> is stock white, which measures <b>5.01:1</b> on the same red. That is the single token this direction had to invent to stay legal, and it is the finding worth keeping: a poster red is fine as an area and fine as a knockout to pure white, and is not fine to the paper it was printed on.</p>
+  <p><b>Type plan</b> — Big Shoulders Display (condensed industrial, variable 100–900) carries every <i>label</i> and every <i>display line</i>: section headers 40/40 uppercase 700, the banner headline 96/96, and the mode pill, the tab/section/table heads and the agent pills at 12–13/16 caps with <code>.1em</code> tracking — tracking is what buys back the legibility the condensed width costs, and it is the one call here a reviewer should judge live. Saira Stencil One appears <b>once</b>, on the banner's <code>RED WEDGE</code> at 24px. Overpass is everything anyone actually reads: rows 13/17, prose 17/26, and paths, metrics and tool verbs 12/16 in Overpass Mono — numerals stay mono by design (mock 17's alignment mechanics), never the condensed display face. The reason the stencil is a single word is arithmetic: slab and stencil forms close their counters below about 20px, so at 13px a stencil <i>colors.css</i> is unreadable — a stencil face is a display face, and any direction that says otherwise is selling a texture. Misregistration (<code>--misreg</code>: 2px red, −2px blue) is legal only on the display word, where the copies land outside the counters; at body size it is a doubling artefact.</p>
+  <p><b>Geometry</b> — 4px grid, <code>--r</code>/<code>--r-md</code>/<code>--r-sm</code>/<code>--r-xs</code> all <b>0</b>, and no blur anywhere: <code>--elev</code> is a hard <code>4px 4px 0 0</code> offset ink plate. Rules are plates — 3px <code>--rule-ink</code> on <code>::before</code>/<code>::after</code>, not 1px borders — drawn on the head, the section labels, the footer, every table row and the selection indicator (a 3px black plate sitting in the row's 4px left gutter). The rotated band is <code>-8deg</code> and lives inside a wrapper with <code>overflow: clip</code>, deliberately not <code>hidden</code>, so <code>.row.foc</code>'s inset ring survives. <b>The Electron hazard this direction actually carries:</b> <code>mix-blend-mode</code> composites against whatever is behind the element in its stacking context, and in a <code>transparent: true</code> frameless window that backdrop is the user's desktop — so a blended layer without an opaque ancestor paints a black box (and every Radix portal lands in <code>document.body</code>, outside the ancestor you thought you gave it). Hence <code>isolation: isolate</code> plus <code>background-color</code> on <code>.head</code>, <code>.gu .h</code>, <code>.desktop</code> and <code>.col</code>, and hence <code>--band-blend</code> is a token: multiply where the ground is paper, screen in the dark edition, because overprinting a near-black ground prints nothing.</p>
+  <ul class="moves">
+    <li><b>Move 1</b>Rewrite <code>src/renderer/styles/tokens/colors.css</code> as a five-ink ramp (paper, ink, red, deep red, screen blue) and re-point the pairs in <code>semantic/theme.css</code>; <code>--elev</code>/<code>--elev-sm</code>/<code>--key</code> in <code>src/renderer/styles/tokens/shadow.css</code> become hard offset plates with no blur. Add <code>--band-blend</code>, <code>--misreg</code>, <code>--halftone</code> and <code>--overprint</code> to the <b>theme blocks</b>, never to <code>:root</code> — a <code>:root</code> value that references a theme-scoped token is invalid at computed-value time and vanishes in every descendant (mock 07's mesh died exactly this way).</li>
+    <li><b>Move 2</b><code>src/renderer/styles/tokens/radius.css</code> to 0 across every rung including the pristine <code>ui/</code> primitives, and <code>src/renderer/styles/tokens/typography.css</code> to three stacks (<code>--display</code>, <code>--stencil</code>, Overpass) with the new 13/17 and 17/26 rungs — the two sizes the palette and the answer actually run at.</li>
+    <li><b>Move 3</b>The devices cannot be tokens. The band, the halftone field and the selection plate need elements or pseudo-elements, so they go in the two component-adjacent stylesheets that already hold component classes: <code>src/renderer/styles/globals.css</code> (palette header, rows, footer) and <code>src/renderer/styles/ask-mode-perplexity.css</code> (answer opener, generative-UI card). Both must also carry the <code>isolation: isolate</code> + opaque-ancestor pair per blended surface.</li>
+  </ul>
+  <p><b>Cost:</b> markup, not tokens. Blends need <code>isolation</code> plus an opaque plate on every blended surface and a stacking review against <code>tokens/z-index.css</code>, because portals escape the ancestor; the halftone and the rotated band need pseudo-elements the current components do not render; the answer opener is a <code>::first-line</code> trick that only holds while the first sentence is short; and any bundled font has to be vendored through the Vite asset pipeline — <code>electron.vite.config.ts</code> copies only <code>sql-wasm.wasm</code> and <code>Automation.node</code>, so non-code runtime resources are not packaged by default and a <code>.woff2</code> read from disk would silently vanish in a production build.</p>
+  <p><b>Biggest risk:</b> rotation destroys the vertical scanning rhythm a 30-row list depends on — a <code>-8deg</code> rule across an 800px row displaces its ends by ~56px, so the angle stays on chrome (banner, header, brief) and never touches row text, section labels or table rules. Second: a 4px-pitch halftone moirés against anti-aliased 13px glyphs, which is why the field sits at 8% on the desk plate and the column backdrop, behind the opaque card, and never under a row. Third: the red that carries this direction is 4.37:1 and cannot be a 13px label in either theme, so emphasis has to come from plate area and cap tracking, not from hue.</p>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--background)"></i><i style="background:var(--card)"></i><i style="background:var(--muted)"></i><i style="background:var(--popover)"></i><i style="background:var(--border)"></i><i style="background:var(--primary)"></i><i style="background:var(--info)"></i><i style="background:var(--success)"></i><i style="background:var(--destructive)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light · paper proof</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 14</span>
+  <h3 class="hero-title">Beat the Whites with the Red Wedge</h3>
+  <p class="hero-thesis">A surface is not a card — it is a plate of ink laid at an angle, and the only hierarchy a poster respects is the one you can measure in millimetres.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark · invented edition</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 14</span>
+  <h3 class="hero-title">Beat the Whites with the Red Wedge</h3>
+  <p class="hero-thesis">A surface is not a card — it is a plate of ink laid at an angle, and the only hierarchy a poster respects is the one you can measure in millimetres.</p>
+  <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
+</header>
+
+<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><i>✓</i>Understanding your question…</div>
+      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td>graph precompile</td><td class="n">388</td><td>getAskGraph</td></tr>
+        <tr><td>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="pill s">High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="ghost">Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+    <tr><td>search_elements</td><td class="ok">ok</td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td class="er">error</td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+    <tr><td>type_text</td><td class="pe">pending</td><td></td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td class="pe">pending</td><td></td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot"></span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="dot off"></span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4>Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

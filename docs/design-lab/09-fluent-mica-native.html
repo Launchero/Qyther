@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 09 · Native Material — Fluent 2 and what Mica actually costs</title>
+<!--
+  DIRECTION: Native Material. Windows 11 / WinUI 3 Mica + Acrylic, i.e. the only direction in this lab
+  that makes the app feel *of* Windows rather than a web app parked on Windows.
+  Colour truth: the WinUI / Windows Terminal **Campbell** scheme (MIT), verbatim hex, dark half.
+  Light half: a Mica-like tinted paper — an APPROXIMATION (see the header prose).
+  Same DOM skeleton, class vocabulary and two-theme page architecture as 00-current-baseline.html;
+  markup added here: a `.layer` wrapper (the material stack), two `.acrylic` wrappers (transient
+  surfaces), `data-material="flat"` on surface 2 (the inactive fallback), `data-state="focus"` on one
+  row (the Reveal two-ring, kept permanently visible), `disabled` on two controls, and one
+  loading-skeleton block. No script element, no webfont, no CDN, no backdrop-filter, no raster image.
+-->
+<style>
+/* ══ token block: light — Mica-like tinted paper. APPROXIMATION: the exact
+   LayerFillColorDefault / SolidBackgroundFillColorBase alphas could not be fetched in
+   this session, so every value in this half except the Campbell hues is derived. ══ */
+[data-theme="light"] {
+  --background: #EDEEF6;            /* Mica base: cool near-white carrying a wallpaper-tint cast */
+  --foreground: #0C0C0C;            /* Campbell black, verbatim */
+  --card: #F9FAFD;                  /* the content card sitting on the layer */
+  --card-foreground: #0C0C0C;
+  --popover: #FDFDFE;               /* transient acrylic, rendered as its solid fallback */
+  --popover-foreground: #0C0C0C;
+  --primary: #0037DA;               /* Campbell blue, verbatim */
+  --primary-foreground: #F2F2F2;    /* Campbell brightWhite, verbatim */
+  --secondary: #E6E7F0;
+  --secondary-foreground: #0C0C0C;
+  --muted: #E9EAF2;
+  --muted-foreground: #646464;      /* foreground at ~62% over the plate — the Fluent secondary-text recipe */
+  --accent: #DEDFEA;                /* hover fill (SubtleFillColorSecondary, approximated) */
+  --accent-foreground: #0C0C0C;
+  --destructive: #C50F1F;           /* Campbell red, verbatim */
+  --destructive-foreground: #F2F2F2;
+  --success: #0F7C0B;               /* Campbell green #13A10E darkened to clear 4.5:1 on paper — derived, not quoted */
+  --warning: #7F6600;               /* Campbell yellow #C19C00 darkened — derived, not quoted */
+  --info: #0037DA;                  /* Campbell blue, verbatim */
+  --success-soft: rgba(15, 124, 11, 0.10);
+  --warning-soft: rgba(127, 102, 0, 0.12);
+  --info-soft: rgba(0, 55, 218, 0.10);
+  --destructive-soft: rgba(197, 15, 31, 0.08);
+  --border: rgba(12, 12, 12, 0.16);         /* decorative stroke — dark-at-16% clears the app's 1.4:1 decorative floor */
+  --input: #767676;                          /* Campbell brightBlack — the 3:1 control boundary */
+  --ring: #0C0C0C;                           /* Reveal ring, outer 2px */
+  --ring-inner: #FDFDFE;                     /* Reveal ring, inner 1px — the surface colour showing through */
+  --edge-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --edge-highlight-flat: inset 0 1px 0 rgba(255, 255, 255, 0);
+  --scrim: rgba(12, 12, 12, 0.45);
+  --file-css: #646464;              /* Fluent icons are monochrome: the three --file-* roles collapse to one neutral */
+  --file-md: #646464;
+  --file-folder: #646464;
+  --disabled-fg: #9B9B9B;           /* intentionally below 4.5:1 — that is what a disabled control looks like */
+  --disabled-fill: #E4E5EC;
+  --desktop-plate: #DCE0EE;         /* base stop of the static Mica gradient */
+  --plate-a: #E7E9F6;
+  --plate-b: #D3D7EC;
+  --plate-c: #C9CFE6;
+  --mica-flat: #E9EBF4;             /* the solid the material falls back to when inactive / on battery saver */
+  --layer-tint: rgba(255, 255, 255, 0.62);   /* a low-opacity SOLID above Mica — this is the "layer" */
+  --layer-tint-flat: #F7F8FC;
+  --mark-bg: rgba(0, 55, 218, 0.16);
+  --mark-on-primary: rgba(242, 242, 242, 0.30);
+  --shadow-command-palette: 0 0 0 1px rgba(12, 12, 12, 0.10), 0 4px 12px -8px rgba(12, 12, 12, 0.24);
+  --shadow-popover: 0 2px 8px -4px rgba(12, 12, 12, 0.28);
+  --shadow-key: none;               /* Mica surfaces carry no drop shadow; the 1px top edge does the work */
+}
+/* ══ token block: dark — the Campbell scheme, verbatim where the scheme has a value ══ */
+[data-theme="dark"] {
+  --background: #0C0C0C;            /* Campbell background, verbatim */
+  --foreground: #CCCCCC;            /* Campbell foreground, verbatim */
+  --card: #1F1F1F;                  /* the layer composited over the Mica base — approximated */
+  --card-foreground: #CCCCCC;
+  --popover: #2B2B2B;
+  --popover-foreground: #F2F2F2;
+  --primary: #3B78FF;               /* Campbell brightBlue, verbatim */
+  --primary-foreground: #0C0C0C;    /* Campbell black, verbatim */
+  --secondary: #232323;
+  --secondary-foreground: #CCCCCC;
+  --muted: #232323;
+  --muted-foreground: #A1A1A1;      /* foreground at ~62% — derived */
+  --accent: #2D2D2D;
+  --accent-foreground: #F2F2F2;
+  --destructive: #E74856;           /* Campbell brightRed, verbatim */
+  --destructive-foreground: #0C0C0C;
+  --success: #16C60C;               /* Campbell brightGreen, verbatim */
+  --warning: #F9F1A5;               /* Campbell brightYellow, verbatim */
+  --info: #61D6D6;                  /* Campbell brightCyan, verbatim */
+  --success-soft: rgba(22, 198, 12, 0.14);
+  --warning-soft: rgba(249, 241, 165, 0.14);
+  --info-soft: rgba(97, 214, 214, 0.14);
+  --destructive-soft: rgba(231, 72, 86, 0.16);
+  --border: rgba(255, 255, 255, 0.14);   /* white at ~14% — clears the 1.4:1 decorative floor on the card */
+  --input: rgba(255, 255, 255, 0.536);    /* strong stroke, composites to ~5.6:1 on the card */
+  --ring: #F2F2F2;                  /* Campbell brightWhite — Reveal outer 2px */
+  --ring-inner: #0C0C0C;            /* Campbell black — Reveal inner 1px */
+  --edge-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);   /* the 1px white top edge, as specified */
+  --edge-highlight-flat: inset 0 1px 0 rgba(255, 255, 255, 0);
+  --scrim: rgba(12, 12, 12, 0.66);
+  --file-css: #A1A1A1;
+  --file-md: #A1A1A1;
+  --file-folder: #A1A1A1;
+  --disabled-fg: #6E6E6E;
+  --disabled-fill: #1A1A1A;
+  --desktop-plate: #0C0C0C;
+  --plate-a: #14182B;               /* wallpaper tint bleeding through an opaque Mica base */
+  --plate-b: #0C0C0C;
+  --plate-c: #171425;
+  --mica-flat: #202020;
+  --layer-tint: rgba(255, 255, 255, 0.045);
+  --layer-tint-flat: #242424;
+  --mark-bg: rgba(97, 214, 214, 0.26);
+  --mark-on-primary: rgba(12, 12, 12, 0.34);
+  --shadow-command-palette: 0 0 0 1px rgba(12, 12, 12, 0.72);
+  --shadow-popover: 0 2px 8px -4px rgba(12, 12, 12, 0.80);
+  --shadow-key: none;
+}
+
+/* ══ token block: shared geometry, type ramp, motion, and the lab sheet's own chrome ══ */
+:root {
+  /* material stack + 4px grid (the exact Fluent step table could not be fetched: approximation) */
+  --plate-angle: 158deg;
+  --mica-rim: 4px;
+  --border-w: 1px;
+  --bar-w: 3px;                    /* the WinUI info/error bar on a card edge */
+  --ring-w: 2px;                   /* FocusVisualPrimaryThickness — approximated */
+  --ring-inner-w: 1px;             /* FocusVisualSecondaryThickness — approximated */
+  --ring-gap: 1px;                 /* outline-offset, i.e. the gap between the two rings */
+  --radius-xs: 2px;
+  --radius-sm: 4px;                /* control radius */
+  --radius-md: 4px;                /* Fluent collapses the middle rung: controls and tiles share 4px */
+  --radius-card: 8px;
+  --radius-palette: 8px;           /* card / flyout radius */
+  --radius-pill: 999px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --pad-card: var(--space-3);
+  --gap-inline: var(--space-2);
+  --gap-block: var(--space-3);
+  --gap-section: var(--space-4);
+  --pad-row: var(--space-2);
+  --gap-tight: var(--space-1);
+  /* fixed geometry from the brief */
+  --palette-w: 800px;
+  --header-h: 72px;
+  --chat-header-h: 56px;
+  --row-h: 40px;                   /* --target-row */
+  --target-min: 32px;              /* --target-min, the README control floor */
+  --target-touch: 40px;            /* Fluent minimum for a standalone target */
+  --col-icon: 28px;
+  --tile-min-w: 200px;
+  --measure: 44rem;
+  --vr-h: var(--space-6);
+  --h-pill: 24px; --h-keycap: 24px; --h-badge: 24px; --h-ghost: var(--target-min);
+  --h-count: 18px; --h-spinner: 14px; --spinner-w: 2px; --dot-size: 16px;
+  --h-progress: 3px; --progress-value: 66%; --skeleton-h: 12px;
+  --skeleton-a: 46%; --skeleton-b: 64%;
+  --switch-w: 40px; --switch-h: 20px; --switch-knob: 14px; --switch-inset: 3px; --switch-travel: 23px;
+  --bubble-max: 88%; --bubble-radius: var(--radius-card);
+  --search-max-w: 220px;
+  --move-basis: 340px;
+  --key-w: 20px; --count-w: 20px; --badge-w: 24px;
+  --num-col: 120px;
+  --swatch-w: 34px; --swatch-h: 24px;
+  /* type: the Windows ramp, named by its own rung. Segoe UI Variable by family name only —
+     licensed, not redistributable; Selawik is the metric-compatible stand-in and is installed
+     nowhere by us. No italic anywhere; Semibold instead of Bold. */
+  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", Selawik, "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", Selawik, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --text-caption: 12px;  --lh-caption: 16px;   /* Caption 12/16 — Microsoft's stated floor for Regular */
+  --text-body: 14px;     --lh-body: 20px;      /* Body 14/20 — the primary UI size, and the floor for Semibold */
+  --text-body-lg: 18px;  --lh-body-lg: 24px;   /* BodyLarge 18/24 */
+  --text-subtitle: 20px; --lh-subtitle: 28px;  /* Subtitle 20/28 */
+  --text-title: 28px;    --lh-title: 36px;     /* Title 28/36 */
+  --text-display: 40px;  --lh-display: 52px;   /* LargeDisplay 40/52 */
+  --text-giant: 68px;    --lh-giant: 92px;     /* Display 68/92 — declared, unused on this sheet */
+  --weight-regular: 400; --weight-semibold: 600;
+  --tracking-label: 0.035em;                   /* Fluent caps its section headers but barely tracks them */
+  /* motion: Windows' own bands are short (100–250ms). The curve is OURS, not Microsoft's. */
+  --duration-fast: 100ms; --duration-med: 150ms; --duration-slow: 250ms;
+  --easing-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --cycle-spin: 900ms; --cycle-caret: 1s; --cycle-skeleton: 1600ms;
+  --caret-dim: 0; --skeleton-dim: 0.55;
+  /* lab-sheet chrome — this page's own shell, not part of the design system */
+  --page-bg: #171717;
+  --page-fg: #CCCCCC;
+  --page-soft: #A1A1A1;
+  --page-muted: #8C8C8C;
+  --page-border: #2A2A2A;
+  --page-fill: #1F1F1F;
+  --page-pad: var(--space-8);
+  --page-pad-end: 96px;
+  --page-max: 1720px;
+  --page-board-gap: var(--space-8);
+  --page-surface-gap: var(--space-10);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: var(--page-pad) var(--page-pad) var(--page-pad-end);
+  font-family: var(--font-ui); font-optical-sizing: auto;
+  font-size: var(--text-body); line-height: var(--lh-body);
+  background: var(--page-bg); color: var(--page-fg);
+}
+h1 { font-family: var(--font-display); font-size: var(--text-subtitle); line-height: var(--lh-subtitle);
+  font-weight: var(--weight-semibold); margin: 0 0 var(--space-2); }
+.brief { max-width: var(--page-max); margin: 0 auto var(--space-4); }
+.brief p { max-width: 82ch; font-size: var(--text-body); line-height: var(--lh-body);
+  color: var(--page-soft); margin: 0 0 var(--gap-inline); }
+.brief b { color: var(--page-fg); font-weight: var(--weight-semibold); }
+.brief code { font-family: var(--font-mono); font-size: var(--text-caption); background: var(--page-fill);
+  border-radius: var(--radius-sm); padding: 0 var(--space-1); }
+.moves { display: flex; gap: var(--gap-block); flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 var(--move-basis); border: var(--border-w) solid var(--page-border);
+  border-radius: var(--radius-card); background: var(--page-fill); padding: var(--space-3);
+  font-size: var(--text-body); color: var(--page-fg); }
+.moves b { display: block; font-size: var(--text-caption); line-height: var(--lh-caption);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--page-muted);
+  margin-bottom: var(--space-1); font-weight: var(--weight-semibold); }
+.swatches { display: flex; gap: var(--gap-section); margin: var(--gap-block) 0 0; flex-wrap: wrap; }
+.swatch-set { display: flex; gap: 0; border: var(--border-w) solid var(--page-border);
+  border-radius: var(--radius-sm); overflow: hidden; }
+.swatch { width: var(--swatch-w); height: var(--swatch-h); }
+.swatch-set figcaption { font-size: var(--text-caption); line-height: var(--lh-caption);
+  color: var(--page-muted); margin-top: var(--space-1); }
+.board { display: flex; gap: var(--page-board-gap); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.col { width: var(--palette-w); max-width: 100%; }
+.col > h2 { font-size: var(--text-caption); line-height: var(--lh-caption); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--page-muted); margin: 0 0 var(--gap-inline); text-align: center; font-weight: var(--weight-semibold); }
+.surface { margin-bottom: var(--page-surface-gap); }
+.surface-label { font-size: var(--text-caption); line-height: var(--lh-caption); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--gap-inline); font-weight: var(--weight-semibold); }
+.surface-label code { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; }
+.page { background: var(--background); color: var(--foreground); padding: var(--space-6); border-radius: var(--radius-card); }
+
+/* ── the material stack: Mica plate → layer → content ─────────────────────── */
+/* A STATIC gradient plate. backdrop-filter is deliberately absent: CSS cannot sample the
+   desktop behind the window, so a blurred mock would demonstrate something the app cannot ship. */
+.desktop {
+  background: linear-gradient(var(--plate-angle), var(--plate-a), var(--plate-b) 52%, var(--plate-c));
+  border-radius: var(--radius-card); padding: var(--space-6);
+}
+.layer {
+  padding: var(--mica-rim);                       /* the Mica rim reads around the layer */
+  border-radius: var(--radius-palette);
+  background: var(--layer-tint);                  /* a low-opacity SOLID — this is the "layer" */
+  box-shadow: var(--edge-highlight);              /* 1px top edge, not a drop shadow */
+}
+/* The flat fallback IS the design: an Alt+Space palette is inactive most of its life, and an
+   inactive material collapses to one solid colour. Surface 2 below renders in it on purpose. */
+[data-material="flat"] {
+  --plate-a: var(--mica-flat); --plate-b: var(--mica-flat); --plate-c: var(--mica-flat);
+  --layer-tint: var(--layer-tint-flat);
+  --edge-highlight: var(--edge-highlight-flat);
+  --shadow-command-palette: none;
+  --border: var(--input);
+}
+/* Acrylic is Microsoft's own answer for TRANSIENT surfaces only. Here it is a wrapper that
+   states the role; even its in-app blur is not faked, so it renders the solid fallback. */
+.acrylic { border-radius: var(--radius-palette); box-shadow: var(--edge-highlight); }
+
+/* ── palette shell ───────────────────────────────────────────────────────── */
+.palette {
+  width: 100%; background: var(--card);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-palette);
+  box-shadow: var(--shadow-command-palette); overflow: hidden;
+}
+.layer > .palette { border-radius: calc(var(--radius-palette) - var(--mica-rim)); }
+.palette-header {
+  height: var(--header-h); display: flex; align-items: center; gap: var(--gap-inline);
+  padding: 0 var(--pad-card); background: var(--card); border-bottom: var(--border-w) solid var(--border);
+}
+.mode-pill {
+  display: inline-flex; align-items: center; gap: var(--space-1); height: var(--h-pill);
+  padding: 0 var(--space-2); border-radius: var(--radius-sm);
+  background: var(--secondary); color: var(--secondary-foreground);
+  font-size: var(--text-caption); line-height: var(--lh-caption); font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  border: var(--border-w) solid var(--border);
+}
+.search { flex: 1; display: flex; align-items: center; gap: var(--gap-inline); min-width: 0; }
+.search svg { flex: none; color: var(--muted-foreground); }
+.query {
+  flex: 1; min-width: 0; border: 0; background: transparent; color: var(--foreground);
+  font-family: var(--font-ui); font-optical-sizing: auto;
+  font-size: var(--text-body-lg); line-height: var(--lh-body-lg); letter-spacing: 0;
+}
+.query::placeholder { color: var(--muted-foreground); }
+.query:focus { outline: none; }
+.query:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); border-radius: var(--radius-sm); }
+/* Reveal two-ring: outer 2px + a 1px gap + an inner 1px ring. Same recipe on every focusable here. */
+.icon-btn {
+  width: var(--target-min); height: var(--target-min); display: grid; place-items: center;
+  border-radius: var(--radius-sm); border: var(--border-w) solid transparent;
+  background: transparent; color: var(--muted-foreground);
+  transition: background-color var(--duration-fast) var(--easing-smooth),
+              color var(--duration-fast) var(--easing-smooth);
+}
+.icon-btn:hover { background: var(--accent); color: var(--accent-foreground); }
+.icon-btn:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+.icon-btn[disabled] { color: var(--disabled-fg); background: transparent; }
+.vr { width: var(--border-w); height: var(--vr-h); background: var(--border); }
+.keycap {
+  display: inline-grid; place-items: center; min-width: var(--key-w); height: var(--h-keycap);
+  padding: 0 var(--space-1); font-family: var(--font-mono); font-size: var(--text-caption);
+  color: var(--secondary-foreground); background: var(--secondary);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-key);
+}
+.palette-body { background: var(--card); }
+.palette-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline);
+  padding: var(--gap-inline) var(--pad-card); background: var(--muted);
+  border-top: var(--border-w) solid var(--border);
+  font-size: var(--text-caption); line-height: var(--lh-caption); color: var(--muted-foreground);
+}
+.ghost-btn {
+  display: inline-flex; align-items: center; gap: var(--space-1); height: var(--h-ghost);
+  padding: 0 var(--space-2); border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--border); background: transparent;
+  color: var(--foreground); font-size: var(--text-caption); line-height: var(--lh-caption);
+  font-family: var(--font-ui);
+  transition: background-color var(--duration-fast) var(--easing-smooth);
+}
+.ghost-btn:hover { background: var(--accent); }
+.ghost-btn:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+
+/* ── lists ───────────────────────────────────────────────────────────────── */
+.section-head {
+  display: flex; align-items: center; gap: var(--gap-inline);
+  padding: var(--gap-inline) var(--pad-card) var(--space-1);
+  font-size: var(--text-caption); line-height: var(--lh-caption); font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground);
+}
+.count {
+  display: inline-grid; place-items: center; min-width: var(--count-w); height: var(--h-count);
+  padding: 0 var(--space-1); border-radius: var(--radius-xs);
+  background: var(--accent); color: var(--accent-foreground); font-weight: var(--weight-semibold);
+}
+.tile-row { display: flex; gap: var(--gap-block); padding: var(--pad-card); }
+.tile {
+  display: flex; align-items: center; gap: var(--gap-inline); min-height: var(--target-touch);
+  padding: var(--space-2) var(--space-3); min-width: var(--tile-min-w);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-md);
+  background: var(--secondary); color: var(--secondary-foreground);
+  font-size: var(--text-body); line-height: var(--lh-body);
+  box-shadow: var(--edge-highlight);
+  transition: background-color var(--duration-fast) var(--easing-smooth);
+}
+.tile:hover { background: var(--accent); }
+.tile:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+.row {
+  display: grid; grid-template-columns: var(--col-icon) minmax(0,1fr) minmax(0,auto) auto;
+  align-items: center; gap: var(--gap-inline); min-height: var(--row-h);
+  padding: var(--pad-row) var(--pad-card); border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) var(--easing-smooth);
+}
+.row .glyph { display: grid; place-items: center; color: var(--file-md); }
+.row-title { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--weight-semibold);
+  color: var(--foreground); }
+.row-path { font-family: var(--font-mono); font-size: var(--text-caption); line-height: var(--lh-caption);
+  color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kind { font-size: var(--text-caption); line-height: var(--lh-caption); color: var(--muted-foreground); }
+.row[data-state="hover"] { background: var(--accent); }
+.row[data-state="hover"] .row-title, .row[data-state="hover"] .kind { color: var(--accent-foreground); }
+.row[data-state="selected"] { background: var(--primary); }
+.row[data-state="selected"] .row-title, .row[data-state="selected"] .kind,
+.row[data-state="selected"] .row-path, .row[data-state="selected"] .glyph { color: var(--primary-foreground); }
+.row[data-state="selected"] mark { background: var(--mark-on-primary); color: var(--primary-foreground); }
+.row[data-state="focus"] { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); background: var(--accent); }
+.row[data-state="focus"] .row-title { color: var(--accent-foreground); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--radius-xs); padding: 0 var(--border-w); }
+.ask-pill {
+  display: inline-flex; align-items: center; height: var(--h-pill); padding: 0 var(--space-2); margin-right: var(--space-1);
+  border-radius: var(--radius-sm); background: var(--popover); color: var(--popover-foreground);
+  border: var(--border-w) solid var(--border); box-shadow: var(--shadow-popover);
+  font-size: var(--text-caption); font-weight: var(--weight-semibold);
+}
+.tooltip {
+  display: inline-block; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
+  background: var(--popover); color: var(--popover-foreground); border: var(--border-w) solid var(--border);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--text-caption); line-height: var(--lh-caption);
+}
+.badge {
+  display: inline-grid; place-items: center; width: var(--badge-w); height: var(--h-badge);
+  border-radius: var(--radius-sm); background: var(--secondary); color: var(--secondary-foreground);
+  border: var(--border-w) solid var(--border); font-family: var(--font-mono); font-size: var(--text-caption);
+}
+.spinner { width: var(--h-spinner); height: var(--h-spinner); border-radius: var(--radius-pill);
+  border: var(--spinner-w) solid var(--muted-foreground); border-top-color: transparent;
+  animation: spin var(--cycle-spin) linear infinite; }
+.skeleton { height: var(--skeleton-h); border-radius: var(--radius-xs); background: var(--muted);
+  animation: breathe var(--cycle-skeleton) var(--easing-smooth) infinite; }
+.skeleton[data-w="a"] { width: var(--skeleton-a); }
+.skeleton[data-w="b"] { width: var(--skeleton-b); }
+.empty { padding: var(--space-5) var(--pad-card); text-align: center; }
+.empty h3 { margin: 0 0 var(--space-1); font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.empty p { margin: 0; font-size: var(--text-caption); color: var(--muted-foreground); }
+
+/* ── chat ────────────────────────────────────────────────────────────────── */
+.chat { display: grid; gap: var(--gap-section); padding: var(--space-4) var(--pad-card); background: var(--card); }
+.bubble-user {
+  justify-self: end; max-width: var(--bubble-max); padding: var(--space-2) var(--space-4);
+  border-radius: var(--bubble-radius); background: var(--primary); color: var(--primary-foreground);
+  font-size: var(--text-body); line-height: var(--lh-body);
+  box-shadow: var(--edge-highlight);
+}
+.answer { max-width: var(--measure); display: grid; gap: var(--gap-block); }
+.answer p { margin: 0; font-size: var(--text-body-lg); line-height: var(--lh-body-lg); }
+.answer code { font-family: var(--font-mono); background: var(--muted); padding: 0 var(--space-1);
+  border-radius: var(--radius-xs); }
+.caret { font-family: var(--font-mono); color: var(--primary); animation: blink var(--cycle-caret) step-end infinite; }
+.pill {
+  display: inline-flex; align-items: center; gap: var(--space-1); height: var(--h-pill); padding: 0 var(--space-2);
+  border-radius: var(--radius-sm); font-size: var(--text-caption); font-weight: var(--weight-semibold);
+  background: var(--info-soft); color: var(--info); border: var(--border-w) solid var(--border);
+}
+.pill--agent { background: var(--popover); color: var(--popover-foreground); }
+.steps { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-md);
+  background: var(--secondary); box-shadow: var(--edge-highlight); }
+.step { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-caption);
+  line-height: var(--lh-caption); color: var(--muted-foreground); }
+.step .dot { width: var(--dot-size); height: var(--dot-size); border-radius: var(--radius-pill);
+  display: grid; place-items: center; background: var(--success-soft); color: var(--success);
+  font-size: var(--text-caption); }
+.step[data-state="running"] .dot { background: var(--warning-soft); color: var(--warning);
+  animation: breathe var(--cycle-skeleton) var(--easing-smooth) infinite; }
+.step .tag { margin-left: auto; padding: 0 var(--space-1); border-radius: var(--radius-xs);
+  background: var(--muted); color: var(--muted-foreground); font-family: var(--font-mono); }
+.genui { border: var(--border-w) solid var(--border); border-radius: var(--radius-md);
+  background: var(--popover); overflow: hidden; box-shadow: var(--edge-highlight); }
+.genui-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline);
+  padding: var(--space-2) var(--space-3); border-bottom: var(--border-w) solid var(--border); }
+.genui-head h4 { margin: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.genui-tools { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-caption);
+  color: var(--muted-foreground); }
+.chip { padding: 0 var(--space-2); height: var(--h-pill); display: inline-flex; align-items: center;
+  border-radius: var(--radius-sm); border: var(--border-w) solid var(--border);
+  background: var(--secondary); color: var(--secondary-foreground);
+  font-family: var(--font-mono); font-size: var(--text-caption); }
+table { width: 100%; border-collapse: collapse; font-size: var(--text-body); }
+th { text-align: left; padding: var(--space-1) var(--space-3); font-size: var(--text-caption);
+  font-weight: var(--weight-semibold); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--muted-foreground); background: var(--muted); border-bottom: var(--border-w) solid var(--border); }
+td { padding: var(--space-2) var(--space-3); border-bottom: var(--border-w) solid var(--border); }
+td.num { font-family: var(--font-mono); text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.sources { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-caption);
+  color: var(--muted-foreground); }
+details { border: var(--border-w) solid var(--border); border-radius: var(--radius-md);
+  background: var(--secondary); }
+summary { padding: var(--space-2) var(--space-3); font-size: var(--text-caption);
+  font-weight: var(--weight-semibold); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--muted-foreground); cursor: pointer; border-radius: var(--radius-md); }
+summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: var(--gap-block);
+  padding: 0 var(--space-3) var(--space-3); }
+.metric b { display: block; font-family: var(--font-mono); font-size: var(--text-body); color: var(--foreground); }
+.metric span { font-size: var(--text-caption); line-height: var(--lh-caption); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--muted-foreground); }
+.caveat { padding: 0 var(--space-3) var(--space-3); font-size: var(--text-caption); line-height: var(--lh-caption);
+  color: var(--muted-foreground); }
+.command-bar { display: grid; gap: var(--space-2); padding: var(--space-3);
+  border: var(--border-w) solid var(--input); border-radius: var(--radius-md);
+  background: var(--card); box-shadow: var(--edge-highlight); }
+.command-bar:focus-within { border-color: var(--ring); }
+.command-bar textarea {
+  width: 100%; min-height: var(--target-touch); resize: none; border: 0; background: transparent;
+  color: var(--foreground); font-family: var(--font-ui); font-optical-sizing: auto;
+  font-size: var(--text-body-lg); line-height: var(--lh-body-lg);
+}
+.command-bar textarea::placeholder { color: var(--muted-foreground); }
+.command-bar textarea:focus { outline: none; }
+.cmdbar-foot { display: flex; align-items: center; gap: var(--gap-inline); }
+.send {
+  margin-left: auto; width: var(--target-min); height: var(--target-min); display: grid; place-items: center;
+  border-radius: var(--radius-sm); background: var(--primary); color: var(--primary-foreground);
+  border: 0; transition: background-color var(--duration-fast) var(--easing-smooth);
+}
+.send:hover { background: var(--ring); }
+.send:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+.send[disabled] { background: var(--disabled-fill); color: var(--disabled-fg); }
+
+/* ── agent activity ──────────────────────────────────────────────────────── */
+.agent-panel { display: grid; gap: var(--gap-block); padding: var(--space-3) var(--pad-card);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-md);
+  background: var(--secondary); box-shadow: var(--edge-highlight); }
+.agent-panel h3 { margin: 0; font-size: var(--text-body); font-weight: var(--weight-semibold);
+  display: flex; align-items: center; gap: var(--gap-inline); }
+.kv { display: grid; grid-template-columns: var(--num-col) minmax(0,1fr); gap: var(--gap-inline);
+  font-size: var(--text-caption); line-height: var(--lh-caption); }
+.kv dt { color: var(--muted-foreground); }
+.kv dd { margin: 0; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress { height: var(--h-progress); border-radius: var(--radius-xs); background: var(--muted); overflow: hidden; }
+.progress i { display: block; height: 100%; width: var(--progress-value); background: var(--primary);
+  transition: width var(--duration-slow) var(--easing-smooth); }
+.trace { width: 100%; border-collapse: collapse; font-size: var(--text-caption); }
+.trace td { padding: var(--space-1) var(--space-2); border-bottom: var(--border-w) solid var(--border); }
+.trace td:first-child { font-family: var(--font-mono); }
+.status { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: var(--weight-semibold); }
+.status::before { content: ""; width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill);
+  background: currentColor; }
+.status--ok { color: var(--success); }
+.status--error { color: var(--destructive); }
+.status--pending { color: var(--muted-foreground); }
+
+/* ── settings ────────────────────────────────────────────────────────────── */
+.dialog { border: var(--border-w) solid var(--border); border-radius: var(--radius-palette);
+  background: var(--card); box-shadow: var(--edge-highlight), var(--shadow-command-palette); overflow: hidden; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline);
+  padding: var(--space-3) var(--pad-card); border-bottom: var(--border-w) solid var(--border); }
+.dialog-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-subtitle);
+  line-height: var(--lh-subtitle); font-weight: var(--weight-semibold); }
+.setting { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--pad-card);
+  border-bottom: var(--border-w) solid var(--border); }
+.setting:last-child { border-bottom: 0; }
+.setting .t { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--weight-semibold); }
+.setting .d { font-size: var(--text-caption); line-height: var(--lh-caption); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; min-height: var(--target-touch);
+  padding: 0 var(--space-3); border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--border); background: var(--secondary);
+  color: var(--secondary-foreground); font-size: var(--text-body); line-height: var(--lh-body);
+  font-family: var(--font-ui); font-weight: var(--weight-semibold);
+  box-shadow: var(--edge-highlight);
+  transition: background-color var(--duration-fast) var(--easing-smooth); }
+.btn:hover { background: var(--accent); }
+.btn:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-gap);
+  box-shadow: inset 0 0 0 var(--ring-inner-w) var(--ring-inner); }
+.btn[disabled] { background: var(--disabled-fill); color: var(--disabled-fg); border-color: var(--border); }
+.btn--outline { background: transparent; }
+.mcp-card { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--pad-card);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-md); background: var(--card); }
+.dot-live { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); background: var(--success); }
+.dot-off { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); background: var(--muted-foreground); }
+.switch { width: var(--switch-w); height: var(--switch-h); border-radius: var(--radius-pill);
+  background: var(--input); position: relative; border: var(--border-w) solid transparent; }
+.switch::after { content: ""; position: absolute; top: var(--switch-inset); left: var(--switch-inset);
+  width: var(--switch-knob); height: var(--switch-knob); border-radius: var(--radius-pill);
+  background: var(--card); }
+.switch[data-on="true"] { background: var(--primary); }
+.switch[data-on="true"]::after { left: var(--switch-travel); }
+.alert-card { display: grid; gap: var(--gap-block); padding: var(--space-4) var(--pad-card);
+  border: var(--border-w) solid var(--border); border-left: var(--bar-w) solid var(--destructive);
+  border-radius: var(--radius-md); background: var(--destructive-soft); }
+/* Severity reads from the 3px bar + the soft plate, NOT from red title text: Campbell
+   brightRed on a red-tinted plate measures ~4.1:1, so a red heading would break the app's
+   "accent tokens clear 4.5:1 as text in both themes" rule. The title stays --foreground. */
+.alert-card h4 { margin: 0; font-size: var(--text-body); font-weight: var(--weight-semibold);
+  color: var(--foreground); }
+.alert-card ul { margin: 0; padding-left: var(--space-5); font-family: var(--font-mono);
+  font-size: var(--text-caption); line-height: var(--lh-caption); color: var(--foreground); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: var(--caret-dim); } }
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: var(--skeleton-dim); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="brief">
+  <h1>09 · Native Material — Fluent 2 and what Mica actually costs</h1>
+  <p><b>Provenance</b> — Microsoft Fluent 2 / WinUI 3 material language (Mica, Acrylic, the layer stack, the Reveal focus visual, the Windows type ramp). Colour truth is the WinUI / Windows Terminal <b>Campbell</b> scheme, MIT-licensed and quoted verbatim: background <code>#0C0C0C</code>, foreground <code>#CCCCCC</code>, black <code>#0C0C0C</code>, red <code>#C50F1F</code>, green <code>#13A10E</code>, yellow <code>#C19C00</code>, blue <code>#0037DA</code>, cyan <code>#3A96DD</code>, purple <code>#881798</code>, white <code>#CCCCCC</code>; brights <code>#767676 #E74856 #16C60C #F9F1A5 #3B78FF #61D6D6 #B4009E #F2F2F2</code>. The dark half is taken from that set. <b>Segoe UI Variable is licensed by Microsoft and is not redistributable</b> — it is referenced by family name only, which costs nothing in Electron because Chromium resolves installed local fonts. <b>Not fetched this session</b>, so labelled as approximations wherever used: the exact <code>LayerFillColorDefault</code> / <code>SolidBackgroundFillColorBase</code> alpha values (hence the whole light plate), the <code>FocusVisualPrimaryThickness</code> / <code>FocusVisualSecondaryThickness</code> pixel recipe, and the 4px grid step table.</p>
+  <p><b>Material model</b> — the content of this option, not decoration. <b>Mica</b> is an OPAQUE wallpaper-tinted base for long-lived windows; content sits on a <b>layer</b>, a low-opacity solid, above it (<code>.layer</code> in this file, with the plate behind it a static gradient). <b>Acrylic</b> is the translucent blur + exclusion-blend + tint + noise material, and Microsoft's own guidance reserves it for <b>transient</b> surfaces with an explicit warning not to put desktop acrylic on large background surfaces (<code>.acrylic</code> wraps the tooltip and the MCP modal only). Both materials <b>fall back to a solid colour</b> when the window is INACTIVE, when transparency effects are off, on battery saver, or on low-end hardware — and an Alt+Space palette is inactive for most of its life. So the flat form must be the legible one. <b>The fallback is the design, not the exception.</b> Surface 2 is rendered in it deliberately: same tokens, tint and highlight swapped out, nothing else changes.</p>
+  <p><b>How to get it in Electron</b> — <code>win.setBackgroundMaterial('mica' | 'acrylic' | 'tabbed' | 'none' | 'auto')</code>, <code>@platform win32</code> in the shipped typings, and the same value as the constructor option <code>backgroundMaterial</code> (which <code>src/main/windows.ts</code> already sets to <code>'none'</code>). CSS <code>backdrop-filter</code> <b>cannot</b> sample the desktop behind the window (electron/electron#30412; the Mica feature requests #38532; vibrancy conflicts #19765), so a mock that fakes Mica with <code>backdrop-filter</code> is demonstrating something the shipped app cannot do. There is no <code>backdrop-filter</code> anywhere in this file: the desktop tint is a static gradient plate and the acrylic surfaces render their solid fallback. Pointer-following <b>Reveal borders</b> also need JS hit-testing and are out of scope for a static mock — only the two-ring focus form of Reveal is shown.</p>
+  <p><b>Type plan</b> — <b>Segoe UI Variable</b>, by family name only: a variable font with a <code>wght</code> axis and automatic <code>opsz</code> in HTML, present on Windows 11 and silently falling back to Segoe UI on Windows 10; the metric-compatible open-source stand-in is <b>Selawik</b>, second in the stack. Windows' own ramp, declared as rungs: Caption 12/16, Body 14/20, 18/24, 20/28, 28/36, 40/52, 68/92. Microsoft's stated floor is "14px Semibold, 12px Regular — text smaller than these sizes and weights are illegible in some languages"; they also prefer Semibold over Bold and exclude italic. This app's 12px label floor and 14px primary UI size <b>already sit exactly on that guidance</b> (<code>tokens/typography.css</code> states 12px as the accessibility floor and keeps <code>--text-2xs</code> / <code>--text-xs-custom</code> / <code>--text-11px</code> as 12px aliases). What does have to move: the control still paints 11px text in three places (<code>.chip</code>, <code>.met span</code>, and the metrics caveat in each theme) — those come up onto Caption 12/16; <code>font-weight: 700</code> is painted in three rules (<code>globals.css</code> <code>.streaming-cursor</code>, <code>.best-badge</code>, <code>.chart-value-number</code>) and becomes Semibold; and three <code>font-style: italic</code> sites exist (<code>.model-name</code> plus two rules in <code>ask-mode-perplexity.css</code>) and are deleted, because the ramp has no italic.</p>
+  <p><b>Geometry</b> — 40px minimum touch targets on standalone controls (<code>--target-touch</code>; the README's 32px <code>--target-min</code> is kept for in-header icon buttons so the fixed geometry still diffs), control radius 4px, card/palette radius 8px with the nested content radius stepping down by the 4px Mica rim, a 1px white-at-~10% top-edge highlight over tinted surfaces (<code>--edge-highlight</code>) instead of a tinted drop shadow, the WinUI 3px info/error bar on the alert card's leading edge, and the <b>Reveal two-ring focus</b>: Windows draws it as an outer 2px border plus an inner 1px border (<code>FrameworkElement.FocusVisualPrimaryThickness</code> / <code>FocusVisualSecondaryThickness</code>), expressed here as <code>outline: 2px solid</code> + <code>outline-offset: 1px</code> + an inner inset ring, and kept visible on the third results row permanently. Spacing runs on a 4px grid — the exact step table and the exact ring pixel values are the approximations named above.</p>
+  <p><b>Motion</b> — Windows' own duration bands are short, so only 100 / 150 / 250ms are declared. No invented curve: the easing is the app's existing <code>cubic-bezier(0.22, 1, 0.36, 1)</code> and <b>that curve is ours, not Microsoft's</b>.</p>
+  <ul class="moves">
+    <li><b>Move 1 — typography</b> <code>src/renderer/styles/tokens/typography.css</code> → replace <code>--font-sans</code> with the Segoe UI Variable stack (Display rungs, Text for body, Selawik as the stand-in), restate the six-size scale as the Windows ramp 12/16 · 14/20 · 18/24 · 20/28 · 28/36 · 40/52, cap weights at Regular/Semibold, delete italic usage. No file ships.</li>
+    <li><b>Move 2 — radius</b> <code>src/renderer/styles/tokens/radius.css</code> → controls to 4px and the card/palette to 8px; the 6px <code>--radius-md</code> rung collapses onto 4px, since Fluent has one control radius. Tailwind maps the <code>--radius-*</code> namespace onto every <code>rounded-*</code> utility, so this moves the pristine <code>components/ui/</code> primitives too, with no component edit.</li>
+    <li><b>Move 3 — elevation</b> <code>src/renderer/styles/tokens/shadow.css</code> → drop the OKLCH tinted drop shadows as the primary elevation signal in favour of the 1px white top-edge highlight plus a 1px outer stroke; keep one small shadow for the transient acrylic surfaces only. <code>--ring-color</code> becomes the two-ring pair (outer 2px foreground, inner 1px surface).</li>
+  </ul>
+  <p><b>The one main-process change</b> — this option is not CSS-only. <code>src/main/windows.ts</code> currently constructs the palette with <code>transparent: true</code>, <code>hasShadow: false</code> and <code>backgroundMaterial: 'none'</code>; the direction needs <code>win.setBackgroundMaterial('mica')</code> (or the constructor option set to <code>'mica'</code>) in <code>createMainWindow</code>, which is a real code change, carries a <b>Windows 11 22H2 floor</b>, has to be branched through <code>isWindows()</code> and a version check with <code>'none'</code> as the fallback, and must be re-tested against the <code>transparent: true</code> + <code>roundedCorners: true</code> pair the palette geometry depends on. The renderer cannot see which material it is being given, so the CSS must be correct on its own.</p>
+  <p><b>Cost:</b> colour, type and radius are token-only — three files, no component edits, and the app's 12/14px floor already matches the guidance. The material itself is one main-process window flag <b>plus</b> a tested fallback path (inactive window, transparency off, battery saver, sub-22H2), and that path is where the real work sits.</p>
+  <p><b>Biggest risk:</b> the material disappears on settings the app does not control — an inactive window, battery saver, or transparency effects off — so the design is only correct in its flat form, and a palette that is invisible-when-inactive is a palette that is invisible most of the time. The tint is also the only elevation signal left once the shadow goes, which means a theme that reads as flat is one stroke value away from reading as broken.</p>
+  <div class="swatches">
+    <figure style="margin:0"><div class="swatch-set" data-theme="light"><span class="swatch" style="background:var(--background)"></span><span class="swatch" style="background:var(--card)"></span><span class="swatch" style="background:var(--muted)"></span><span class="swatch" style="background:var(--popover)"></span><span class="swatch" style="background:var(--border)"></span><span class="swatch" style="background:var(--primary)"></span><span class="swatch" style="background:var(--info)"></span><span class="swatch" style="background:var(--success)"></span><span class="swatch" style="background:var(--destructive)"></span></div><figcaption>light ramp (approximated plate)</figcaption></figure>
+    <figure style="margin:0"><div class="swatch-set" data-theme="dark"><span class="swatch" style="background:var(--background)"></span><span class="swatch" style="background:var(--card)"></span><span class="swatch" style="background:var(--muted)"></span><span class="swatch" style="background:var(--popover)"></span><span class="swatch" style="background:var(--border)"></span><span class="swatch" style="background:var(--primary)"></span><span class="swatch" style="background:var(--info)"></span><span class="swatch" style="background:var(--success)"></span><span class="swatch" style="background:var(--destructive)"></span></div><figcaption>dark ramp (Campbell, verbatim)</figcaption></figure>
+  </div>
+</div>
+
+<main class="board">
+<!-- ══════════════════ LIGHT COLUMN (dark column repeats the same markup) ══════════════════ -->
+<section class="col" data-theme="light">
+  <h2>Light — tinted paper (approximation)</h2>
+
+  <div class="surface">
+    <p class="surface-label">1 · Palette, Files tab, empty query — Mica plate → layer → card; clear button disabled</p>
+    <div class="desktop">
+      <div class="layer">
+        <div class="palette">
+          <div class="palette-header">
+            <span class="mode-pill">Files</span>
+            <div class="search">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+              <input class="query" value="" placeholder="Search for files, tools, actions..." aria-label="Search">
+            </div>
+            <button class="icon-btn" aria-label="Clear search" disabled><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+            <span class="vr"></span>
+            <span class="keycap">Alt</span><span class="keycap">Space</span>
+          </div>
+          <div class="palette-body">
+            <p class="section-head">Quick Actions</p>
+            <div class="tile-row"><span class="tile"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg>Find in Folder</span></div>
+            <p class="section-head">Recently Opened</p>
+            <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">colors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-md)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-folder)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">toolbox.ts</span><br><span class="row-path">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="kind">TypeScript</span><span class="badge">↵</span></div>
+          </div>
+          <div class="palette-footer"><span>Tip: Press Alt+Enter to ask about the selected file</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, permanent Reveal focus, opening, skeleton. Rendered in the <b>flat fallback</b>: the same tokens with the window inactive</p>
+    <div class="desktop" data-material="flat">
+      <div class="layer">
+        <div class="palette">
+          <div class="palette-header">
+            <span class="mode-pill">Files</span>
+            <div class="search">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+              <input class="query" value="design tokens" aria-label="Search">
+            </div>
+            <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+            <span class="vr"></span>
+            <span class="keycap">Alt</span><span class="keycap">Space</span>
+          </div>
+          <div class="palette-body">
+            <p class="section-head">Results <span class="count">6</span></p>
+            <div class="row" data-state="selected"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title"><mark>co</mark>lors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">SHADCN-DESIGN-SYSTEM.md</span><br><span class="row-path">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+            <div class="row" data-state="focus"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">theme.css</span><br><span class="row-path">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row" data-state="hover"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">spacing.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="kind"><span class="ask-pill">Ask</span>CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="spinner"></span></div>
+            <p class="section-head" style="padding-top:var(--space-1)">State · loading more results</p>
+            <div style="padding:0 var(--pad-card) var(--space-2)"><span class="skeleton" data-w="a"></span></div>
+            <div style="padding:0 var(--pad-card) var(--space-3)"><span class="skeleton" data-w="b"></span></div>
+            <p class="section-head" style="padding-top:var(--space-1)">Transient surface · acrylic role, shown as its solid fallback</p>
+            <div class="acrylic" style="padding:0 var(--pad-card) var(--space-3)"><span class="tooltip">Ask about this file (Alt+Enter)</span></div>
+          </div>
+          <div class="palette-footer"><span>6 results found</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics; send disabled on an empty field</p>
+    <div class="page">
+      <div class="palette" style="box-shadow:none">
+        <div class="palette-header" style="height:var(--chat-header-h)">
+          <span class="mode-pill">Ask</span>
+          <span class="pill pill--agent">Desktop</span>
+          <span class="vr"></span>
+          <span class="ghost-btn">New Chat</span>
+        </div>
+        <div class="chat">
+          <div class="bubble-user">What is our current cold-start cost breakdown?</div>
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
+            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+          </div>
+          <div class="answer" role="article" aria-label="Assistant response">
+            <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
+          </div>
+          <div class="genui">
+            <div class="genui-head"><h4>Cold-start cost by phase</h4><div class="genui-tools"><span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">MD</span><span>Filter {column}…</span><span class="chip">All columns</span></div></div>
+            <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+              <tr><td>main boot</td><td class="num">214</td><td>main.ts</td></tr>
+              <tr><td>graph precompile</td><td class="num">388</td><td>getAskGraph</td></tr>
+              <tr><td>MCP connect</td><td class="num">1,204</td><td>mcpService</td></tr>
+              <tr><td>es.exe init</td><td class="num">96</td><td>initializeEs</td></tr>
+            </tbody></table>
+          </div>
+          <div class="sources"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4h11v8h-11z"/><path d="M5 6.5h6M5 9h4"/></svg>3 sources<span class="pill" style="background:var(--success-soft);color:var(--success)">High confidence (85%)</span></div>
+          <details open>
+            <summary>Task Details</summary>
+            <div class="metrics">
+              <div class="metric"><b>4,812</b><span>Tokens</span></div>
+              <div class="metric"><b>$0.0131</b><span>Cost (est.)</span></div>
+              <div class="metric"><b>8.6 s</b><span>Time</span></div>
+              <div class="metric"><b>559 tok/s</b><span>Speed</span></div>
+            </div>
+            <p class="caveat">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+          </details>
+          <div class="command-bar">
+            <textarea placeholder="Ask anything about your code, files, or project..." aria-label="Ask the AI assistant"></textarea>
+            <div class="cmdbar-foot">
+              <button class="icon-btn" aria-label="Attach file or folder"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+              <span class="chip">3 MCP</span>
+              <span class="ghost-btn">Stop response</span>
+              <button class="send" aria-label="Send message" disabled><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">4 · Desktop-agent activity + tool trace — ok, error, pending</p>
+    <div class="page">
+      <div class="agent-panel">
+        <h3>Automating browser task… <span class="pill" style="background:var(--warning-soft);color:var(--warning)">in_progress</span></h3>
+        <dl class="kv">
+          <dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+          <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+          <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+          <dt>Time:</dt><dd>4.2 s</dd>
+        </dl>
+        <div class="progress" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+        <span style="font-size:var(--text-caption);color:var(--muted-foreground)">Step 2 of 3</span>
+      </div>
+      <table class="trace" style="margin-top:var(--gap-block)"><tbody>
+        <tr><td>screenshot</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+        <tr><td>get_screen_text</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+        <tr><td>search_elements</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+        <tr><td>invoke_element</td><td><span class="status status--error">error</span></td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+        <tr><td>type_text</td><td><span class="status status--pending">pending</span></td><td></td></tr>
+        <tr><td>close_window <span class="chip">verifies</span></td><td><span class="status status--pending">pending</span></td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">5 · Settings, MCP modal rows (transient acrylic), and the not-ready card</p>
+    <div class="page" style="display:grid;gap:var(--gap-section)">
+      <div class="dialog">
+        <div class="dialog-head"><h3>Settings</h3><button class="icon-btn" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button></div>
+        <div class="setting"><span style="flex:1"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+      </div>
+      <div class="acrylic">
+        <div class="dialog" style="box-shadow:var(--shadow-popover)">
+          <div class="dialog-head"><h3 style="font-size:var(--text-body-lg)">MCP servers</h3><input class="query" style="max-width:var(--search-max-w);font-size:var(--text-body)" placeholder="Search servers..." aria-label="Search MCP servers"></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable filesystem"></span></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable sequential-thinking"></span></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-off" aria-label="Status: disconnected"></span><span style="flex:1"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span></span><span class="chip">stdio</span><span class="switch" data-on="false" aria-label="Enable playwright"></span></div>
+        </div>
+      </div>
+      <div class="alert-card" role="alert">
+        <h4>Ask mode is not ready</h4>
+        <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+        <div><span class="btn">Back to Files</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ DARK COLUMN ══════════════════ -->
+<section class="col" data-theme="dark">
+  <h2>Dark — Campbell, verbatim</h2>
+
+  <div class="surface">
+    <p class="surface-label">1 · Palette, Files tab, empty query — Mica plate → layer → card; clear button disabled</p>
+    <div class="desktop">
+      <div class="layer">
+        <div class="palette">
+          <div class="palette-header">
+            <span class="mode-pill">Files</span>
+            <div class="search">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+              <input class="query" value="" placeholder="Search for files, tools, actions..." aria-label="Search">
+            </div>
+            <button class="icon-btn" aria-label="Clear search" disabled><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+            <span class="vr"></span>
+            <span class="keycap">Alt</span><span class="keycap">Space</span>
+          </div>
+          <div class="palette-body">
+            <p class="section-head">Quick Actions</p>
+            <div class="tile-row"><span class="tile"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg>Find in Folder</span></div>
+            <p class="section-head">Recently Opened</p>
+            <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">colors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-md)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-folder)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+            <div class="row"><span class="glyph" style="color:var(--file-css)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">toolbox.ts</span><br><span class="row-path">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="kind">TypeScript</span><span class="badge">↵</span></div>
+          </div>
+          <div class="palette-footer"><span>Tip: Press Alt+Enter to ask about the selected file</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, permanent Reveal focus, opening, skeleton. Rendered in the <b>flat fallback</b>: the same tokens with the window inactive</p>
+    <div class="desktop" data-material="flat">
+      <div class="layer">
+        <div class="palette">
+          <div class="palette-header">
+            <span class="mode-pill">Files</span>
+            <div class="search">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5"/></svg>
+              <input class="query" value="design tokens" aria-label="Search">
+            </div>
+            <button class="icon-btn" aria-label="Clear search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button>
+            <span class="vr"></span>
+            <span class="keycap">Alt</span><span class="keycap">Space</span>
+          </div>
+          <div class="palette-body">
+            <p class="section-head">Results <span class="count">6</span></p>
+            <div class="row" data-state="selected"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title"><mark>co</mark>lors.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">SHADCN-DESIGN-SYSTEM.md</span><br><span class="row-path">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="kind">Markdown</span><span class="badge">↵</span></div>
+            <div class="row" data-state="focus"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">theme.css</span><br><span class="row-path">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="kind">CSS</span><span class="badge">↵</span></div>
+            <div class="row" data-state="hover"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h5.4L13 5.4V14H4z"/><path d="M9.2 1.8v3.8H13"/></svg></span><span><span class="row-title">spacing.css</span><br><span class="row-path">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="kind"><span class="ask-pill">Ask</span>CSS</span><span class="badge">↵</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5h5l1.2 1.6H14V12H2z"/></svg></span><span><span class="row-title">screenshots</span><br><span class="row-path">Qyther/docs/assets/screenshots</span></span><span class="kind">Folder</span><span class="badge">→</span></div>
+            <div class="row"><span class="glyph"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.8h8V14H4z"/><path d="M6.2 6h3.6M6.2 8.4h3.6"/></svg></span><span><span class="row-title">AGENTS.md</span><br><span class="row-path">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="kind">Markdown</span><span class="spinner"></span></div>
+            <p class="section-head" style="padding-top:var(--space-1)">State · loading more results</p>
+            <div style="padding:0 var(--pad-card) var(--space-2)"><span class="skeleton" data-w="a"></span></div>
+            <div style="padding:0 var(--pad-card) var(--space-3)"><span class="skeleton" data-w="b"></span></div>
+            <p class="section-head" style="padding-top:var(--space-1)">Transient surface · acrylic role, shown as its solid fallback</p>
+            <div class="acrylic" style="padding:0 var(--pad-card) var(--space-3)"><span class="tooltip">Ask about this file (Alt+Enter)</span></div>
+          </div>
+          <div class="palette-footer"><span>6 results found</span><span style="display:flex;gap:var(--gap-inline);align-items:center"><span class="ghost-btn">Keyboard shortcuts</span><span class="ghost-btn">Theme</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics; send disabled on an empty field</p>
+    <div class="page">
+      <div class="palette" style="box-shadow:none">
+        <div class="palette-header" style="height:var(--chat-header-h)">
+          <span class="mode-pill">Ask</span>
+          <span class="pill pill--agent">Desktop</span>
+          <span class="vr"></span>
+          <span class="ghost-btn">New Chat</span>
+        </div>
+        <div class="chat">
+          <div class="bubble-user">What is our current cold-start cost breakdown?</div>
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
+            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+          </div>
+          <div class="answer" role="article" aria-label="Assistant response">
+            <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
+          </div>
+          <div class="genui">
+            <div class="genui-head"><h4>Cold-start cost by phase</h4><div class="genui-tools"><span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">MD</span><span>Filter {column}…</span><span class="chip">All columns</span></div></div>
+            <table><thead><tr><th>Phase</th><th style="text-align:right">ms</th><th>Owner</th></tr></thead><tbody>
+              <tr><td>main boot</td><td class="num">214</td><td>main.ts</td></tr>
+              <tr><td>graph precompile</td><td class="num">388</td><td>getAskGraph</td></tr>
+              <tr><td>MCP connect</td><td class="num">1,204</td><td>mcpService</td></tr>
+              <tr><td>es.exe init</td><td class="num">96</td><td>initializeEs</td></tr>
+            </tbody></table>
+          </div>
+          <div class="sources"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4h11v8h-11z"/><path d="M5 6.5h6M5 9h4"/></svg>3 sources<span class="pill" style="background:var(--success-soft);color:var(--success)">High confidence (85%)</span></div>
+          <details open>
+            <summary>Task Details</summary>
+            <div class="metrics">
+              <div class="metric"><b>4,812</b><span>Tokens</span></div>
+              <div class="metric"><b>$0.0131</b><span>Cost (est.)</span></div>
+              <div class="metric"><b>8.6 s</b><span>Time</span></div>
+              <div class="metric"><b>559 tok/s</b><span>Speed</span></div>
+            </div>
+            <p class="caveat">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+          </details>
+          <div class="command-bar">
+            <textarea placeholder="Ask anything about your code, files, or project..." aria-label="Ask the AI assistant"></textarea>
+            <div class="cmdbar-foot">
+              <button class="icon-btn" aria-label="Attach file or folder"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+              <span class="chip">3 MCP</span>
+              <span class="ghost-btn">Stop response</span>
+              <button class="send" aria-label="Send message" disabled><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">4 · Desktop-agent activity + tool trace — ok, error, pending</p>
+    <div class="page">
+      <div class="agent-panel">
+        <h3>Automating browser task… <span class="pill" style="background:var(--warning-soft);color:var(--warning)">in_progress</span></h3>
+        <dl class="kv">
+          <dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+          <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+          <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+          <dt>Time:</dt><dd>4.2 s</dd>
+        </dl>
+        <div class="progress" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+        <span style="font-size:var(--text-caption);color:var(--muted-foreground)">Step 2 of 3</span>
+      </div>
+      <table class="trace" style="margin-top:var(--gap-block)"><tbody>
+        <tr><td>screenshot</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">1.1 s</td></tr>
+        <tr><td>get_screen_text</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">2.8 s</td></tr>
+        <tr><td>search_elements</td><td><span class="status status--ok">ok</span></td><td style="text-align:right;color:var(--muted-foreground)">0.4 s</td></tr>
+        <tr><td>invoke_element</td><td><span class="status status--error">error</span></td><td style="text-align:right;color:var(--muted-foreground)">element not found</td></tr>
+        <tr><td>type_text</td><td><span class="status status--pending">pending</span></td><td></td></tr>
+        <tr><td>close_window <span class="chip">verifies</span></td><td><span class="status status--pending">pending</span></td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="surface">
+    <p class="surface-label">5 · Settings, MCP modal rows (transient acrylic), and the not-ready card</p>
+    <div class="page" style="display:grid;gap:var(--gap-section)">
+      <div class="dialog">
+        <div class="dialog-head"><h3>Settings</h3><button class="icon-btn" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"/></svg></button></div>
+        <div class="setting"><span style="flex:1"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+        <div class="setting"><span style="flex:1"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+      </div>
+      <div class="acrylic">
+        <div class="dialog" style="box-shadow:var(--shadow-popover)">
+          <div class="dialog-head"><h3 style="font-size:var(--text-body-lg)">MCP servers</h3><input class="query" style="max-width:var(--search-max-w);font-size:var(--text-body)" placeholder="Search servers..." aria-label="Search MCP servers"></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable filesystem"></span></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-live" aria-label="Status: connected"></span><span style="flex:1"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span></span><span class="chip">stdio</span><span class="switch" data-on="true" aria-label="Enable sequential-thinking"></span></div>
+          <div class="setting"><span class="mcp-card" style="flex:1;border:0;padding:0;background:transparent"><span class="dot-off" aria-label="Status: disconnected"></span><span style="flex:1"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span></span><span class="chip">stdio</span><span class="switch" data-on="false" aria-label="Enable playwright"></span></div>
+        </div>
+      </div>
+      <div class="alert-card" role="alert">
+        <h4>Ask mode is not ready</h4>
+        <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+        <div><span class="btn">Back to Files</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+</body>
+</html>
