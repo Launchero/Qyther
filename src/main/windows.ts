@@ -1,7 +1,7 @@
-import { BrowserWindow, screen, nativeImage } from 'electron';
+import { BrowserWindow, app, nativeImage } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { windowManager } from './windowManager';
+import { windowManager, getPaletteLayout } from './windowManager';
 import { createLogger } from './utils/logger';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -9,25 +9,50 @@ const log = createLogger('Window');
 
 let mainWindow: BrowserWindow | null = null;
 
+// An app-level Quit (`tray.ts:51`, `app:quit`) closes every window, which lands in the
+// `close` handler below. Without this flag the unconditional hide-instead-of-close rule
+// would veto the app's own shutdown. No Quit path is added here.
+let isQuitting = false;
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
 
+/** Electron passes WndProc `wParam`/`lParam` to the hook callback as little-endian buffers. */
+function readWindowMessageArgument(arg: Buffer | undefined): number {
+  return arg && arg.length >= 4 ? arg.readUInt32LE(0) : 0;
+}
+
+/**
+ * Alt+Space is reserved by Windows for the system context menu, and the system-context-menu
+ * event doesn't capture it in Electron 41.x, so the toggle is driven from the WndProc by
+ * intercepting WM_SYSCOMMAND (0x0112) with SC_KEYMENU (0xF100). The koffi hook in
+ * `shortcuts.ts` is the other half of this pair.
+ */
+function hookAltSpaceInterceptor(window: BrowserWindow): void {
+  const WM_SYSCOMMAND = 0x0112;
+  const SC_KEYMENU = 0xF100;
+
+  window.hookWindowMessage(WM_SYSCOMMAND, (wParam, lParam) => {
+    const command = readWindowMessageArgument(wParam) & 0xFFF0;
+    // WM_SYSCOMMAND/SC_KEYMENU is posted for every Alt+<key> accelerator and lParam carries the
+    // key pressed with it — 0 only for bare Alt+Space — so lParam alone separates the two cases.
+    if (command === SC_KEYMENU && readWindowMessageArgument(lParam) === 0) {
+      toggleMainWindow();
+      return true; // Prevent the system menu for Alt+Space
+    }
+    return false; // Let Alt+<letter> (Alt+Shift+T, Alt+Shift+M, ...) reach the app's shortcuts
+  });
+}
+
 export function createMainWindow(): BrowserWindow {
   const config = windowManager.getModeConfig();
-  const currentScreen = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const { width: screenWidth, height: screenHeight } = currentScreen.workAreaSize;
-
-  const windowWidth = config.width;
-  const windowHeight = config.height;
-  const x = Math.floor((screenWidth - windowWidth) / 2 + currentScreen.bounds.x);
-  
-  // Keep consistent top position for both modes (expand downward only)
-  const y = Math.floor(screenHeight * 0.15 + currentScreen.bounds.y); // 15% from top
-
-  // Cap height to avoid taskbar occlusion on initial launch
-  const maxAvailableHeight = screenHeight - (y - currentScreen.bounds.y);
-  const effectiveHeight = Math.min(windowHeight, maxAvailableHeight);
+  // Origin, width and the height cap all come from the display's `workArea` (see
+  // `getPaletteLayout`), so a taskbar docked top or left is already excluded.
+  const { x, y, width: windowWidth, height: effectiveHeight } = getPaletteLayout(config.width, config.height);
 
   // Load window icon from build resources
   const isDev = process.env.DEV === 'true' || process.env.NODE_ENV === 'development';
@@ -68,46 +93,51 @@ export function createMainWindow(): BrowserWindow {
 
   mainWindow = new BrowserWindow(options);
 
+  // A session restored into `expanded` never goes through `setMode`, so the mode's
+  // constraints (resizable, min/max bounds, width lock) have to be applied here too.
+  windowManager.applyModeConstraints(mainWindow);
+
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow?.setMenuBarVisibility(false);
     mainWindow?.show();
+    // A launcher takes the keyboard with the screen. Without this the window is shown but never
+    // activated, Chromium puts the caret on the first tabbable node (the mode-switch button), and
+    // the palette is unusable by keyboard until something clicks the input — measured: typed
+    // characters produced an empty input and three real Escape presses failed to hide the window.
+    mainWindow?.focus();
     // Open DevTools for debugging in detached mode
     if (process.env.ELECTRON_VITE_DEV_MODE === 'true') {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
   });
 
-  // Keep menu bar hidden on window show
+  // Keep menu bar hidden on window show, and announce the show. This is the ONE place
+  // `window:shown` is emitted: the renderer parks/restores keyboard focus and plays the surface
+  // reveal off it, so the boot show (`ready-to-show` below) and every hotkey/tray reveal have to
+  // be indistinguishable here. Emitting it from `showMainWindow()` as well used to double-play the
+  // reveal, and not emitting it at all at boot left the caret wherever Chromium put it.
   mainWindow.on('show', () => {
     mainWindow?.setMenuBarVisibility(false);
+    mainWindow?.webContents.send('window:shown');
   });
 
-  // Intercept Alt+Space on Windows.
-  // Alt+Space is reserved by Windows for the system context menu.
-  // The system-context-menu event doesn't capture Alt+Space in Electron 41.x,
-  // so we use hookWindowMessage to intercept WM_SYSCOMMAND (0x0112) with SC_KEYMENU (0xF100).
-  const WM_SYSCOMMAND = 0x0112;
-  const SC_KEYMENU = 0xF100;
+  hookAltSpaceInterceptor(mainWindow);
 
-  mainWindow.hookWindowMessage(WM_SYSCOMMAND, (wParam) => {
-    const command = wParam.readUInt32LE(0) & 0xFFF0;
-
-    if (command === SC_KEYMENU) {
-      toggleMainWindow();
-      return true; // Prevent default
-    }
-    return false; // Allow other commands
-  });
-
-  // Hide window instead of closing when user presses escape
+  // Hide window instead of closing: a close while hidden would destroy the window, fire
+  // `window-all-closed` and quit the app, leaving `mainWindow` a dead reference.
   mainWindow.on('close', (event) => {
+    if (isQuitting) return; // an app-level Quit must still be able to destroy the window
+    event.preventDefault();
     if (mainWindow?.isVisible()) {
-      event.preventDefault();
       // Notify renderer to store active element before hiding
       mainWindow.webContents.send('window:will-hide');
       mainWindow.hide();
     }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   // Load application
@@ -126,7 +156,7 @@ export function showMainWindow(): void {
     windowManager.repositionWindow(mainWindow);
     mainWindow.show();
     mainWindow.focus();
-    mainWindow.webContents.send('window:shown');
+    // `window:shown` comes from the window's own `show` handler, so this path must not send it too.
   }
 }
 

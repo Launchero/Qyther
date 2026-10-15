@@ -2,7 +2,7 @@
 // before any module-scope ChatOpenAI instances read process.env.*
 import 'dotenv/config';
 
-import { app, Menu } from 'electron';
+import { app, Menu, ipcMain } from 'electron';
 import { createMainWindow } from './windows';
 import { registerIPCHandlers } from './ipc/handlers';
 import { registerApiConfigHandlers } from './ipc/api-config';
@@ -10,12 +10,11 @@ import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts'
 import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
 import { initializeEs } from './utils/esDownloader';
-import { initializeDatabaseManager } from './services/database/database-manager';
-import { logSystemInfo, getPlatformName, isWindows, isMacOS } from './utils/platform';
+import { initializeDatabaseManager, getDatabaseManager } from './services/database/database-manager';
+import { logSystemInfo, getPlatformName, isWindows, isMacOS, initializeAnimationPreference } from './utils/platform';
 import { mcpService } from './services/mcp/client';
 import { registerBrowserHandlers } from './ipc/browser-handlers';
-import { statefulBrowserAgent } from './services/browser/stateful-browser-agent';
-import { getAskGraph } from './services/langgraph/research-agent';
+import { createShutdown, type ShutdownStep } from './lifecycle';
 import { execSync } from 'child_process';
 import { createLogger } from './utils/logger';
 
@@ -35,6 +34,26 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   log.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
+
+// SIGTERM/SIGINT handlers - graceful shutdown for container orchestrators and Ctrl+C.
+// Without these, Node.js exits immediately without cleanup when receiving these signals.
+// Docker, Kubernetes, and systemd send SIGTERM; Ctrl+C sends SIGINT.
+// Research: "Once you add your own listener, Node removes that default exit behavior"
+// so we MUST call app.quit() to trigger the normal Electron shutdown path.
+let signalReceived = false;
+const handleShutdownSignal = (signal: string) => {
+  if (signalReceived) {
+    log.warn(`Received ${signal} during shutdown, already processing`);
+    return;
+  }
+  signalReceived = true;
+  log.info(`Received ${signal}, initiating graceful shutdown...`);
+  // Route into Electron's normal quit path so will-quit fires and runs the ordered teardown.
+  app.quit();
+};
+
+process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
 
 // Enable security features
 app.enableSandbox();
@@ -95,7 +114,7 @@ app.whenReady().then(async () => {
     log.info('File search not available on', getPlatformName());
   }
 
-  // Initialize MCP service — loads tools from mcp-config.json for LangGraph nodes
+  // Initialize MCP service — loads tools from mcp-config.json for the Ask-mode agent
   try {
     await mcpService.initializeWithRetry();
     log.info('MCP service initialized');
@@ -115,14 +134,17 @@ app.whenReady().then(async () => {
   registerBrowserHandlers();
   log.info('Browser handlers registered');
   
-  // Pre-compile LangGraph in background - shifts cost from first message to startup
-  getAskGraph()
-    .then(() => log.info('LangGraph compiled and cached'))
-    .catch((err) => log.warn('LangGraph pre-compilation failed (will retry on first chat):', err));
+  // Nothing to pre-compile. This used to warm `getAskGraph()`, which built the 5-node
+  // AskGraph ahead of the first message. There is no graph now: the Ask-mode agent and its
+  // toolbox are built lazily by `pi/ask-turn.ts` on the first turn, which is also what keeps
+  // the tesseract worker and UIA facade off the boot path.
 
   try {
     log.info('Checking Playwright installation...');
-    execSync('npx playwright install chromium', { stdio: 'ignore' });
+    // Bounded: `execSync` defaults to no timeout, so a network or npm hang would block the
+    // entire boot indefinitely. 120s is generous for a first-time Chromium download but short
+    // enough that a stuck install does not strand the app on the boot path.
+    execSync('npx playwright install chromium', { stdio: 'ignore', timeout: 120_000 });
     log.info('Playwright Chromium installed');
   } catch (error) {
     log.warn('Playwright installation failed:', error instanceof Error ? error.message : 'Unknown error');
@@ -132,14 +154,6 @@ app.whenReady().then(async () => {
   registerGlobalShortcuts();
   log.info('Global shortcuts registered');
 
-  // Run desktop agent integration test in dev mode
-  if (isWindows() && process.env.TEST_DESKTOP_TOOLS === '1') {
-    log.info('TEST_DESKTOP_TOOLS=1 detected — running desktop agent tools integration test');
-    import('./utils/desktop-tools-test')
-      .then(({ runDesktopToolsTest }) => runDesktopToolsTest())
-      .catch((err) => log.error('Desktop tools test failed:', err));
-  }
-
   // Create system tray
   createTray();
   log.info('System tray created');
@@ -147,6 +161,10 @@ app.whenReady().then(async () => {
   // Create main window
   createMainWindow();
   log.info('Main window created');
+
+  // Off the first-paint path: the mode-height tween honours the OS "Show animations" setting
+  // once this resolves, and animates by default until it does.
+  void initializeAnimationPreference();
   
   // Prevent menu bar from appearing on Alt key press
   app.on('browser-window-focus', (_, window) => {
@@ -174,20 +192,116 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('will-quit', () => {
-  log.info('App quitting...');
-  unregisterGlobalShortcuts();
-  destroyTray();
-  
-  mcpService.cleanup().catch(err => {
-    log.warn('MCP cleanup error:', err);
+/**
+ * The ordered teardown, in one list, so the sequence is a readable contract rather than a chain of
+ * statements — and so each release reports a name and a duration.
+ *
+ * Order is load-bearing:
+ *  - The koffi hook and its 10 ms message-pump interval go first. That interval is what keeps the
+ *    message loop alive, so nothing that can throw may sit in front of releasing it.
+ *  - `langchain` next, because its browser-session inactivity timer is a live handle that would
+ *    otherwise outlive the process, and `cleanupBrowserAgent` is also the browser subtree's release
+ *    path — one owner, one call, no second `statefulBrowserAgent.cleanup()` step.
+ *  - MCP after it, because the shared `mcpService` client owns the Playwright stdio child in the
+ *    normal (config-driven) case; the fallback client that the browser agent holds only exists when
+ *    MCP did not initialise, and it is released by the step above.
+ *  - The Pi desktop agent is second-to-last and the database last, so a trajectory written during
+ *    teardown is still on disk when `close()` flushes. Each step is individually bounded, so a
+ *    slow native release costs its own deadline and not the ones behind it.
+ */
+function buildShutdownSteps(): ShutdownStep[] {
+  return [
+    { name: 'global-shortcuts', dispose: () => unregisterGlobalShortcuts() },
+    { name: 'tray', dispose: () => destroyTray() },
+    {
+      // The browser subtree's release path — `cleanupBrowserAgent()` clears the inactivity
+      // timer and tears down the Playwright session. There is deliberately no separate
+      // `browser` step: one owner, one call. The method still lives on the legacy-named
+      // `LangChainAgent` session store, which is why the dynamic import is of that module.
+      // It buys no cold-start laziness — the three IPC registrars import it statically, so the
+      // build reports INEFFECTIVE_DYNAMIC_IMPORT for it. The import doubles as the "was a
+      // browser session ever opened?" test, which is what decides whether the timer could
+      // still be armed.
+      name: 'browser-agent',
+      dispose: async () => {
+        const { langChainAgent } = await import('./services/langchain/agent');
+        await langChainAgent.cleanupBrowserAgent();
+      },
+    },
+    { name: 'mcp', dispose: () => mcpService.cleanup() },
+    {
+      // The dynamic import buys no cold-start laziness either — `ipc/chat-handlers.ts` already
+      // imports this module statically, so the build reports INEFFECTIVE_DYNAMIC_IMPORT for it too.
+      // What it does buy is a cheap exit: the singleton only exists once a desktop task has run, so
+      // this import doubles as the check for whether there is anything to release, and
+      // `closePiDesktopAgent()` is a no-op otherwise.
+      name: 'pi-desktop-agent',
+      dispose: async () => {
+        const { closePiDesktopAgent } = await import('./services/pi/agent');
+        await closePiDesktopAgent();
+      },
+    },
+    {
+      // IPC handler cleanup — removes all handlers to prevent memory leaks and ensure
+      // no new requests arrive during final teardown. Research shows unregistered IPC listeners
+      // are a common Electron memory leak source. This runs late in the sequence because
+      // earlier cleanup steps might still need to notify the renderer, and the renderer might
+      // still be sending messages until the window is destroyed.
+      name: 'ipc-handlers',
+      dispose: () => {
+        try {
+          ipcMain.removeAllListeners();
+          log.debug('All IPC handlers removed');
+        } catch (error) {
+          log.warn('Failed to remove IPC handlers:', error);
+        }
+      },
+    },
+    {
+      name: 'database',
+      dispose: () => {
+        // Boot wraps initialisation in try/catch and degrades to a warn, so the manager may simply
+        // not exist. That is not a shutdown failure — there is nothing to flush.
+        try {
+          getDatabaseManager().close();
+        } catch {
+          log.debug('Database manager was never initialised, nothing to close');
+        }
+      },
+    },
+  ];
+}
+
+const shutdown = createShutdown();
+
+/**
+ * `will-quit` cannot await, so teardown is deferred to `app.exit(0)`: veto the quit once, run the
+ * ordered releases, then exit. The veto is unconditional for the same reason the window's `close`
+ * veto is — a quit that lands mid-run would end the process with live children. `shutdown.run` is
+ * memoised, so a second `will-quit` joins the run in flight instead of disposing twice.
+ */
+app.on('will-quit', (event) => {
+  event.preventDefault();
+
+  void shutdown.run(buildShutdownSteps()).then((outcomes) => {
+    for (const outcome of outcomes) {
+      if (outcome.status === 'ok') {
+        log.info(`Released ${outcome.name} in ${outcome.ms}ms`);
+      } else {
+        log.warn(`Released ${outcome.name} FAILED (${outcome.status}) after ${outcome.ms}ms:`, outcome.error);
+      }
+    }
+    log.info('Shutdown complete');
+    app.exit(0);
   });
-  
-  statefulBrowserAgent.cleanup().catch(err => {
-    log.warn('Browser agent cleanup error:', err);
-  });
-  
-  log.info('Cleanup complete');
+});
+
+// Final quit confirmation - fires after will-quit completes and app.exit() is called.
+// This is the last chance to log or clean up before the process actually terminates.
+// Note: On Windows, this event does NOT fire if the app is closed due to system shutdown/restart
+// or user logout (Electron docs). The will-quit handler above is the reliable cleanup path.
+app.on('quit', (exitCode) => {
+  log.info(`App quitting with exit code ${exitCode}`);
 });
 
 // Security: Prevent new window creation
@@ -207,3 +321,5 @@ app.on('web-contents-created', (_, contents) => {
     }
   });
 });
+
+

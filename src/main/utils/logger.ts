@@ -53,8 +53,12 @@ const globalLevel = getGlobalLevel();
 /**
  * Subsystem-specific env var names that can override the global level.
  * The keys here match the values passed to `createLogger()` (uppercased with LOG_ prefix).
+ *
+ * Exported so `logger.test.ts` can assert that every `createLogger('<name>')` call site in the
+ * tree appears here. An unregistered name inherits `globalLevel`, which defaults to `error` in
+ * production, so its `info`/`debug` lines silently never appear and no env switch can enable them.
  */
-const SUBSYSTEM_ENV_VARS: Record<string, string> = {
+export const SUBSYSTEM_ENV_VARS: Record<string, string> = {
   App: 'LOG_APP',
   Tray: 'LOG_APP',
   Shortcuts: 'LOG_APP',
@@ -63,23 +67,29 @@ const SUBSYSTEM_ENV_VARS: Record<string, string> = {
   Window: 'LOG_WINDOW',
   WindowMgr: 'LOG_WINDOW',
   IPC: 'LOG_IPC',
+  ApiConfig: 'LOG_IPC',
   Chat: 'LOG_CHAT',
   BrowserHandlers: 'LOG_BROWSER',
   BrowserAgent: 'LOG_BROWSER',
   BrowserSessionMgr: 'LOG_BROWSER',
+  BrowserSkillLoader: 'LOG_BROWSER',
+  DocumentExecutor: 'LOG_DOCUMENT',
+  DocumentVerifier: 'LOG_DOCUMENT',
   MCP: 'LOG_MCP',
+  MCPRouter: 'LOG_MCP',
   LangChain: 'LOG_LANGCHAIN',
   Graph: 'LOG_GRAPH',
+  Pi: 'LOG_PI',
   ESDownloader: 'LOG_SEARCH',
   ESRunner: 'LOG_SEARCH',
   DocLoader: 'LOG_SEARCH',
-  DesktopAgent: 'LOG_DESKTOP',
-  DesktopTools: 'LOG_DESKTOP',
-  DesktopVerifier: 'LOG_DESKTOP',
-  DesktopPlanner: 'LOG_DESKTOP',
-  DesktopMemory: 'LOG_DESKTOP',
-  DesktopRecovery: 'LOG_DESKTOP',
-  DesktopSubgraph: 'LOG_DESKTOP',
+  Search: 'LOG_SEARCH',
+  AccessibilityTree: 'LOG_DESKTOP',
+  GroundTruthVerifier: 'LOG_DESKTOP',
+  InputSimulator: 'LOG_DESKTOP',
+  ScreenshotCapture: 'LOG_DESKTOP',
+  UIANative: 'LOG_DESKTOP',
+  WindowsDesktopAdapter: 'LOG_DESKTOP',
   DB: 'LOG_DB',
 };
 
@@ -170,14 +180,7 @@ export async function withTiming<T>(
     logger.debug(`${label} completed in ${Date.now() - start}ms`);
     return result;
   } catch (err) {
-    // GraphInterrupt/NodeInterrupt are LangGraph's HITL mechanism, not failures
-    const isInterrupt = err instanceof Error &&
-      (err.name === 'GraphInterrupt' || err.name === 'NodeInterrupt');
-    if (isInterrupt) {
-      logger.debug(`${label} interrupted after ${Date.now() - start}ms (HITL pause)`);
-    } else {
-      logger.debug(`${label} failed after ${Date.now() - start}ms:`, err);
-    }
+    logger.debug(`${label} failed after ${Date.now() - start}ms:`, err);
     throw err;
   }
 }

@@ -409,6 +409,7 @@ export async function isEverythingRunning(): Promise<boolean> {
     await execAsync(command, {
       encoding: 'utf8',
       timeout: 3000,
+      maxBuffer: 1024 * 1024, // 1MB buffer - health check returns minimal output
     });
     return true;
   } catch (error) {
