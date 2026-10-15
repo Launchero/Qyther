@@ -6,7 +6,7 @@ This is the deep-dive technical reference. The README stays shallow; everything 
 
 ## What Qyther is
 
-Qyther is a Windows desktop launcher and AI assistant in one Electron app: a single frameless, always-on-top window summoned with Alt+Space that acts as a fuzzy command-and-file palette (local file search via the Everything `es.exe` CLI) and expands into "Ask mode", a streaming chat driven by a LangGraph agent runtime. That runtime classifies each request and can route it into three capabilities — Windows GUI automation, browser automation through the Playwright MCP server, and office-document generation (`docx`/`pptx`/`xlsx`) — with a human-in-the-loop confirmation gate before any non-safe desktop action. All state is local; the only remote calls are the LLM endpoint, web search, the MCP children, and the `es.exe` download.
+Qyther is a Windows desktop launcher and AI assistant in one Electron app: a single frameless, always-on-top window summoned with Alt+Space that acts as a fuzzy command-and-file palette (local file search via the Everything `es.exe` CLI) and expands into "Ask mode", a streaming chat driven by a LangGraph agent runtime. That runtime classifies each request and can route it into three capabilities — Windows GUI automation, browser automation through the Playwright MCP server, and office-document generation (`docx`/`pptx`/`xlsx`) — with no confirmation gate: every desktop tool runs without asking, by deliberate product decision. All state is local; the only remote calls are the LLM endpoint, web search, the MCP children, and the `es.exe` download.
 
 ## What Qyther is not
 
@@ -38,7 +38,7 @@ Diagrams, in `docs/diagrams/` (the `.mmd` files are the source of truth, the `.s
 
 - [`system-context.mmd`](diagrams/system-context.mmd) — process topology and every external boundary.
 - [`ask-routing.mmd`](diagrams/ask-routing.mmd) — the AskGraph, its router, and the six non-node handlers.
-- [`desktop-hitl.mmd`](diagrams/desktop-hitl.mmd) — the desktop subgraph, the flat ReAct loop and the danger gate.
+- [`desktop-hitl.mmd`](diagrams/desktop-hitl.mmd) — the desktop subgraph, the flat ReAct loop and the danger classification. (The filename is historical: there is no HITL path any more.)
 
 ## Boot sequence
 
@@ -62,11 +62,10 @@ Order is a contract: IPC registration precedes window creation so the renderer c
 | `getAskGraph()` pre-compile | `src/main/services/langgraph/research-agent.ts` | Fire-and-forget promise with `.catch` → warn; recompiled on the first chat |
 | `execSync('npx playwright install chromium')` | `src/main/main.ts` | Wrapped; warns and defers to first use. This is the single largest cold-start offender and the only synchronous blocking call on the boot path |
 | `registerGlobalShortcuts()` | `src/main/shortcuts.ts` | Fatal; the koffi hook plus `globalShortcut` registration |
-| `runDesktopToolsTest()` when `TEST_DESKTOP_TOOLS=1` on Windows | `src/main/utils/desktop-tools-test.ts`, dynamic import | Caught and logged; a smoke harness, not a gate |
 | `createTray()` | `src/main/tray.ts` | Fatal |
 | `createMainWindow()` | `src/main/windows.ts` | Fatal; last step |
 
-Teardown, from the `will-quit` handler in `src/main/main.ts`: `unregisterGlobalShortcuts()` then `destroyTray()` synchronously, then asynchronous `mcpService.cleanup()` and `statefulBrowserAgent.cleanup()`, each with its own catch. The hook and its 10 ms message-pump interval are released inside `cleanupWindowsGlobalHotkey` (`src/main/shortcuts.ts`); if they are not, the process lingers.
+Teardown is a real quit, not a log line. `will-quit` in `src/main/main.ts` calls `event.preventDefault()`, runs the ordered `buildShutdownSteps()` list through `createShutdown()` (`src/main/lifecycle.ts`), and only then `app.exit(0)` — because Electron does not wait on a handler's promises, so the previous handler returned while every disposer was still in flight. `lifecycle.ts` runs the steps sequentially in array order, bounds each at `SHUTDOWN_STEP_DEADLINE_MS` (2 s) so one wedged disposer cannot strand the rest, never rejects, and memoises `run()` so a second `will-quit` joins the run instead of double-disposing. The order: `unregisterGlobalShortcuts()` → `destroyTray()` → `langChainAgent.cleanupBrowserAgent()` (which is also the browser subtree's release path) → `mcpService.cleanup()` → `browserMemory.close()` → `closePiDesktopAgent()` → `getDatabaseManager().close()`. The hook and its 10 ms message-pump interval are released inside `cleanupWindowsGlobalHotkey` (`src/main/shortcuts.ts`), which is why that step is first — if they are not released, the process lingers. `SHUTDOWN_STEP_DEADLINE_MS` is a ceiling on a *stuck* disposer, not a budget for a slow one; the common case is single-digit milliseconds.
 
 The window hides rather than closes: the `close` handler in `src/main/windows.ts` calls `preventDefault()` and hides, and both `hideMainWindow` and the close path emit `window:will-hide` **before** hiding so the renderer can park focus. There is no `requestSingleInstanceLock` and no second-instance handler anywhere in `src/` (0 grep hits), and no blur-to-hide.
 
@@ -85,19 +84,19 @@ Derived counts for this checkout:
 
 | Measure | Count | How derived |
 | --- | --- | --- |
-| `ipcMain.handle` channels, unique | 60 | grep and `sort -u` over `src/main` |
+| `ipcMain.handle` channels, unique | 59 | grep and `sort -u` over `src/main` |
 | — in `src/main/ipc/handlers.ts` | 25 | `grep -c "ipcMain.handle("` |
-| — in `src/main/ipc/chat-handlers.ts` `registerChatHandlers` | 12 | same |
+| — in `src/main/ipc/chat-handlers.ts` `registerChatHandlers` | 11 | same |
 | — in `src/main/ipc/mcp-handlers.ts` `registerMCPHandlers` | 10 | same |
 | — in `src/main/ipc/browser-handlers.ts` `registerBrowserHandlers` | 9 | same |
 | — in `src/main/ipc/api-config.ts` `registerApiConfigHandlers` | 4 | same |
-| `ipcRenderer.invoke` channels in preload | 56 | grep and `sort -u` over `src/preload` |
-| `ipcRenderer.on` push channels in preload | 15 | same |
-| distinct main→renderer send channels | 10 | grep of `.send('` in `src/main`, `sort -u` |
+| `ipcRenderer.invoke` channels in preload | 55 | grep and `sort -u` over `src/preload` |
+| `ipcRenderer.on` push channels in preload | 13 | same |
+| distinct main→renderer send channels | 8 | grep of `.send('` in `src/main`, `sort -u` |
 | `ipcMain.on` receivers | 0 | none exist; every pull channel is `handle`/`invoke` |
 | Namespaces in use | 12 | `app` `window` `command` `url` `file` `apps` `dialog` `debug` `chat` `mcp` `browser` `api-config` |
 
-Invoke distribution across those 56: `chat` 12, `app` 8, `browser` 8, `window` 7, `mcp` 7, `file` 4, `api-config` 4, `dialog` 2, `url` 1, `command` 1, `apps` 1, `debug` 1.
+Invoke distribution across those 55: `chat` 11, `app` 8, `browser` 8, `window` 7, `mcp` 7, `file` 4, `api-config` 4, `dialog` 2, `url` 1, `command` 1, `apps` 1, `debug` 1.
 
 Naming convention is `namespace:camelCaseVerb`, with two known three-segment exceptions: `file:everything:status` (`src/main/ipc/handlers.ts`) and `desktop:screenshot:capture` (`src/preload/preload.ts`).
 
@@ -110,10 +109,10 @@ These are half-wired bridges, not absent features. Do not delete the surviving h
 | Drift | Detail |
 | --- | --- |
 | Handlers registered but unreachable from the renderer (4) | `browser:initialize`, `browser:executeTask`, `browser:cleanup` (all in `src/main/ipc/browser-handlers.ts` `registerBrowserHandlers`) and `mcp:initialize` (`src/main/ipc/mcp-handlers.ts` `registerMCPHandlers`). `src/preload/preload.ts` invokes `browser:initializeAgent` instead, a different channel, which shadows `browser:initialize` |
-| Preload listeners with no sender in main (5) | `chat:stream-replace`, `chat:ui-payload-started`, `chat:ui-payload-progress`, `chat:ui-payload-reset` (all `src/preload/preload.ts`), plus `desktop:screenshot:capture` |
+| Preload listeners with no sender in main (1) | `desktop:screenshot:capture` |
 | Preload sends with no receiver (2) | `desktop:screenshot:result` and `desktop:screenshot:error`. There are zero `ipcMain.on` registrations repo-wide, so the whole screenshot round-trip is dead at both ends |
 | Senders with no listener | none |
-| Invokes with no handler | none — 56 invokes all resolve |
+| Invokes with no handler | none — 55 invokes all resolve |
 | Cross-namespace registration | `browser:initializeAgent` and `browser:getStatus` are registered by `registerMCPHandlers`, not by `registerBrowserHandlers`. Grep `ipcMain.handle` across all five files before assuming where a `browser:*` channel lives |
 
 Three error idioms coexist and a new handler must pick one deliberately: a result envelope `{ success, output?, error? }` with the throw swallowed into a log (`command:execute`, `url:open`, `file:open` in `src/main/ipc/handlers.ts`); a re-throw that crosses IPC and rejects the renderer promise (`window:setMode`, `file:search`, `browser:executeTask`); or a swallowed failure returning a fallback value (`window:getMode` and `window:toggleMode` fall back to `'compact'`, `window:getHeight` to `600`).
@@ -124,10 +123,11 @@ Four compiled graphs, 29 nodes total, all counts from `.addNode` greps.
 
 | Graph | File | Nodes | Names |
 | --- | --- | --- | --- |
-| AskGraph | `src/main/services/langgraph/research-agent.ts` `getAskGraph` | 5 | `classify`, `browserSubgraph`, `desktopSubgraph`, `documentSubgraph`, `postProcessNode` |
+| AskGraph | `src/main/services/langgraph/research-agent.ts` `getAskGraph` | 5 | `classify`, `browserSubgraph`, `desktopAgent`, `documentSubgraph`, `postProcessNode` |
 | Browser subgraph | `src/main/services/browser/browser-subgraph.ts` | 8 | `memoryRetrieve`, `skillRouter`, `loadSkills`, `planner`, `executeSubtask`, `verifier`, `recovery`, `memoryStore` |
-| Desktop subgraph | `src/main/services/desktop/desktop-subgraph.ts` | 7 | `memoryRetrieve`, `planner`, `executeSubtask`, `delegateToBrowser`, `verifier`, `recovery`, `memoryStore` |
 | Document subgraph | `src/main/services/document/document-subgraph.ts` | 9 | `memoryRetrieve`, `classifyAction`, `planner`, `executeAction`, `delegateToBrowser`, `delegateToDesktop`, `verifier`, `recovery`, `memoryStore` |
+
+Three compiled graphs, 22 nodes. There is no desktop subgraph: it was deleted at the Pi cutover. `desktopAgent` is a node in name only — `desktopAgentNode` makes one call to `runPiDesktopTask(...)` in `src/main/services/pi/agent.ts` and maps the returned tool progress onto `desktopActions` / `desktopExecutionTrace`. The Pi agent is a single loop over 32 TypeBox tools, not a plan→execute→verify→recover graph, so there is nothing to register.
 
 AskGraph shape: `__start__` → `classify` → a conditional edge → exactly one of the three subgraph nodes → all three fan into `postProcessNode` → `END`. The checkpointer is `new MemorySaver()` and the compiled instance is cached on an env-derived key (`getGraphEnvCacheKey`), so `getAskGraph()` pays the compile once at boot. After changing `MODEL`, `FAST_MODEL`, `BASE_URL` or `API_KEY` at runtime you must call `clearGraphCache()` or the cached graph keeps the old model config.
 
@@ -139,48 +139,45 @@ Why that distinction matters: because they are not nodes, they produce no LangGr
 
 Streaming contract, implemented in `src/main/ipc/chat-handlers.ts` inside `registerChatHandlers`.
 
-- `graph.streamEvents(input, { version: "v2", configurable: { thread_id }, recursionLimit: 50, timeout })` on the `chat:sendStreamMessage` handler, with the same shape repeated on the resume path.
-- The thread id is per-turn, `${sessionId}:turn-${Date.now()}`, so one `MemorySaver` thread never carries checkpoint state across turns. The resume path uses the session thread id instead.
-- Tokens are emitted **only** for nodes in the `responseNodes` whitelist, and that `Set` is written out twice — once inside the `chat:sendStreamMessage` handler and again inside the `chat:resumeGraph` handler. Both contain the same four entries (`browserSubgraph`, `desktopSubgraph`, `documentSubgraph`, `postProcessNode`). `classify` is deliberately absent, so classification never streams tokens; it appears in `NODE_AGENT_MAP` only.
+- `graph.streamEvents(input, { version: "v2", configurable: { thread_id }, recursionLimit: 50, timeout })` on the `chat:sendStreamMessage` handler. That is the only chat pump: `chat:sendMessage` and the HITL `chat:resumeGraph` pump were both deleted.
+- The thread id is per-turn, `${sessionId}:turn-${Date.now()}`, so one `MemorySaver` thread never carries checkpoint state across turns.
+- Tokens are emitted **only** for nodes in `RESPONSE_NODE_SET`, which the `chat:sendStreamMessage` pump imports from `src/main/services/langgraph/node-registry.ts`. It contains the four entries `browserSubgraph`, `desktopSubgraph`, `documentSubgraph`, `postProcessNode`; `classify` is deliberately absent, so classification never streams tokens and appears in `NODE_AGENT_MAP` only. Both maps are derived from one `ASK_GRAPH_NODES` table, and `research-agent-registry.test.ts` compares that table against the `.addNode()` calls in `research-agent.ts`, so a node and its registry row cannot disagree.
 - `NODE_AGENT_MAP` maps the five AskGraph node names to UI agent labels (`classify` and `postProcessNode` render as Research, the three subgraphs as Browser, Desktop, Document).
 - Push channels: `chat:stream-chunk` for tokens, `chat:thinking-step` for reasoning steps, `chat:agent-change` for the agent pill. The final chunk carries `uiPayloads`, `sources` and `metrics`. Every post-stream state read goes through `withStateLock`.
 - Structured output uses one trio consistently: a Zod schema, `chatModel.withStructuredOutput(schema, { method: "jsonMode" })`, then a post-parse validity filter. The renderer side mirrors it as a five-member payload union in `src/renderer/components/ask-mode/GenerativeUI/index.tsx` (`GenerativeUIType`: `table`, `form`, `comparison`, `list`, `chart`) with a JSON fallback branch for unknown types.
 
-Human-in-the-loop. A node calls `interrupt()` (the live caller is `src/main/services/desktop/desktop-agent.ts`), LangGraph pauses and stores `__interrupt__` in state; `chat-handlers.ts` reads it after the stream ends, checks that the payload type is `desktop_confirmation`, and pushes `desktop:confirmation-request` to that specific `event.sender`. The renderer answers through `chat:resumeGraph`, which rebuilds the input as `new Command({ resume: confirmed })` and re-enters `streamEvents` with a 60 s resume timeout. Denial is not just a skip: the desktop agent pushes both a ToolMessage and a HumanMessage instructing the model not to retry that action.
+No human-in-the-loop path exists. There used to be one — a node called `interrupt()`, `chat-handlers.ts` pushed `desktop:confirmation-request`, and the renderer answered through `chat:resumeGraph` — but the whole round trip has been removed as a deliberate product decision: no `interrupt()` call remains anywhere, both IPC channels are deleted, `src/shared/ipc/hitl-decision.ts` is deleted, and `desktopConfirmationState` is gone from `AskState`. Every desktop tool runs without asking.
 
-Delegation between agents travels in `AskState.crossAgentContext` (an append reducer in `src/main/services/langgraph/state.ts`) and in typed results such as `BrowserDelegationResult`. The edges are one-directional: document delegates to both browser and desktop (`src/main/services/document/document-delegation.ts`), desktop delegates to browser only (`src/main/services/desktop/desktop-subgraph.ts` `delegateToBrowser`), and there is no desktop-to-document handoff and no browser delegation out of the browser subtree.
+Cancellation is the other half of that story, and it is what replaced the gate. The chat pump registers each turn's `AbortController` in `activeTurns` keyed by the per-turn thread id, and `chat:cancelTurn {threadId}` aborts it. LangGraph does not cancel a node that is already running, so the pump's `finally` in `chat-handlers.ts` also calls `abortPiDesktopRun()` — on **every** exit path, not only a user stop. Inside the Pi agent, `withAbort` (`src/main/services/pi/abort.ts`) races `agent.prompt()` against the run's own controller, so the node settles as an abort instead of hanging; a `Stop` press, the 120 s `GRAPH_TIMEOUT_MS` and normal completion all end up there. That combination is what closes the 2026-10-15 hang, where a 3-step task left main at 0% CPU on a promise that never resolved.
+
+Delegation between agents travels in `AskState.crossAgentContext` (an append reducer in `src/main/services/langgraph/state.ts`) and in typed results such as `BrowserDelegationResult`. The edges are one-directional: document delegates to both browser and desktop (`src/main/services/document/document-delegation.ts`), the desktop agent is reached by the AskGraph's `desktopAgent` node via `runPiDesktopTask`, and there is no desktop-to-document handoff and no browser delegation out of the browser subtree.
 
 ## The desktop capability
 
-Registry truth: **32 tools**, counted three independent ways in this checkout — 32 `export function create<X>Tool` factories in `src/main/services/desktop/desktop-tools.ts`, 32 matching `name: '<tool>'` descriptors in the same file, and 32 `create<X>Tool(` calls in the tool array built by `DesktopAgent.initialize()` in `src/main/services/desktop/desktop-agent.ts`. Any doc saying 26 or 28 is stale.
+Registry truth: **32 tools**, all TypeBox `AgentTool`s in `src/main/services/pi/toolbox.ts`, and the list is frozen by `src/main/services/pi/toolbox.test.ts`, which asserts the toolbox exposes exactly those 32 names. Any doc saying 26 or 28 is stale. They were zod `tool()` factories in `src/main/services/desktop/desktop-tools.ts` until the Pi cutover deleted that file.
 
-The 32 names, as they appear in `DANGER_POLICY`: `click`, `click_element`, `clipboard`, `close_window`, `double_click`, `drag`, `execute_command`, `file_operations`, `focus_window`, `get_element_info`, `get_element_text`, `get_screen_text`, `get_selected_text`, `get_window_info`, `get_window_list`, `hold_key`, `hover`, `invoke_element`, `key_combo`, `launch_app`, `maximize_window`, `minimize_window`, `move_mouse`, `navigate_to_path`, `restore_window`, `right_click`, `screenshot`, `scroll`, `search_elements`, `set_element_value`, `type_text`, `wait`.
+The 32 names: `click`, `click_element`, `clipboard`, `close_window`, `double_click`, `drag`, `execute_command`, `file_operations`, `focus_window`, `get_element_info`, `get_element_text`, `get_screen_text`, `get_selected_text`, `get_window_info`, `get_window_list`, `hold_key`, `hover`, `invoke_element`, `key_combo`, `launch_app`, `maximize_window`, `minimize_window`, `move_mouse`, `navigate_to_path`, `restore_window`, `right_click`, `screenshot`, `scroll`, `search_elements`, `set_element_value`, `type_text`, `wait`.
 
-Adding one tool requires six coupled edits, and only one of them is compiler-checked.
+Adding one tool requires four coupled edits, and only one of them is mechanically checked.
 
 | # | Edit | File and symbol | Consequence if skipped |
 | --- | --- | --- | --- |
-| 1 | `create<X>Tool` factory | `src/main/services/desktop/desktop-tools.ts` | the tool does not exist |
-| 2 | add the kebab name to `DesktopToolName` | `src/main/services/desktop/types.ts` | type error |
-| 3 | add a `DANGER_POLICY` entry | `src/main/services/desktop/desktop-agent.ts` | typecheck fails — `Record<DesktopToolName, DangerLevel>` is exhaustiveness-checked; this is the one mechanical guard |
-| 4 | push the factory into the `initialize()` array | `src/main/services/desktop/desktop-agent.ts` | `bindTools` never sees it; the model cannot call it |
-| 5 | add a guidance line to the system prompt | `src/main/services/desktop/desktop-agent.ts` | the model never prefers it over a screenshot |
-| 6 | teach `inferStatusFromTool` | `src/main/services/desktop/desktop-agent.ts` | the UI reports `capturing` forever, silently |
+| 1 | `AgentTool` factory with its TypeBox `parameters` schema inline | `src/main/services/pi/toolbox.ts` | the tool does not exist |
+| 2 | add the name to the frozen list | `src/main/services/pi/toolbox.test.ts` | `toolbox.test.ts` fails — this is the one mechanical guard |
+| 3 | report a real `details.status` (and `details.verifies: true` only if it should run the pixel verifier) | the tool's `execute` | the UI reports `capturing` forever, silently |
+| 4 | add a guidance line to the system prompt | `src/main/services/pi/prompt.ts` | the model never prefers it over a screenshot |
 
-Danger policy, counted from the map: **29 `safe`, 2 `reviewable`, 1 `dangerous`**. The reviewable tools are `drag` and `execute_command`; `close_window` is the only dangerous one. A tool absent from the map defaults to `reviewable`, so nothing fails open.
+There is no danger policy and no status-inference map any more. `DANGER_POLICY` (29 `safe`, 2 `reviewable`, 1 `dangerous`) and `inferStatusFromTool` both died with `desktop-agent.ts`, and **neither is replaced**. Every tool reports its own `details.status`, so the exhaustiveness check that used to guard the policy map is unnecessary — a tool cannot forget its own flag. Nothing pauses for approval: that gate was removed by decision, so `execute_command` still runs arbitrary PowerShell with no prompt and no allowlist.
 
-`file_operations` overrides its own level per action inside the danger check, because it is one tool with seven enum actions (`list_directory`, `read_file`, `write_file`, `copy_file`, `move_file`, `delete_file`, `file_exists`): `delete_file` → `dangerous`; `write_file`, `copy_file`, `move_file` → `reviewable`; the remaining three → `safe`. Its map entry reads `safe`, so adding a new action to the enum without touching the override silently downgrades it.
+`file_operations` (seven enum actions: `list_directory`, `read_file`, `write_file`, `copy_file`, `move_file`, `delete_file`, `file_exists`) carries no per-action danger override any more.
 
-Any level that is not `safe` triggers `interrupt()`. Approval logs and executes; denial injects the "do not attempt again" messages and continues the loop.
-
-Two verifier levels, and only one of them is automatic.
+One verifier, automatic.
 
 | Verifier | File | When it runs | Gate |
 | --- | --- | --- | --- |
-| `GroundTruthVerifier` | `src/main/services/desktop/verifier.ts` | in-loop, only when `dangerLevel === 'dangerous'` (`desktop-agent.ts` checks this before invoking it) | pixel-diff thresholds `PIXEL_DIFF_THRESHOLD` 0.01 and `ACTION_EFFECT_MIN_DIFF` 0.02; injects a corrective HumanMessage on hard-reject or a score below 0.5 |
-| `desktopVerifier` | `src/main/services/desktop/desktop-verifier.ts` | the `verifier` node of the desktop subgraph, after every subtask | UIA-first with a deterministic window fast path; screenshot fallback scores window 0.4, pixel 0.4, OCR 0.2; `HARD_REJECT_THRESHOLD` 0.3. Its `verifyBrowserDelegation` method has no caller |
+| `GroundTruthVerifier` | `src/main/services/desktop/verifier.ts` | after any tool whose result sets `details.verifies` — `close_window` is the only one today | pixel-diff thresholds `PIXEL_DIFF_THRESHOLD` 0.01 and `ACTION_EFFECT_MIN_DIFF` 0.02; the verdict is fed back with `agent.steer()` on hard-reject or a score below 0.5 |
 
-Recovery ladder in `src/main/services/desktop/desktop-recovery.ts`: `MAX_RETRIES = 2`; `shouldRetry` treats not-found style errors as non-transient and never retries them, timeouts, capture failures and access-denied as transient; above the ceiling the strategy becomes `abort`. `replan` routes back to the planner, `retry` back to `executeSubtask`, and both `skip` and `abort` route to `memoryStore`. The browser subtree keeps its own five-strategy union (`retry`, `alternative`, `replan`, `skip`, `abort` in `src/main/services/browser/types.ts`) and aborts at three recoveries.
+The 912-line NL-postcondition `desktop-verifier.ts`, the `verifier` node it ran in, the recovery ladder in `desktop-recovery.ts` (`MAX_RETRIES = 2`, `shouldRetry`, `replan`) and the trajectory memory in `desktop-memory.ts` were all deleted at the Pi cutover; Pi has no equivalent. The browser subtree keeps its own five-strategy recovery union (`retry`, `alternative`, `replan`, `skip`, `abort` in `src/main/services/browser/types.ts`) and aborts at three recoveries.
 
 Native backend families — four mechanisms, and the accessibility one is often mis-documented.
 
@@ -188,12 +185,12 @@ Native backend families — four mechanisms, and the accessibility one is often 
 | --- | --- | --- |
 | koffi FFI | `src/main/services/desktop/input-simulation.ts` | loads `user32.dll` and `shell32.dll` through `koffi.load`; 44 exported functions covering SendInput, cursor and window APIs, DPI helpers, `blockInput`, and elevation/protection probes |
 | libwin32 | same file, the `libwin32/user32` and `libwin32/advapi32` imports | used only for `GetWindowThreadProcessId` and token elevation; DPI and input-blocking are koffi-only |
-| UIA via COM | `src/main/services/desktop/uia-native.ts` (`require('node-winautomation')`) behind the `AccessibilityTreeAdapter` facade in `accessibility-tree.ts` | **native COM, not PowerShell UIA.** `uia-wrapper.ts` is the old PowerShell path and has zero importers repo-wide. The adapter logs that it initialised natively with no PowerShell |
+| UIA via COM | `src/main/services/desktop/uia-native.ts` (`require('node-winautomation')`) behind the `AccessibilityTreeAdapter` facade in `accessibility-tree.ts` | **native COM, not PowerShell UIA.** The old PowerShell path (`uia-wrapper.ts`) has been deleted. The adapter logs that it initialised natively with no PowerShell |
 | Screen capture and OCR | `screenshot-capture.ts` (`electron.desktopCapturer.getSources`) and `windows-adapter.ts` (`tesseract.js` `createWorker`) | capture falls back to a PowerShell `System.Drawing` script on failure or when zero sources return, once plus one retry; OCR backs the screenshot-fallback verifier score |
 
-`DesktopAdapter` in `src/main/services/desktop/types.ts` is the seam between tools and Win32, with `WindowsDesktopAdapter` as its only implementation. Counted from the interface body it declares **17** methods, not the 18 stated in `src/main/services/desktop/AGENTS.md` — the code is the authority here.
+`DesktopAdapter` in `src/main/services/desktop/types.ts` is the seam between tools and Win32, with `WindowsDesktopAdapter` as its only implementation. Counted from the interface body it declares **18** members: 17 tool-facing methods plus the optional `cleanup?()`, which `PiDesktopAgent.dispose()` calls on quit to terminate the tesseract worker and release the input-simulation FFI state. `cleanup` is optional precisely so a stub adapter in `toolbox.test.ts` need only implement the 17.
 
-Two handle tables are the agent's only working memory and both are process-local integers: `hWndMap` in `input-simulation.ts` (rendered to the model as `[N] "title"` by `get_window_list` and re-resolved by every window tool) and `elementHandleMap` in `uia-native.ts`. Stale handles fail with an explicit "may be invalid or the window may no longer exist" string, so the model must re-list after any UI change. Coordinates are clamped to the primary `workArea` in `windows-adapter.ts`, not to the full screen. `execute_command` runs arbitrary strings through `exec` with `shell: 'powershell.exe'` and a 30 s default timeout, with no allowlist — its only guard is the reviewable HITL gate.
+Two handle tables are the agent's only working memory and both are process-local integers: `hWndMap` in `input-simulation.ts` (rendered to the model as `[N] "title"` by `get_window_list` and re-resolved by every window tool) and `elementHandleMap` in `uia-native.ts`. Stale handles fail with an explicit "may be invalid or the window may no longer exist" string, so the model must re-list after any UI change. Coordinates are clamped to the primary `workArea` in `windows-adapter.ts`, not to the full screen. `execute_command` runs arbitrary strings through `exec` with `shell: 'powershell.exe'` and a 30 s default timeout, with no allowlist and no confirmation prompt.
 
 ## Persistence and local state
 
@@ -214,9 +211,9 @@ Chat history is **not** persisted. Sessions live in the `sessions: Map` inside `
 
 | Boundary | Code | Contract |
 | --- | --- | --- |
-| LLM endpoint | `src/main/services/langgraph/research-agent.ts` (`chatModel`, `routerModel`, `rewriteModel`) and `src/main/services/langchain/agent.ts` | any OpenAI-compatible endpoint through `@langchain/openai` `ChatOpenAI`. Four env vars, read at module import: `API_KEY`, `BASE_URL`, `MODEL`, `FAST_MODEL` (plus `TAVILY_API_KEY` for search). Without a key `chatModel` stays null and ask-mode returns a canned error string — there is no mock or offline path beyond the classifier fast path |
-| MCP servers | `src/main/services/mcp/client.ts` `MCPService`, config `mcp-config.json` at repo root | client only, over `MultiServerMCPClient` from `@langchain/mcp-adapters` with a 30 s default tool timeout. Three servers declared here: `filesystem`, `sequential-thinking`, `playwright`. Loading is gated on `prefs.mcp.enabled`; a missing or unparseable config degrades to zero servers with a warning, never a crash |
-| Web search | `src/main/services/langgraph/tools.ts` `webSearchTool` | DuckDuckGo HTML scrape (`https://html.duckduckgo.com/html/`) with a Tavily fallback (`https://api.tavily.com/search`) used only when `TAVILY_API_KEY` is set. The result-scraping regexes are fragile by nature |
+| LLM endpoint | `src/main/services/langgraph/research-agent.ts` (`chatModel`, `routerModel`, `rewriteModel`) and `src/main/services/langchain/agent.ts` | any OpenAI-compatible endpoint through `@langchain/openai` `ChatOpenAI`. Four env vars, read at module import: `API_KEY`, `BASE_URL`, `MODEL`, `FAST_MODEL` (plus the optional `TAVILY_API_KEY` / `BRAVE_API_KEY` / `JINA_API_KEY` for web). Without a key `chatModel` stays null and ask-mode returns a canned error string — there is no mock or offline path beyond the classifier fast path |
+| MCP servers | `src/main/services/mcp/client.ts` `MCPService`, config `mcp-config.json` at repo root | client only, over `MCPAdapter` (2.x; was `MultiServerMCPClient`) from `@langchain/mcp-adapters` with `prefixToolNameWithServerName: false` and a 30 s default tool timeout. Three servers declared here: `filesystem`, `sequential-thinking`, `playwright`. Loading is gated on `prefs.mcp.enabled`; a missing or unparseable config degrades to zero servers with a warning, never a crash |
+| Web search and page fetch | `src/main/services/web/` — `searchWeb`, `fetchWebPage`, `checkFetchUrl` | Sequential provider chain in registry order (`exa` -> `parallel` -> `searxng` -> `marginalia` -> `duckduckgo` -> `tavily` -> `brave`), first usable response wins, failures returned as model-facing notes rather than thrown. **Five of the seven need no API key at all**: two keyless MCP endpoints (`mcp.exa.ai/mcp`, SSE-framed; `search.parallel.ai/mcp`, double-encoded payload), a bounded rotating pool of public SearXNG instances, the Marginalia small-web index, and the DuckDuckGo HTML endpoint. Every keyless engine rate-limits by IP (measured: 0 of 71 SearXNG instances served JSON to a cloud IP, DuckDuckGo bans and unbans on its own), so the chain is a best-effort ladder rather than redundancy. Measured live 2026-10-15. Google-style query directives (`site:`, `-site:`, `after:`/`before:`, `filetype:`, quoted phrases) are parsed once, re-emitted per engine dialect, and re-applied as a lenient post-filter that relaxes a constraint matching nothing. Fetch: `<url>.md` sibling, markdown content negotiation, reader chain (local extractor, then `r.jina.ai`) behind a quality gate, 500k hard cap plus a caller budget. Every URL passes `checkFetchUrl` (http/https only, no credentials, loopback/private/link-local/metadata blocked) **twice** — once on the string, once after redirects. Consumed by `externalSearchNode`; the old `langgraph/tools.ts` is deleted |
 | Local file index | `src/main/utils/esDownloader.ts` and `esRunner.ts` | `es.exe` is fetched from the GitHub releases API for `voidtools/ES` and unzipped into userData; searches shell out to it |
 | Browser | `src/main/services/browser/stateful-browser-agent.ts` | Chromium is driven **only** through the Playwright MCP stdio child (headless, `--caps=vision`), selected by a `browser_` name-prefix filter. No browser tool count is declared in this repo and none should be written into code or docs |
 | Operating system | the desktop subtree above | Win32 via koffi/libwin32, UIA via `node-winautomation` COM, capture via Electron `desktopCapturer`, OCR via `tesseract.js`, plus a PowerShell `System.Drawing` capture fallback |
@@ -226,7 +223,7 @@ Chat history is **not** persisted. Sessions live in the `sessions: Map` inside `
 | Trap | Where | Effect |
 | --- | --- | --- |
 | Unregistered logger subsystems lose their `info` and `debug` lines in production | `SUBSYSTEM_ENV_VARS` in `src/main/utils/logger.ts` | 50 distinct `createLogger('<Name>')` subsystem names are constructed across `src/main`, of which 26 have a registry entry. The remaining **24 are unregistered**, including all seven `Document*` names and six of the nine `Browser*` names, plus `InputSimulator`, `UIANative`, `AccessibilityTree`, `ScreenshotCapture`, `WindowsDesktopAdapter`, `GroundTruthVerifier`, `MCPRouter`, `ApiConfig`. An unregistered name inherits `globalLevel`, which defaults to `error` in production, so its `info` and `debug` output never appears and no environment switch can enable it |
-| A new graph node missing the streaming maps produces no output at all | `NODE_AGENT_MAP` and both `responseNodes` sets in `src/main/ipc/chat-handlers.ts` | no tokens, no agent change, no error. Register the node in `NODE_AGENT_MAP` and in **both** duplicated whitelists |
+| A new graph node with no registry row used to produce no output at all | one `ASK_GRAPH_NODES` table (`src/main/services/langgraph/node-registry.ts`), bound to the builder by `research-agent-registry.test.ts` | the failure mode was silent: no tokens, no agent change, no error. Register the node once and `NODE_AGENT_MAP` plus the emitting set follow automatically; a node and a registry row that disagree now fail `npm run test` |
 | `clearGraphCache()` is exported but called by nothing | `src/main/services/langgraph/research-agent.ts` | env changes after the first `getAskGraph()` are silently ignored; invalidation is manual and there is no env watcher |
 | Model default drift | `chatModel` in `src/main/services/langchain/agent.ts` defaults to `qwen3.5-plus`; every other default across `agent.ts`, `research-agent.ts`, `chat-handlers.ts` and the browser planner/verifier/recovery defaults to `qwen3.6-plus` | applies only when `MODEL` is unset; harmonise, do not add a third value |
 | Runtime prompt material is not packaged | the copy step in `electron.vite.config.ts` and `build.files` in `package.json` | the build copies only `sql-wasm.wasm` and `Automation.node` into `out/main`, and packages `out/**/*` plus `package.json`. `src/main/services/browser/skills/` holds six `SKILL.md` directories that no copy step touches — verified empirically: `out/main/` in this checkout contains the wasm but no `skills` directory. `browser-skill-loader.ts` resolves `skills` next to the bundle, so a production build logs "Skills directory not found" and runs with zero skills; skills are observable only under `npm run dev`. Same reasoning applied to `mcp-config.json`: it sits at the repo root, is resolved from `PROJECT_ROOT` in `client.ts`, and is not in `build.files` — inference, not an observed production run, that a packaged build therefore starts with no MCP servers |
@@ -237,7 +234,7 @@ Chat history is **not** persisted. Sessions live in the `sessions: Map` inside `
 | `stepTimeout` is declared and never read | `stateful-browser-agent.ts` and `browser-session-manager.ts` | there is no 30 s per-step limit; the effective timeout is the Playwright MCP env value |
 | The direct browser IPC bypasses the subgraph | `browser:executeTask` in `src/main/ipc/browser-handlers.ts` | runs the bare ReAct executor with no planner, verifier, recovery or skills; skills and the plan/verify loop apply only to the graph and delegation entry points |
 | Reducers are load-bearing | `src/main/services/langgraph/state.ts` | a per-turn field using an append reducer instead of `replaceArray` leaks across turns on a reused thread |
-| Three copies of a dead detector | `ui-detector.ts` in `desktop/`, `document/` and `browser/` | the desktop and document copies differ only in their `SOURCE_NODE` constant; all three have zero importers. `uia-wrapper.ts`, `document-tools.ts`, `mockAskData.ts` and several renderer hooks and components are likewise dead with zero importers |
+| Three deleted detectors | `ui-detector.ts` in `desktop/`, `document/` and `browser/` have been deleted (all three had zero importers). `document-tools.ts`, `mockAskData.ts` and several renderer hooks and components are likewise dead with zero importers |
 
 ## Known gaps and honest limits
 
@@ -253,32 +250,31 @@ Chat history is **not** persisted. Sessions live in the `sessions: Map` inside `
 
 `command:execute` is the sharpest edge: its only guard lives in the preload layer, which is renderer-reachable, so any direct `ipcRenderer.invoke('command:execute', …)` from a compromised renderer bypasses the blocklist entirely. Tightening validation means tightening both layers in the same change, with main as the boundary the sandbox actually guarantees.
 
-**The two test files import no production code.** `src/main/ipc/handlers.test.ts` imports only `describe`, `it` and `expect` from vitest and re-declares its own copies of the three validators named above. `src/main/services/langgraph/research-agent.test.ts` imports vitest plus a type-only `AskStateType`, and re-implements router logic for routers that do not exist in `research-agent.ts`. A green suite therefore proves nothing about IPC or about the graph.
+**Coverage is real but uneven.** `npm run test` collects 38 files / 305 tests, and 35 of them import production code - the guards (`command-guard.test.ts`, `file-guard.test.ts`, `api-config-guard.test.ts`), the window singleton (`windowManager.test.ts`), the quit-time teardown policy (`lifecycle.test.ts`, which is why that module is Electron-free and separate from `main.ts`), the IPC wire contracts (`chat-sessions-push.test.ts`, `chat-cancel-turn.test.ts`), the logger registry (`logger.test.ts`), the shared boundary parsers (`src/shared/ipc/*.test.ts`), the agent's session publish (`sessions-publish.test.ts`), the Pi runtime (`pi/provider.test.ts`, `pi/toolbox.test.ts` driving all 32 tools against stub adapters, `pi/events.test.ts`, `pi/cancel.test.ts`), `input-simulation.ts` (`ffi.test.ts`) and the renderer hook tests plus one pure renderer util test (`markdownBlocks.test.ts`). Only three still prove nothing about shipped code: `handlers.test.ts` re-declares its own copies of `validateUrl`/`validatePath`/`isCommandSafe` and imports nothing from production; `ocr.test.ts` re-implements its subject against `pngjs`; `client-contract.test.ts` imports only the `@langchain/mcp-adapters` library (though it drives the repo's own stdio MCP server, which makes it a genuine contract test of a dependency's behaviour, not of this repo's code). No test imports any `services/browser` module, and nothing constructs a `PiDesktopAgent` or runs a real Pi loop. `lifecycle.test.ts` covers the teardown *policy* and not the `will-quit` wiring, because `main.ts` is structurally unimportable under vitest — so the quit path's coverage stops one layer short of where the resources actually are. A green suite therefore under-proves the handler surface, and only the live harness (`scripts/harness/`) exercises the shipped window.
 
 **Measured gate results in this checkout** (run after `npm install`; `node_modules` is present here, which contradicts several AGENTS.md files that still assert it is absent, and `tsconfig.json` no longer sets `baseUrl`):
 
 | Gate | Command | Result |
 | --- | --- | --- |
 | Typecheck | `npx tsc --noEmit` | exit 0, no output — 0 errors |
-| Lint | `npx eslint "src/**/*.ts" "src/**/*.tsx"` | exit 0, 81 warnings and 0 errors (unused vars and `no-explicit-any`, both configured to warn) |
-| Unit tests | `npx vitest run` | exit 0, 2 test files, 65 tests, all passing — and see the caveat immediately above |
+| Lint | `npx eslint "src/**/*.ts" "src/**/*.tsx"` | exit 0, 44 warnings and 0 errors (unused vars and `no-explicit-any`, both configured to warn) |
+| Unit tests | `npx vitest run` | exit 0, 38 test files / 305 tests, all passing — and see the caveat immediately above |
 
-**What is untested, deliberately on the record.** All 60 IPC handlers, the whole streaming contract, `langchain/agent.ts`, every graph node, every reducer, `tools.ts`, the HITL `interrupt()` round-trip, all 32 desktop tool factories, `DANGER_POLICY` enforcement, both ReAct loops and the subgraph routers, verifier scoring, memory persistence, the screenshot fallback, DPI clamping, the entire browser subtree, the skill loader, and the entire document subtree. `npm run typecheck` plus a manual pass in `npm run dev` is the only real gate for most of this code. There are no renderer tests at all: no `*.test.tsx` file exists anywhere in the repo. `scripts/desktop-ffi-test.ts` re-declares its own koffi bindings rather than importing `input-simulation.ts`, so it validates the FFI pattern rather than shipped code, and it is wired to no npm script.
+**What is untested, deliberately on the record.** Most of the ~60 IPC handlers — the ones that validate now have a test (`command-guard`, `file-guard`, `api-config-guard`, and the three chat wire contracts), but `app:*`, `dialog:*`, `apps:list`, `url:open`, `debug:log` and the `window:resizeHeight` handler itself still have none (`windowManager.test.ts` proves `clampExpandedHeight`, not the handler's expanded-mode-only check or its returned height). The token-stream pump (chunk assembly, `NODE_AGENT_MAP` routing, the `responseNodes` whitelist) has no test even though the cancel path does. The document subtree has one executor test, not coverage. The entire browser subtree and the skill loader have none. `main.ts`, `windows.ts`, `shortcuts.ts` and `tray.ts` have none, so the Alt+Space hook and the reveal/settle pushes are proven only by `npm run harness:selftest` against the running window. `scripts/desktop-ffi-test.ts` re-declares its own koffi bindings rather than importing `input-simulation.ts`, so it validates the FFI pattern rather than shipped code, and it is wired to no npm script — `src/main/services/desktop/ffi.test.ts` is the version that does import production. Renderer hooks are covered by five `.test.tsx` files (`useWindowMode`, `useWindowReveal`, `useWindowTween`, `useResizeDrag`, `useChatSession`); no component-level or DOM-integration test exists, so layout and CSS remain manual-pass territory.
 
 ## How this doc is verified
 
 Every number above was re-derived, not copied. Run these from the repo root; they are all read-only.
 
 ```bash
-# desktop tool count — must agree on all three
-grep -cE "^export function create[A-Za-z]+Tool" src/main/services/desktop/desktop-tools.ts
-grep -cE "name: '[a-z_]+'" src/main/services/desktop/desktop-tools.ts
-awk '/^const DANGER_POLICY/,/^};/' src/main/services/desktop/desktop-agent.ts | grep -cE "^  '?[a-z_]+'?:"
+# desktop tool count — the frozen list in the test is the authority
+npx vitest run src/main/services/pi/toolbox.test.ts
+grep -cE "^  name: '[a-z_]+'" src/main/services/pi/toolbox.ts
 
-# danger distribution — 29 safe, 2 reviewable, 1 dangerous
-awk '/^const DANGER_POLICY/,/^};/' src/main/services/desktop/desktop-agent.ts | grep -oE "'(safe|reviewable|dangerous)'" | sort | uniq -c
+# there is no DANGER_POLICY and no inferStatusFromTool any more; both died with desktop-agent.ts
+grep -rn "DANGER_POLICY\|inferStatusFromTool" src/main | grep -v "^\S*:\s*[0-9]*:\s*\*\|//"
 
-# IPC surface — expect 60 handlers, 56 invokes, 15 listener channels, 10 send channels
+# IPC surface — expect 59 handlers, 55 invokes, 13 listener channels, 8 send channels
 grep -rhoE "ipcMain\.handle\(\s*['\"][^'\"]+" src/main   | sed -E "s/.*\(\s*['\"]//;s/['\"]//" | sort -u | wc -l
 grep -rhoE "ipcRenderer\.invoke\(\s*['\"][^'\"]+" src/preload | sed -E "s/.*\(\s*['\"]//;s/['\"]//" | sort -u | wc -l
 grep -rhoE "ipcRenderer\.on\(\s*['\"][^'\"]+" src/preload     | sed -E "s/.*\(\s*['\"]//;s/['\"]//" | sort -u | wc -l
@@ -291,9 +287,9 @@ comm -23 <(grep -rhoE "ipcRenderer\.on\(\s*['\"][^'\"]+" src/preload | sed -E "s
          <(grep -rhoE "\.send\(\s*['\"][^'\"]+" src/main | sed -E "s/.*\(\s*['\"]//;s/['\"]//" | sort -u)
 grep -rn "ipcMain.on(" src/main   # expect no matches
 
-# graph nodes — expect 5, 8, 7, 9 for a total of 29 across 4 compiled graphs
+# graph nodes — expect 5, 8, 9 for a total of 22 across 3 compiled graphs (there is no desktop subgraph)
 grep -c "\.addNode(" src/main/services/langgraph/research-agent.ts \
-  src/main/services/browser/browser-subgraph.ts src/main/services/desktop/desktop-subgraph.ts \
+  src/main/services/browser/browser-subgraph.ts \
   src/main/services/document/document-subgraph.ts
 grep -cE "^async function (comparisonNode|formNode|chartNode|externalSearchNode|internalKnowledgeNode|generalChatNode)" \
   src/main/services/langgraph/research-agent.ts   # the six non-node handlers = 6
@@ -311,7 +307,7 @@ grep -cE "id: [0-9]," src/main/services/database/schema.ts    # migrations = 4
 # invariants that must stay empty
 grep -rn "McpServer\|StdioServerTransport" src/ | grep -v AGENTS.md   # client-only
 grep -rn "requestSingleInstanceLock" src/ | grep -v AGENTS.md          # does not exist
-grep -rn "document-tools\|ui-detector\|uia-wrapper" src/ --include=*.ts | grep -E "import|from '"  # dead files stay uncalled
+grep -rn "document-tools" src/ --include=*.ts | grep -E "import|from '"  # dead files stay uncalled
 
 # gates, after npm install and npx electron-rebuild for the native deps
 npx tsc --noEmit

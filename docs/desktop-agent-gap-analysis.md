@@ -1,5 +1,7 @@
 # Desktop Agent Gap Analysis
 
+> **Status**: roadmap — **pre-Pi-cutover, not inventory.** This study predates the replacement of the desktop agent by the Pi agent, so its "our implementation" sections describe code that no longer exists: the 7-node desktop subgraph, the hand-rolled ReAct loop (`DesktopAgent.runReactLoop`), the `DANGER_POLICY` table and its 29/2/1 split, LangChain tool factories, and PowerShell UIA. The live path is **32 TypeBox tools in `src/main/services/pi/toolbox.ts`** driven by one Pi `Agent` loop (`src/main/services/pi/agent.ts`), with native `node-winautomation` COM for accessibility. Its competitor research and roadmap sections are still useful; its descriptions of *our* code are not. See `docs/AGENTS.md`.
+
 > **Date**: 2026-05-13
 > **Scope**: Our `src/main/services/desktop/` implementation vs. leading open-source desktop automation agents
 > **Methodology**: Source-level audit of our codebase + deep research of 9+ comparable projects (Accomplish, Agent-S/Agent-S3, OS-Copilot/FRIDAY, ScreenHand, Open Interpreter, vnc-use, OS AI Computer Use, Anthropic Computer Use, OpenAI Codex)
@@ -8,7 +10,7 @@
 
 ## 1. Executive Summary
 
-Our desktop agent is a **Windows-only, ReAct-loop-based** automation system with **28 LangChain tools** driven by a single LLM (`qwen3.6-plus`). It uses Win32 FFI (koffi) for input simulation, PowerShell UI Automation for accessibility, and Electron `desktopCapturer` for screenshots. It features a basic danger policy, a pixel-diff verifier, and HITL interrupts via LangGraph.
+Our desktop agent is a **Windows-only, ReAct-loop-based** automation system with **32 LangChain tools** driven by a single LLM (`qwen3.6-plus`). It uses Win32 FFI (koffi) for input simulation, native UIA via `node-winautomation` COM for accessibility, and Electron `desktopCapturer` for screenshots. It features a basic danger classification, a pixel-diff verifier, and no human approval gate — tools run without asking, by deliberate product decision.
 
 **Key finding**: Our implementation covers the *foundational layer* of computer use well (input simulation, screenshots, basic UI automation), but is missing entire *categories* of capability that are now standard across the state-of-the-art open-source landscape:
 
@@ -46,7 +48,7 @@ LangGraph Research Agent
               ├─ ChatOpenAI (qwen3.6-plus, 60s timeout)
               ├─ 26 LangChain StructuredTool
               ├─ WindowsDesktopAdapter (Win32 FFI via koffi)
-              ├─ AccessibilityTreeAdapter (PowerShell UIA)
+              ├─ AccessibilityTreeAdapter (native UIA via node-winautomation)
               └─ GroundTruthVerifier (pixel-diff)
 ```
 
@@ -88,14 +90,13 @@ LangGraph Research Agent
 
 ### 2.3 Safety Mechanisms
 
-- **Danger policy table**: 24 of 26 tools classified as `'safe'` (auto-executed). Only `delete_file` is `'dangerous'` (HITL), `write_file`/`copy_file`/`move_file` are `'reviewable'` (HITL).
+- **Danger classification table**: 29 of 32 tools classified as `'safe'` (auto-executed). `close_window` is `'dangerous'`, `drag` and `execute_command` are `'reviewable'` — but no level gates on approval any more: there is no confirmation dialog and no interrupt. The table feeds only the automatic in-loop pixel verifier, which runs for `dangerous` tools; the `reviewable` level is consulted for nothing — and any tool missing from the table falls through to `'reviewable'` (`desktop-agent.ts`).
 - **GroundTruthVerifier**: Takes baseline screenshot, computes pixel diff after action (1/16 sampling). `hardReject` is **never set to `true`** in practice — soft feedback only.
-- **LangGraph `interrupt()`**: Used for HITL confirmation on reviewable/dangerous actions.
 
 ### 2.4 Integration
 
 - Integrated into LangGraph research agent via `desktopAgentNode`
-- IPC flow: `chat:sendStreamMessage` → LangGraph stream → `desktop:confirmation-request` → renderer dialog → `chat:resumeGraph`
+- IPC flow: `chat:sendStreamMessage` → LangGraph stream → tool execution → verifier → recovery (no confirmation round trip exists)
 - Progress events via EventEmitter
 - Context trimming at 40 messages
 
@@ -341,7 +342,7 @@ LangGraph Research Agent
 | Multi-rate perception | ❌ | — | — | ✅ (3-rate) | — | — | — | 🟡 |
 | Context awareness | ❌ | — | — | ✅ | — | — | ✅ (per-session mem) | 🟡 |
 | **Safety & Security** | | | | | | | |
-| HITL confirmation | ✅ | — | — | — | ✅ | — | ✅ (approval policy) | — |
+| HITL confirmation | ❌ (removed by design) | — | — | — | ✅ | — | ✅ (approval policy) | — |
 | Multi-tier danger policy | ⚠️ basic | — | — | — | — | — | ✅ (sandbox+approval) | 🟡 |
 | Shell command blocking | ❌ | — | — | — | — | — | ✅ (refuses terminal) | 🔴 |
 | PII redaction | ❌ | — | — | ✅ (S75) | — | — | — | 🟡 |
@@ -375,7 +376,7 @@ LangGraph Research Agent
 ### 5.1 CRITICAL GAPS (Must-Have for Production Viability)
 
 #### 5.1.1 Cross-Platform Support (macOS + Linux)
-**Status**: Windows-only (user32.dll, shell32.dll, PowerShell UIA)
+**Status**: Windows-only (user32.dll, shell32.dll, native UIA via node-winautomation)
 **Competitors**: All major projects support at least 2 platforms; Accomplish supports all 3
 **Impact**: Limits user base to Windows only; excludes macOS (primary Raycast audience) and Linux (common dev environment)
 **Recommended approach**:
@@ -437,7 +438,7 @@ LangGraph Research Agent
 - Post-condition verification between subtasks (did the subtask actually achieve its goal?)
 
 #### 5.2.3 Safety & Security Hardening
-**Status**: Basic danger policy (24/26 tools are `'safe'`), verifier never hard-rejects, no shell command filtering
+**Status**: Basic danger policy (29/32 tools are `'safe'`), verifier never hard-rejects, no shell command filtering
 **Competitors**: CoWork-OS (pattern blocking for `sudo`, `rm -rf /`, etc.), AgentTrust (95% accuracy interception), ScreenHand (S75 PII redaction), OpenAI Codex (sandbox + approval + refusal lists)
 **Impact**: Agent can execute destructive actions (close windows, type arbitrary text, delete files) without user approval. No protection against prompt injection or malicious task descriptions.
 **Recommended approach**:
@@ -538,7 +539,7 @@ LangGraph Research Agent
 **Competitors**: OpenAI Codex (persistent memory across sessions), Agent-S (dual memory system)
 **Codex pattern**: Remembers user preferences, corrections, and gathered context across sessions. Can proactively suggest work based on previous context. Memory is user-scoped and persistent.
 **Recommended approach**:
-- Leverage existing better-sqlite3 infrastructure for persistent storage
+- Leverage the existing sql.js persistence layer (`src/main/services/database/database-manager.ts`) for persistent storage
 - Start with simple preference storage (user's common apps, frequently used workflows)
 - Store failed task outcomes with error signals for recall
 - Cross-reference with Section 5.2.1 (Memory & Learning from Experience) for episodic/narrative memory
@@ -592,7 +593,7 @@ LangGraph Research Agent
 
 | Project | Language(s) | UI Framework | Agent Framework | LLM Integration | Desktop APIs | Browser Automation | IPC / Transport |
 |---|---|---|---|---|---|---|---|
-| **Our Project** | TypeScript 100% | React 19 + Vite | LangGraph.js | LangChain + ChatOpenAI | Win32 FFI (koffi), PowerShell UIA, Electron desktopCapturer | None (coordinate-only) | Electron IPC |
+| **Our Project** | TypeScript 100% | React 19 + Vite | LangGraph.js | LangChain + ChatOpenAI | Win32 FFI (koffi), native UIA (node-winautomation), Electron desktopCapturer | None (coordinate-only) | Electron IPC |
 | **Accomplish** | TypeScript 92.6% | React + Electron | OpenCode (custom) | Multi-provider (12+): Anthropic, OpenAI, Google, xAI, DeepSeek, Ollama, LM Studio | Electron IPC + node-pty | Chrome extension | Electron IPC, stdio |
 | **Agent-S / S3** | Python 99.7% | CLI only | Custom hierarchical (Manager-Worker) | OpenAI, Anthropic, Azure, vLLM | PyAutoGUI, platform-specific bridges | None | Stdio |
 | **ScreenHand** | TypeScript 90.6%, Swift 3.4%, C# 2.3% | CLI / MCP server | Custom 7-layer ReAct | OpenAI, Anthropic via MCP | Native AX (macOS), UIA (Windows) | CDP (15 tools) | MCP (stdio) |
@@ -697,7 +698,7 @@ Based on what the 8 most relevant projects use, here are the lowest-risk technol
 | **Terminal execution** | `node-pty` (npm) | Accomplish | Cross-platform pseudo-terminal; same Electron stack |
 | **macOS support** | Swift native bridge + AppleScript | ScreenHand (Swift), OS AI CU (CGEvent), Codex (macOS AX API) | Required for accessibility API access on macOS |
 | **Linux support** | xdotool/scrot (X11) + ydotool/grim (Wayland) | ScreenHand, OS AI CU | Standard tools; simple FFI or child process wrappers |
-| **Memory/persistence** | better-sqlite3 (already in our stack) | Codex (persistent memory), Agent-S (dual memory) | No new dependency; use existing SQLite infrastructure |
+| **Memory/persistence** | sql.js (already in our stack) | Codex (persistent memory), Agent-S (dual memory) | No new dependency; use existing SQLite infrastructure |
 | **MCP server mode** | `@modelcontextprotocol/sdk` (npm) | ScreenHand, Codex (MCP helpers) | Official SDK; minimal integration surface |
 | **Hierarchical planning** | Additional LangGraph subgraphs (no new framework) | Agent-S (custom) | Extend existing LangGraph graph topology |
 | **Safety sandbox** | Configurable allowlists/blocklists + approval gates | Codex (seatbelt + approval + refusal) | Three-layer safety model directly applicable |
@@ -751,13 +752,13 @@ These approaches are notably **absent** across all surveyed projects:
 │  │  │(navigate│ │Manager   │  │   │   │  └──────────┬──────────┘  │   │       │
 │  │  │,click,  │ │          │  │   │   │             │ bindTools   │   │       │
 │  │  │fill)    │ └──────────┘  │   │   │  ┌──────────▼──────────┐  │   │       │
-│  │  └─────────┘               │   │   │  │  28 LangChain Tools │  │   │       │
+│  │  └─────────┘               │   │   │  │  32 LangChain Tools │  │   │       │
 │  └──────────────────────────────┘   │   │  │  (toolMap)          │  │   │       │
 │                                     │   │  └──────────┬──────────┘  │   │       │
 │  ┌──────────────────────────────┐   │   │             │             │   │       │
 │  │      MCP Service             │   │   │  ┌──────────▼──────────┐  │   │       │
-│  │  MultiServerMCPClient        │   │   │  │ Danger Policy Check │  │   │       │
-│  │  (external MCP servers)      │   │   │  │ → HITL interrupt()  │  │   │       │
+│  │  MCPAdapter (2.x)            │   │   │  │ Danger Policy Check │  │   │       │
+│  │  (external MCP servers)      │   │   │  │ → auto verify only  │  │   │       │
 │  └──────────────────────────────┘   │   │  └──────────┬──────────┘  │   │       │
 │                                     │   │             │             │   │       │
 │                                     │   │  ┌──────────▼──────────┐  │   │       │
@@ -785,7 +786,7 @@ These approaches are notably **absent** across all surveyed projects:
 │  │  │                                                             │  │       │
 │  │  │  koffi ──► user32.dll ──► SendInput, SetCursorPos          │  │       │
 │  │  │         ──► shell32.dll ──► ShellExecuteW                   │  │       │
-│  │  │  PowerShell UIA ──► IUIAutomation COM ──► accessibility    │  │       │
+│  │  │  Native UIA    ──► IUIAutomation COM ──► accessibility    │  │       │
 │  │  │  Electron desktopCapturer ──► screenshots                   │  │       │
 │  │  └─────────────────────────────────────────────────────────────┘  │       │
 │  └───────────────────────────────────────────────────────────────────┘       │
@@ -843,7 +844,7 @@ These approaches are notably **absent** across all surveyed projects:
 │       │                                                              │
 │       ▼                                                              │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  ChatOpenAI.bindTools(28 tools)                             │    │
+│  │  ChatOpenAI.bindTools(32 tools)                             │    │
 │  │                                                              │    │
 │  │  Response: tool_calls = [{name: "get_window_list", args}]   │    │
 │  └────┬───────────────────────────────────────────────────────┘    │

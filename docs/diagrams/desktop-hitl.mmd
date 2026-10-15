@@ -1,7 +1,7 @@
 ---
-title: Desktop agent path with HITL danger gate
+title: Desktop agent path with the pixel verifier
 ---
-%%{accTitle: "Desktop path: intent desktop enters the 7-node subgraph (memoryRetrieve, planner, executeSubtask, delegateToBrowser, verifier, recovery, memoryStore). executeSubtask drives a flat ReAct loop; each tool call passes the DANGER_POLICY gate (29 safe, 2 reviewable, 1 dangerous), non-safe actions interrupt for approve or deny, then verify, recovery, and memoryStore. Tools reach Win32/UIA/OCR through the DesktopAdapter."}%%
+%%{accTitle: "Desktop path: intent desktop enters the AskGraph's desktopAgent node, which makes a single call to the Pi desktop agent — one Agent loop over 32 TypeBox tools, no subgraph. Pi owns the loop, streams typed AgentEvents into a bridge, and runs the automatic GroundTruthVerifier pixel check only for a tool whose result sets details.verifies (close_window today). There is no approval gate: every tool runs without asking. Cancelling a turn aborts the run through abortPiDesktopRun, and withAbort settles the node even if the model never answers. Tools reach Win32/UIA/OCR through the DesktopAdapter."}%%
 flowchart TB
   classDef node fill:#0a0a0a,stroke:#38bdf8,stroke-width:2px,color:#fafafa;
   classDef gate fill:#2a0d0d,stroke:#e5484d,color:#fafafa;
@@ -9,40 +9,40 @@ flowchart TB
   classDef term fill:#1b1b1b,stroke:#5b6470,color:#fafafa;
 
   IN(["intent = desktop"]):::term
-  MR["memoryRetrieve<br/>(sql.js trajectories)"]:::node
-  PL["planner<br/>desktop-planner.ts"]:::node
-  EX["executeSubtask<br/>desktop-subgraph.ts"]:::node
-  DB["delegateToBrowser<br/>desktop-subgraph.ts"]:::node
-  VF["verifier (912 lines)<br/>UIA-first · screenshot fallback<br/>w.4 pixel.4 ocr.2 · reject<0.3"]:::node
-  RC["recovery<br/>retry/replan/abort"]:::node
-  MS["memoryStore"]:::node
+  DN["desktopAgent node<br/>research-agent.ts"]:::node
   ENDN(["END"]):::term
 
-  IN --> MR --> PL --> EX
-  PL -- "isBrowserTask" --> DB
-  EX -- "verifier" --> VF
-  EX -- "delegateToBrowser" --> DB
-  DB -- "executeBrowserSubgraph (stdio JSON-RPC)" --> VF
-  VF -- "pass" --> MS
-  VF -- "fail" --> RC
-  RC -- "retry → executeSubtask" --> EX
-  RC -- "replan → planner" --> PL
-  RC -- "abort → memoryStore" --> MS
-  MS --> ENDN
+  IN --> DN --> ENDN
 
-  subgraph REACT["Flat ReAct loop (DesktopAgent.runReactLoop, desktop-agent.ts) driven per subtask"]
+  subgraph AGENT["Pi desktop agent (pi/agent.ts) — one Agent, no graph"]
     direction TB
-    TOOL["32 tools (desktop-tools.ts)"]:::node
-    DG{"DANGER_POLICY gate<br/>29 safe · 2 reviewable (drag, execute_command) · 1 dangerous (close_window)<br/>file_operations per-action "}:::gate
-    INT{"interrupt() "}:::gate
-    HITL["desktop:confirmation-request<br/>→ chat:resumeGraph new Command({resume})"]:::gate
-    TOOL --> DG
-    DG -- "safe → execute" --> TOOL
-    DG -- "!== safe" --> INT --> HITL
-    HITL -- "approve → execute" --> TOOL
-    HITL -- "deny → ToolMessage+HumanMessage<br/>'Do NOT attempt again'" --> TOOL
+    PR["Provider: openai-completions<br/>pi/provider.ts · lazy, memoised"]:::node
+    SP["System prompt<br/>pi/prompt.ts · tool priority"]:::node
+    LOOP["Agent.prompt() loop<br/>pi-agent-core · toolExecution: parallel"]:::node
+    BR["AgentEvent → bridge<br/>pi/events.ts · pure, typed union"]:::node
+    PR --> LOOP
+    SP --> LOOP
+    LOOP --> BR
   end
-  EX -.drives.-> TOOL
+  DN -- "runPiDesktopTask(task, sessionId, bridge)" --> LOOP
+
+  subgraph REACT["Toolbox (pi/toolbox.ts) — 32 TypeBox AgentTools"]
+    direction TB
+    TOOL["32 tools<br/>tools never throw: isError + details"]:::node
+    SHOT{"details.verifies ?<br/>only close_window sets it<br/>no approval gate — every tool runs without asking"}:::gate
+    TOOL --> SHOT
+    SHOT -- "yes → GroundTruthVerifier" --> TOOL
+    SHOT -- "no → result back to the loop" --> TOOL
+  end
+  BR -- "tool_execution_start / _end" --> TOOL
+  LOOP -.drives.-> TOOL
+
+  VF["GroundTruthVerifier<br/>verifier.ts · pixel diff 0.01 / effect 0.02<br/>hard-reject or score &lt;0.5 → agent.steer()"]:::gate
+  SHOT -- "verifies" --> VF
+  VF -.steer.-> LOOP
+
+  AB["Abort: chat pump finally →<br/>abortPiDesktopRun() → withAbort settles the node"]:::node
+  LOOP -- "signal" --> AB
 
   subgraph BACKEND["Native layers"]
     direction TB

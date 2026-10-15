@@ -8,7 +8,7 @@ Three diagrams, drawn only from what the code does. Each arrow is labelled with 
 |---|---|
 | `system-context.mmd` / `.svg` | Process topology + external boundaries: main / sandboxed preload / React renderer / tray, MCP stdio children, Playwright-driven Chromium, `es.exe`, LLM endpoint, DuckDuckGo/Tavily, `userData` stores, Win32/UIA/OCR, and the Alt+Space hook. |
 | `ask-routing.mmd` / `.svg` | The 5-node AskGraph: `classify` → conditional → 3 subgraph branches → fan-in to `postProcessNode` → END, with the classifier fast-path, `MemorySaver`, and the six imperative handlers drawn as a **non-node** dispatch chain. |
-| `desktop-hitl.mmd` / `.svg` | The desktop path: subgraph nodes + flat ReAct loop + `DANGER_POLICY` gate (29 safe / 2 reviewable / 1 dangerous) + `interrupt()` approve/deny + verify → recovery → memoryStore, and the tool→adapter→Win32/UIA/OCR layering. |
+| `desktop-hitl.mmd` / `.svg` | The desktop path: the AskGraph's `desktopAgent` node calling one Pi `Agent` loop over 32 TypeBox tools, the `AgentEvent`→bridge translation, the `details.verifies` opt-in driving the automatic pixel check, the turn-abort path, and the tool→adapter→Win32/UIA/OCR layering. (The filename is historical: there is no HITL path any more.) |
 
 ## Source-of-truth per box
 
@@ -18,20 +18,23 @@ Cited by path plus symbol. To re-check a box, open the file and find the named s
 |---|---|
 | Sandbox + preload | `src/main/main.ts`, the module-scope `app.enableSandbox()` call; `src/main/windows.ts`, the `webPreferences` literal inside `createMainWindow` (`contextIsolation`, `nodeIntegration`, `sandbox`, and the `preload: '../preload/preload.cjs'` entry) |
 | One window + tray + hook | `src/main/windows.ts`, `createMainWindow` (the `new BrowserWindow(options)` construction) and its `hookWindowMessage(WM_SYSCOMMAND)` handler that swallows `SC_KEYMENU`; `src/main/tray.ts`, `createTray`; `src/main/shortcuts.ts`, `setupWindowsGlobalHotkey` — the `SetWindowsHookExW(WH_KEYBOARD_LL, …)` install and the `messagePumpInterval` that keeps it alive |
-| MCP stdio spawn | `src/main/services/mcp/client.ts`, `MCPService.initialize()` (the `new MultiServerMCPClient({ defaultToolTimeout: 30000, … })` construction); the Playwright server itself is declared in `mcp-config.json` at the repo root |
-| `es.exe` / DuckDuckGo / Tavily | `src/main/utils/esRunner.ts`, `searchFiles`; `src/main/services/langgraph/tools.ts`, `searchTavily` (the `api.tavily.com` call) and `webSearchTool` (the `html.duckduckgo.com` scrape) |
+| MCP stdio spawn | `src/main/services/mcp/client.ts`, `MCPService.initialize()` (the `new MCPAdapter({ prefixToolNameWithServerName: false, defaultToolTimeout: 30000, … })` construction — 2.x renamed `MultiServerMCPClient` to `MCPAdapter`); the Playwright server itself is declared in `mcp-config.json` at the repo root |
+| `es.exe` / web search / page fetch | `src/main/utils/esRunner.ts`, `searchFiles`; `src/main/services/web/search/exa.ts` and `search/parallel.ts` (the two keyless `tools/call` POSTs the chain relies on first), `search/searxng.ts` (`INSTANCE_POOL`, the rotating public-instance list) and `search/marginalia.ts`, `search/duckduckgo.ts` (the `html.duckduckgo.com` scrape), `search/tavily.ts` (the `api.tavily.com` call), `search/registry.ts` (`SEARCH_PROVIDERS`, whose array order *is* the chain order), and `fetch/page.ts`, `loadPage` (the only outbound transport: UA rotation, `Accept-Encoding: identity`, 50 MiB streaming cap) |
 | Win32/UIA/OCR | `src/main/services/desktop/input-simulation.ts`, `ensureLoaded` (the `koffi.load('user32.dll')` and `koffi.load('shell32.dll')` calls); `src/main/services/desktop/uia-native.ts`, the module-scope `require('node-winautomation')`; `src/main/services/desktop/windows-adapter.ts`, `ensureOcrWorker` (tesseract `createWorker`) |
 | Persistence | `src/main/services/database/database-manager.ts`, the `initSqlJs`/`Database` imports from `sql.js` plus the `dbPath` assignment in the `DatabaseManager` constructor (`userData/desktop-agent.db`) — sql.js, not better-sqlite3 |
 | AskGraph build + router | `src/main/services/langgraph/research-agent.ts`, `getAskGraph` (the `.addNode`/`.addEdge`/`.addConditionalEdges` chain and the `new MemorySaver()` checkpointer) and `routeAfterClassify` |
 | Classifier fast-path | `src/main/services/langgraph/research-agent.ts`, `detectFastPath`, consumed at the top of `classifyNode`; the LLM path is the `routerModel.invoke` call inside `classifyNode` |
 | Six NON-graph handlers | dispatched imperatively inside `browserSubgraphNode`; defined as `comparisonNode`, `formNode`, `chartNode`, `externalSearchNode`, `internalKnowledgeNode`, `generalChatNode` in `src/main/services/langgraph/research-agent.ts` — none is passed to `.addNode` |
-| Desktop subgraph edges | `src/main/services/desktop/desktop-subgraph.ts`, the build chain ending in the exported `desktopSubgraph` compile; `executeSubtaskNode` drives the flat loop, `delegateToBrowserNode` is the cross-agent edge |
-| Flat ReAct loop | `src/main/services/desktop/desktop-agent.ts`, `DesktopAgent.runReactLoop` |
-| DANGER_POLICY + interrupt | `src/main/services/desktop/desktop-agent.ts`, the `DANGER_POLICY` const (29 safe / 2 reviewable / 1 dangerous); inside `runReactLoop`, the `file_operations` per-action override, the non-safe branch calling `interrupt()`, and its denial branch that pushes both a ToolMessage and a HumanMessage |
-| HITL resume | `src/main/ipc/chat-handlers.ts`, the `chat:resumeGraph` handler registered inside `registerChatHandlers` (`new Command({ resume: … })`) |
-| Verifier weights | `src/main/services/desktop/desktop-verifier.ts`, the `WEIGHT_WINDOW` / `WEIGHT_PIXEL_DIFF` / `WEIGHT_OCR` constants (0.4 / 0.4 / 0.2) and `HARD_REJECT_THRESHOLD` (<0.3) |
+| Desktop path (no subgraph) | `src/main/services/langgraph/research-agent.ts`, `desktopAgentNode` — one call to `runPiDesktopTask`; the subgraph, planner, NL-postcondition verifier, recovery ladder and trajectory memory it replaced were deleted at the Pi cutover |
+| Pi agent loop | `src/main/services/pi/agent.ts`, the `new Agent({...})` construction inside `PiDesktopAgent.run` and the `abort.ts` `withAbort` race around `agent.prompt()` |
+| Event bridge | `src/main/services/pi/events.ts`, `dispatchAgentEvent` — an exhaustive switch over Pi's `AgentEvent` union, so a new arm is a type error rather than a silent drop |
+| Toolbox (32 TypeBox tools) | `src/main/services/pi/toolbox.ts`, `createPiDesktopToolbox`; the name list is frozen by `src/main/services/pi/toolbox.test.ts` |
+| Verifier opt-in (`details.verifies`, not a policy table) | `src/main/services/pi/toolbox.ts`, the `close_window` tool's `details.verifies: true`; there is **no** `DANGER_POLICY` and no `interrupt()` or denial branch any more |
+| Turn abort | `src/main/ipc/chat-handlers.ts`, the `finally` that calls `abortPiDesktopRun()` on every exit path, plus `abortPiDesktopRun` / `withAbort` in `src/main/services/pi/` |
+| Removed HITL resume | `chat:resumeGraph` and `desktop:confirmation-request` no longer exist; `src/main/ipc/chat-handlers.ts` has no resume path |
+| Verifier thresholds | `src/main/services/desktop/verifier.ts`, the `PIXEL_DIFF_THRESHOLD` / `ACTION_EFFECT_MIN_DIFF` constants (0.01 / 0.02); the 0.4/0.4/0.2 weighted scorer belonged to `desktop-verifier.ts`, which is deleted |
 
-Re-derived counts (grep, and again in `docs/architecture.md`): Ask=5, browser=8, desktop=7, document=9 → **29 nodes / 4 compiled graphs**; **32** desktop tools; **60** `ipcMain.handle` channels (handlers 25, chat 12, mcp 10, browser 9, api-config 4). These match the brief.
+Re-derived counts (grep, and again in `docs/architecture.md`): Ask=5, browser=8, document=9 → **22 nodes / 3 compiled graphs** (there is no desktop subgraph); **32** desktop tools; **59** `ipcMain.handle` channels (handlers 25, chat 11, mcp 10, browser 9, api-config 4). These match the brief.
 
 ## Re-render the SVGs
 

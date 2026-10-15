@@ -1278,59 +1278,77 @@ const [isHovered, setIsHovered] = useState(false)
 
 ### Design Philosophy
 
-Animations are CSS-first with `@formkit/auto-animate` for list-level transitions.
+Animations are CSS-first with `@formkit/auto-animate` for list-level transitions. No animation
+library is installed and none should be added for a transition this layer can express.
 
 **Principles:**
-1. **CSS-first**: Use CSS keyframes and transitions for element-level animations
-2. **auto-animate for lists**: Use `@formkit/auto-animate` for message list add/remove/reorder
-3. **Token-driven**: All durations and easing use motion tokens
-4. **Accessible**: Respect `prefers-reduced-motion` (globally in globals.css)
-5. **Performant**: Animate only `opacity` and `transform`
-6. **No conflicts**: Never combine auto-animate and CSS animations on the same element
+1. **CSS-first**: keyframes and transitions for element-level motion, authored in `styles/`
+2. **auto-animate for lists**: `@formkit/auto-animate` for message add/remove/reorder
+3. **Token-driven, consumed whole**: `animation: var(--animate-scale-in)` — never
+   `animation: scaleIn var(--duration-150) var(--easing-smooth) both`. Hand-composing the
+   triplet is how `.welcome-fade-out` shipped pointing at a `--duration-250` that did not exist
+4. **Only opacity and transform**: those two are composited. `transition: all` is drift, not style
+5. **Enter by default, exit only when it carries information**: a view that swaps in fades; the
+   palette does not fade out on Alt+Space, because a launcher that delays hiding feels laggy and
+   would race its own toggle. A toast exits because "that one dismissed" is the message
+6. **Accessible**: `prefers-reduced-motion` is honoured centrally, and JS reads the same tokens
+7. **No conflicts**: never combine auto-animate and a CSS animation on the same element
 
 ### Architecture
 
 ```
-Message List: @formkit/auto-animate (JS DOM transitions)
-  - New messages: slide-in from bottom
-  - Removed messages: slide-out
-  - Loading dots: appear/disappear
-
-Element-level: CSS keyframes
-  - Welcome cards: scaleIn with stagger
-  - Error banner: slideDownFade + shake icon
-  - Related questions: slideUpFade with stagger
-  - Typing dots: typingDots loop
+Window summon   .palette-revealing (useWindowReveal) — opacity + 0.98 scale, 150ms
+                Restarts on every `electron-window-shown`; hide is instant by decision.
+Window geometry windowManager.animateWindowHeight — 180ms easeOutCubic over the height only,
+                top edge fixed so the palette grows downward. Honours the Win32
+                "Show animations in Windows" flag, which CSS cannot reach.
+View swap       .view-enter on each branch of CommandPaletteBody / CommandPaletteHeader,
+                plus the three AskModeExpanded readiness cards. Each branch needs its own
+                React key or the node is reused and the animation never re-runs.
+Message list    @formkit/auto-animate (JS DOM transitions) — add/remove/reorder tweens
+Element-level   CSS keyframes — welcome cards scaleIn+stagger, error banner slideDownFade+shake,
+                related questions slideUpFade+stagger, typing dots loop
+Payload arrival .generative-ui-container fades in (opacity only) over the skeleton it replaces,
+                because auto-animate owns the layout of its ancestors
 ```
 
 ### Duration Hierarchy
 
 | Category | Token | Use Case |
 |----------|-------|----------|
-| Micro | `--duration-75` to `--duration-100` | Hovers, toggles, icon swaps |
-| Standard | `--duration-150` to `--duration-200` | Message entry, dropdowns, chips |
-| Macro | `--duration-250` to `--duration-500` | Welcome transitions, layout changes |
-| Loop | `1.4s` infinite | Typing indicator dots |
+| Micro | `--duration-100` | Row selection, comparison rows |
+| Fast | `--duration-150` | Palette reveal, view swaps, hovers, focus, toast exit |
+| Normal | `--duration-200` | Message entry, dropdowns, chips, toast enter, payload fade |
+| Slow | `--duration-300` | Welcome content, layout morphs |
+| Macro | `--duration-500` | The auto-collapse confirmation flash (`.collapse-flash`) |
+| Loop | `1.4s` / `2s` / `1.5s` infinite | Typing dots, agent pill, shimmer — cycles, so they stay off the transition scale |
 
 ### Available Keyframe Animations
 
-| Keyframe | Purpose | Duration | File |
-|----------|---------|----------|------|
-| `slideUpFade` | Message/question entry | 200ms | `motion.css` |
-| `slideDownFade` | Error banner entry | 200ms | `motion.css` |
-| `scaleIn` | Welcome card entry | 150ms | `motion.css` |
-| `errorShake` | Error icon feedback | 300ms | `motion.css` |
-| `typingDots` | Typing indicator | 1.4s loop | `motion.css` |
-| `fadeOutUp` | Exit transitions | 250ms | `motion.css` |
-| `fadeIn` | General fade-in | -- | `globals.css` |
-| `slideDown` | Context chip dropdown | -- | `globals.css` |
+| Keyframe | Shorthand token | Duration | Purpose |
+|----------|-----------------|----------|---------|
+| `paletteReveal` | `--animate-palette-reveal` | 150ms | Alt+Space summon (opacity + 0.98 scale) |
+| `viewEnter` | `--animate-view-enter` | 150ms | A view mounting into the body/header slot (4px rise) |
+| `scaleIn` | `--animate-scale-in` | 150ms | Welcome suggestion cards |
+| `fadeIn` | `--animate-fade-in` | 200ms | Generative-UI payload, drag-drop overlay |
+| `fadeIn` | `--animate-welcome-enter` | 300ms | Welcome state |
+| `slideUpFade` | `--animate-slide-up-fade` | 200ms | Chips, related questions |
+| `slideDownFade` | `--animate-slide-down-fade` | 200ms | Error banner entry |
+| `toastEnter` / `toastExit` | `--animate-toast-enter` / `-exit` | 200 / 150ms | Toast lifecycle |
+| `errorShake` | `--animate-error-shake` | 300ms | Error icon feedback |
+| `spin`, `pulse`, `cursorBlink`, `typingDots` | matching `--animate-*` | loops | Loading and streaming state |
+
+Deleted, not to be revived without a reason: `fadeOutUp`/`slideDown`/`bounce` (nothing consumed
+them), and the `--transition-*` composites, which could only be used by adopting `transition: all`.
+`fadeIn` and `collapsePulse` moved into `motion.css`; `collapsePulse` stayed in `globals.css`
+because its keyframe paints semantic colours and `tokens/` must not reach up the layer stack.
 
 ### Stagger Pattern
 
-Use CSS `nth-child` selectors for sequential elements. No JavaScript tracking needed:
+Use CSS `nth-child` selectors. No JavaScript tracking needed:
 
 ```css
-.item { animation: slideUpFade 200ms var(--easing-smooth) both; }
+.item { animation: var(--animate-slide-up-fade); }
 .item:nth-child(1) { animation-delay: var(--stagger-50); }
 .item:nth-child(2) { animation-delay: var(--stagger-100); }
 .item:nth-child(3) { animation-delay: var(--stagger-150); }
@@ -1338,61 +1356,52 @@ Use CSS `nth-child` selectors for sequential elements. No JavaScript tracking ne
 
 ### `@formkit/auto-animate` Usage
 
-For list containers where items are added/removed/reordered:
-
 ```tsx
 import autoAnimate from '@formkit/auto-animate';
+import { motionDurationMs, motionEasing } from '../../utils/motion';
 
-const containerRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-  if (containerRef.current) {
-    const ctrl = autoAnimate(containerRef.current, {
-      duration: 200,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-    });
-    return () => ctrl.stop();
-  }
-}, []);
-
-return <div ref={containerRef}>{items.map(item => <Item key={item.id} />)}</div>;
+const controller = autoAnimate(area, {
+  duration: motionDurationMs('--duration-200', 200),
+  easing: motionEasing('--easing-smooth', 'ease-in-out'),
+});
+return () => controller.destroy?.();
 ```
 
 **Rules:**
 - Items MUST have stable `key` props (use unique IDs, not array indices)
-- Do NOT combine with CSS animation classes on child elements
-- Call `ctrl.stop()` on cleanup to prevent memory leaks
-- Works with `React.memo` children
+- Do NOT combine with CSS animation classes on the same element
+- Destroy the controller on cleanup. auto-animate 0.10 has **no `stop()`**; `destroy()` is the
+  call that disconnects its MutationObserver, ResizeObserver and timers. A dropped controller
+  leaves them running against the element, and StrictMode double-mounts guarantee you hit that
+- Read duration/easing from the tokens, not literals, so the list cannot drift off the scale
+- The library disables itself on `prefers-reduced-motion` — no media query needed here
 
 ### Reduced Motion
 
-All animations respect `prefers-reduced-motion: reduce`:
+`globals.css:16-64` is the single switch, and it is layered so nothing has to opt in:
 
-**Global token override** (globals.css):
 ```css
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --animate-spin: 0ms;
-    --animate-pulse: 0ms;
-    --animate-bounce: 0ms;
-    --animate-slide-up-fade: 0ms;
-    /* ... all animation tokens set to 0ms */
+    --animate-spin: none;          /* every shorthand → none, not 0ms: `animation: 0ms` is
+                                      invalid at computed-value time and only works by error
+                                      recovery; `none` states the intent */
+    --duration-150: 0ms;           /* … the whole scale, and every --stagger-* delay */
+    --stagger-100: 0ms;
+  }
+  *, *::before, *::after {         /* for literals outside the token path */
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
   }
 }
 ```
 
-**Component-level override** (ask-mode-perplexity.css):
-```css
-@media (prefers-reduced-motion: reduce) {
-  .typing-dot, .suggestion-card, .related-question-item, ... {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}
-```
-
-Users with reduced motion preferences see instant state changes with no transitions.
+Anything consuming an `--animate-*` shorthand is therefore covered automatically — including
+Tailwind's generated `animate-spin`. JS motion calls `motionDurationMs()` /
+`prefersReducedMotion()` in `src/renderer/utils/motion.ts`, so `scrollIntoView`, the toast exit
+delay and the main-process height tween obey the same request. Under emulated reduce, the palette
+computes `animation-name: none, opacity: 1, transform: none` — reduced motion reveals the UI, it
+never hides it.
 
 ---
 

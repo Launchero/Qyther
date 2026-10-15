@@ -15,8 +15,10 @@ This harness exists so an agent (or a person) can see and operate that surface t
 | **Playwright `_electron.launch`** | Rejected. It cannot attach to an already-running app — it only spawns its own main script, which bypasses this repo's real dev bootstrap, tray, global hook and single-window lifecycle. Electron's own testing docs pair it with launching the app yourself. |
 | **Playwright MCP with `--cdp-endpoint`** | Kept, but **agent-side and observation-only**. `@playwright/mcp` officially supports connecting over CDP. Pointing it at the live palette gives aria snapshots and screenshots. Its `browser_click`/`browser_type` synthesise DOM events, which fails the fidelity rule below, and its `browser_evaluate` is a code-execution surface (see Security). |
 | **CDP `Input.dispatchKeyEvent` / `Runtime.evaluate`** | Rejected for input. CDP input never traverses the Win32 window manager, so it skips focus, hit-testing, and the app's `WH_KEYBOARD_LL` hook — the Alt+Space path would be untested. Kept for **reads** only. |
-| **OS UI Automation (`node-winautomation`, FlaUI, pywinauto, WinAppDriver/Appium)** | Rejected as the observation channel. Chromium builds its accessibility tree on demand, and in this checkout the UIA addon is not built at all (below). WinAppDriver is unmaintained and its successor path is heavier than needed. |
-| **CDP `Accessibility.getFullAXTree`** | Measured, and it does not work here: enable + a settle delay returns **0 nodes**. DOM queries via `Runtime.evaluate` are the reliable tree. |
+| **OS UI Automation (`node-winautomation`, FlaUI, pywinauto, WinAppDriver/Appium)** | Rejected as the observation channel, and the CDP AX tree is why: it gives role + accessible name + box straight off the live renderer with no native addon. WinAppDriver's server has not been maintained since 2022 and Appium points at community replacements; FlaUI.WebDriver is explicitly experimental. None of them reaches a `WH_KEYBOARD_LL` hook in any case. |
+| **Microsoft `winapp-cli --via send-input`** | The only surveyed tool with an explicit supported OS-input switch, and its docs draw the same line this harness already drew: `send-input` is genuinely real but goes to whatever holds the foreground and is UIPI-blocked, while `post-message` "cannot trigger `WH_KEYBOARD_LL` global hotkeys". Not adopted — it adds a toolchain to reach a process the harness already reaches, and would still need the CDP sidecar. |
+| **`Page.startScreencast` as the animation instrument** | Rejected on measurement grounds. Ack-paced and throttled (no FPS parameter; ~5 fps headed reported in 2017), CPU-heavy on animating pages, and it observes compositor output rather than the DOM values the tween is asserted on. The in-page rAF sampler is the higher-resolution clock for a 180 ms tween, and the two research passes disagreed on whether ack-first pacing rescues the rate. |
+| **CDP `Accessibility.getFullAXTree`** | **Kept, and it works.** This file previously recorded it as returning **0 nodes** with DOM queries as the only reliable tree. That was a measurement artefact: the tree is off until `Accessibility.enable` is called, which is what switches it on for a CDP-driven read. With `enable` → `getFullAXTree` → `disable`, the palette returns **101 nodes** — `textbox "Search for files, tools, actions..."`, `listbox "Search results"`, `option` rows with their computed accessible names, `button "Keyboard shortcuts"`. `ax_snapshot` is now built on the real tree, and `click_role` targets a control by role plus accessible name. `queryAXTree` is *not* usable for name/role filtering in this Chromium — it demands a nodeId/backendNodeId/objectId — so filter client-side. |
 | **nut.js / robotjs** | Rejected as a dependency. `koffi` is already a declared native dependency and already drives `SendInput` in `src/main/services/desktop/input-simulation.ts`; robotjs is unmaintained. |
 | **Third-party computer-use MCP servers (Windows-MCP, UI-TARS)** | Rejected. They duplicate capabilities this repo already ships, add a Python/.NET toolchain, and bring their own model dependency. |
 | **Electron `desktopCapturer`** | Rejected for the harness: it needs the Electron runtime, which would force the driver to run inside the app and lose the standalone CLI. The product's own screenshot tool still uses it. |
@@ -37,23 +39,33 @@ These are the constraints the harness is built around. All were observed on this
 9. **There is no `window:show` IPC handler.** Showing is reachable only through Alt+Space, the in-window `SC_KEYMENU` intercept, or a tray click — which is why the reveal path is a real keystroke rather than an API call.
 10. **File search leaks personal paths.** Everything indexes every drive: the query `desktop` returned 49 rows, most of them under `C:\Users\…` and `C:\Windows\WinSxS`. Every frame write goes through the privacy gate inherited from `capture-ui.mjs`.
 11. **Two dev instances cannot coexist by launching twice.** `windows.ts` hardcodes `http://localhost:5173`, and a second `npm run dev` rebuilds the shared `out/` tree under the first one; observed to fail with `ENOENT` on a hashed chunk in the `dirname-fix-and-wasm` plugin. Multi-instance is a real hazard (there is no `requestSingleInstanceLock`), but it cannot be reproduced by simply starting twice.
+12. **The accessibility tree is live over CDP.** `Accessibility.enable` → `getFullAXTree` → `disable` returns **101 nodes** with role, Chromium-computed accessible name and box per node. Earlier notes in this file and in `scripts/harness/AGENTS.md` said this returned 0 nodes; both were taken without `Accessibility.enable` and were wrong. `queryAXTree` cannot filter by name/role in this Chromium (it demands a nodeId/backendNodeId/objectId), so the harness filters client-side.
+13. **`SetCursorPos` is not input.** It repositions the cursor without inserting anything into the input stream, so no `WM_MOUSEMOVE` reaches the app. Movement is now a real `MOUSEEVENTF_MOVE | ABSOLUTE | VIRTUALDESK` event normalised from the virtual-desktop origin; every target across this 3440×1440 desktop lands within 1 px. Without `VIRTUALDESK` the normalisation is against the primary monitor and the origin is ignored, so a window on a second screen is clicked in the wrong place while every DOM read still looks healthy.
+14. **The page's rAF is a measured 59.9 Hz** (median 16.7 ms, min 16.6, max 16.8), so a 180 ms tween cannot legitimately span more than ~11 frames. An impossible ramp is evidence about the *sampler*, not the tween — see the recorder-retirement note below.
+15. **File search is case-sensitive.** The query `qyther` returns 47 rows; `Qyther` returns 0. Anything deriving a probe query from a path must lower-case it.
+16. **A recorder left installed in a long-running page cannot be replaced by its successor.** Each sampler owns a rAF loop that reads the *shared* arm deadline, which the live recorder keeps extending, so an old loop never retires on its own: two live samplers gave the frame buffer three frames per frame (gaps of `0,0,17 ms`) and a 584 ms hole where the tween should have been. The recorder is now versioned, a superseded loop retires on its next frame, and a new install cancels the previous handle — but loops predating both still need one app restart.
 
 ## Architecture
 
 ```
 scripts/harness/
-  native.mjs      Win32: SendInput, cursor, EnumWindows(+class/pid/DPI), monitors,
+  native.mjs      Win32: SendInput (keys, and a real normalised virtual-desktop
+                  mouse-move), cursor, EnumWindows(+class/pid/DPI), monitors,
                   GDI screen grab, process DPI awareness. No Electron.
   cdp.mjs         CDP: endpoint discovery + pid attribution, target by title,
-                  closed registry of DOM reads, page capture, event recorder.
-  driver.mjs      The verbs. Only file that chooses input vs observation.
-  cli.mjs         Operator surface + `selftest`.
+                  closed registry of DOM reads, page capture, versioned event +
+                  per-frame recorder, the accessibility tree, trace selection.
+  driver.mjs      The verbs. Only file that chooses input vs observation. Owns
+                  the coordinate pipeline, the focus rule, the privacy predicate.
+  cli.mjs         Operator surface + `selftest` + the DOM-input guard. Flags or
+                  a JSON blob; per-verb exit-code predicates.
   mcp-server.mjs  The same verbs as MCP tools, whitelisted, no code-bearing args.
+  run-verify.mjs  Ad-hoc REPL poking; `cli.mjs` is the supported entrypoint.
 ```
 
-**The fidelity rule.** Anything that changes app state goes through `native.mjs` (`SendInput`, `SetCursorPos`). CDP is used only to read DOM truth and to capture the palette's own pixels. `selftest` enforces this by scanning the harness's own executable lines for DOM-input patterns — and independently by asserting that a click produced a real focus change and that typing produced a real input value.
+**The fidelity rule.** Anything that changes app state goes through `native.mjs` (`SendInput`, and a real move event rather than `SetCursorPos`). CDP is used only to read DOM truth, to read the accessibility tree, and to capture the palette's own pixels. `selftest` enforces this by scanning the harness's own executable lines for DOM-input patterns — the list covers `el.click()`, `dispatchEvent`, `electronAPI.`, the pointer/window constructors, and CDP's `Input.dispatch*` and `Emulation.setDeviceMetricsOverride`, since those make the page believe it was driven by a user when nothing crossed the OS input queue — and independently by asserting that a click produced a real focus change and a real cursor within 1 px of the computed point, and that typing produced a real input value.
 
-**Two capture scopes, deliberately both available.** `palette` is CDP page capture: true alpha, exact resolution, blind to z-order. `desktop` is a GDI `BitBlt` of the real composited region: true occlusion and rounding. GDI runs inside the harness process precisely because that process is per-monitor-aware — an unaware PowerShell `CopyFromScreen` returns the whole desktop resampled to 2752×1152 here.
+**Two capture scopes, deliberately both available.** `palette` is CDP page capture: true alpha, exact resolution, blind to z-order. `desktop` is a GDI `BitBlt` of the real composited region: true occlusion and rounding. GDI runs inside the harness process precisely because that process is per-monitor-aware — an unaware PowerShell `CopyFromScreen` returns the whole desktop resampled to 2752×1152 here. Both refuse when the window is hidden: page capture hangs outright, and a desktop grab of a hidden window's rect is not empty, it is *the desktop behind the palette* — another app's window, reported as a successful capture and written to disk. Both return pixel statistics, because a capture that returns bytes is not a capture that shows the app.
 
 **Why the Win32 bindings are re-declared.** `input-simulation.ts` imports `screen` from Electron at module scope, so it cannot load under plain `node`; `scripts/desktop-ffi-test.ts` re-declares for the same reason. Three of its helpers are also wrong for this use: `clampToPhysicalScreen` and `getDpiScaleFactor` are primary-monitor-only, and `WindowsDesktopAdapter.clampToScreen` compares physical coordinates against a DIP-sized work area.
 
@@ -62,13 +74,18 @@ scripts/harness/
 ```bash
 npm run dev                      # a person starts the app; the harness never does
 npm run harness:preflight        # gate: refuses rather than drive one app and read another
-npm run harness:selftest         # 14-step proof that OS input reaches the shipped UI
+npm run harness:selftest         # 18-step proof that OS input reaches the shipped UI
 node scripts/harness/cli.mjs reveal
-node scripts/harness/cli.mjs click_element '{"selector":"#search-input"}'
-node scripts/harness/cli.mjs type '{"text":"desktop-hitl"}'
-node scripts/harness/cli.mjs save_frame '{"id":"my-frame","scope":"desktop"}'
+node scripts/harness/cli.mjs click_element --selector "#search-input"
+node scripts/harness/cli.mjs click_role --role textbox --name "Search for files"
+node scripts/harness/cli.mjs type --text "qyther"
+node scripts/harness/cli.mjs save_frame --id my-frame --scope desktop
 npm run harness:mcp              # same verbs as an MCP stdio server
 ```
+
+**Use flags, not the JSON blob.** Windows PowerShell 5.1 strips the double quotes out of a single-quoted argument before the native process sees it, so the form this file used to show — `cli.mjs type '{"text":"qyther"}'` — died with a raw Node `SyntaxError` on the default Windows shell. `--flag value` carries no quotes to lose, and a value becomes a number only when it round-trips exactly through `Number`, so `--text 007` stays the string `"007"`. The JSON blob still works and is what the MCP surface speaks.
+
+**Every verb's exit code is its verdict.** Only `preflight` and `wait` ever returned an `ok` key, so the old exit rule (`out.ok === false`) reported success for a `hide` the app ignored, a `reveal` the hotkey dropped, a `set_mode` that never settled and a `clear_input` that left the text. Each verb now declares what success means for itself; argument errors exit 2, verb failures exit 1.
 
 Artifacts land in `tmp/harness/` (gitignored, on the repo drive), capped at 40 frames / 150 MB and pruned oldest-first. The system temp directory is on `C:`, which on this box sits at 97 % full.
 
@@ -106,14 +123,14 @@ qodercli mcp add playwright-qyther -- npx @playwright/mcp@latest \
 | Check | Result |
 |---|---|
 | `npm run typecheck` | clean |
-| `npm run test` | 3 files / 81 tests pass — up from 2 files / 65, the delta being `command-guard.test.ts` |
+| `npm run test` | **41 files / 321 tests pass** (re-measured 2026-10-15; this file previously said 81, and `src/main/AGENTS.md` said 305/38 — all stale) |
 | `npm run harness:preflight` | passes against one dev instance; **exits 1** with a named reason when the CDP port is owned by a pid that has no palette window |
-| `npm run harness:selftest` | **14 / 14 pass** against `npm run dev` |
-| Harness MCP server | completes the `initialize` → `tools/list` → `tools/call` handshake over stdio |
-| Frame written | `tmp/harness/selftest-results.png`, 1000 × 754 px, privacy-gated |
+| `npm run harness:selftest` | **18 / 18 pass**, twice in a row, against `npm run dev` on a fresh renderer |
+| Harness MCP server | completes the `initialize` → `tools/list` → `tools/call` handshake over stdio, and the real `MCPAdapter` contract test drives it (`client-contract.test.ts`, which freezes the tool count at 18) |
+| Frame written | `tmp/harness/selftest-frame.png`, privacy-gated, pixel-checked |
 | `npm run build:win:dir` | **fails** — `node-gyp` cannot rebuild `node-winautomation` (no VS C++ workload). `npm run build` itself succeeds and emits `out/renderer`. Packaged driving is therefore designed but unproven. |
 
-The self-test's own evidence that input is real: a `SendInput` click at the computed point (1710, 272) left `GetCursorPos` at exactly that position **and** moved `document.activeElement` to `search-input`; per-character `KEYEVENTF_UNICODE` typing produced `inputValue: "desktop-hitl"` and two result rows; `ArrowDown` changed the highlighted row from `desktop-hitl.mmd` to `desktop-hitl.svg`.
+The self-test's own evidence that input is real: a `SendInput` click at the computed point left `GetCursorPos` within 1 px of it (the 16-bit normalised absolute move is off by a pixel or two by construction) **and** moved `document.activeElement` to `search-input`; per-character `KEYEVENTF_UNICODE` typing produced `inputValue: "qyther"` and 47 result rows; `ArrowDown` moved the highlighted row from `qyther C:\Users\kanis\AppData\Roaming\qyther\Folder` to `Qyther D:\test_electron\Qyther\Folder`; and `click_role` reached the same input by role and accessible name rather than by CSS selector.
 
 ## Security
 
@@ -131,9 +148,9 @@ Being precise about what the guard does *not* do: a four-string blocklist is not
 
 Reported here rather than silently repaired, since each is outside this work's scope:
 
-- **UIA is dead in this checkout.** `node_modules/node-winautomation/build/Release` does not exist, `out/main` carries no `Automation.node`, and `require('node-winautomation')` throws "Could not locate the bindings file". Six of the 32 desktop tools (`get_element_info`, `click_element`, `search_elements`, `invoke_element`, `set_element_value`, `get_element_text`) therefore cannot work here, and the `electron.vite.config.ts` copy step for `Automation.node` is wrapped in a silent `catch {}`, so packaged builds inherit the same dead path.
+- **UIA is dead in this checkout.** `node_modules/node-winautomation/build/Release` does not exist, `out/main` carries no `Automation.node`, and `require('node-winautomation')` throws "Could not locate the bindings file". Six of the 32 desktop tools (`get_element_info`, `click_element`, `search_elements`, `invoke_element`, `set_element_value`, `get_element_text`) therefore cannot work here, and the `electron.vite.config.ts` copy step for `Automation.node` is wrapped in a silent `catch {}`, so packaged builds inherit the same dead path. **This no longer constrains the harness**: it reads the CDP accessibility tree instead, which needs no addon. It still constrains the product's desktop agent.
 - **`WindowsDesktopAdapter.clampToScreen` mixes coordinate spaces** (physical against DIP), which on a 125 % panel makes the shipped desktop agent unable to address the rightmost ~689 px and bottom ~289 px of the screen.
-- **Nothing enables Chromium accessibility**, so OS UIA clients see a lazily built tree; combined with the point above, the accessibility-based tools have no working path here.
+- **Nothing in the product enables Chromium accessibility**, so OS UIA clients (and the product's own accessibility tools) see a lazily built tree; combined with the point above, the accessibility-based *product* tools have no working path here. The harness is unaffected — `Accessibility.enable` switches the tree on for its own CDP reads.
 - **The browser agent's tools are gated off by local preferences.** `client.ts` drops a config server when preferences enable other servers but not it; with only `filesystem` enabled, `playwright` contributes zero tools and `stateful-browser-agent` throws "No browser tools found from Playwright MCP server". Independent of this harness.
 - **`mcp-config.json` is untracked**, so any configuration conclusion drawn from it is machine-local.
 
@@ -142,10 +159,11 @@ Reported here rather than silently repaired, since each is outside this work's s
 ```bash
 npm run typecheck
 npm run lint
-npm run test                                                   # command-guard cases
-node scripts/harness/cli.mjs selftest                          # 14 steps, exit 0 only if all pass
+npm run test                                                   # 41 files / 321 tests
+node scripts/harness/cli.mjs selftest                          # 18 steps, exit 0 only if all pass
 grep -rn "McpServer\|StdioServerTransport" src/ --include="*.ts" --include="*.tsx"   # must be empty (scope it to code: the docs that ban these strings otherwise match themselves)
-grep -cE "^export function create[A-Za-z]+Tool" src/main/services/desktop/desktop-tools.ts   # 32
+npx vitest run src/main/services/pi/toolbox.test.ts                # the frozen 32-name list
+npx vitest run src/main/services/mcp/client-contract.test.ts      # the frozen harness tool count
 ```
 
 Re-derive the claims in "Measured facts" with: `node scripts/harness/cli.mjs who` (scale, DPI, rect, mode), `... state` (rows, focus), `... list_windows` (classes and titles of every top-level), and by reading `src/main/shortcuts.ts`, `src/main/windows.ts`, `src/main/windowManager.ts`, `src/renderer/hooks/useKeyboard.ts`.

@@ -15,11 +15,11 @@
 
 **LangGraph Agent**: Hierarchical architecture with one main AskGraph (5 nodes) routing through 3 smart subgraphs:
 
-- **AskGraph** (`src/main/services/langgraph/research-agent.ts`): Simplified StateGraph with `classify` node routing to 3 subgraphs only (`browserSubgraph`, `desktopSubgraph`, `documentSubgraph`) → `postProcessNode` → END. `browserSubgraphNode` is a smart wrapper that handles fast-path, comparison, form, chart, external search, internal knowledge, and general chat inline before delegating to `executeBrowserSubgraph` for actual browser intent. `desktopSubgraphNode` and `documentSubgraphNode` check intent and fall back to inline LLM if not their domain. `postProcessNode` detects markdown tables and extracts comparison/form/chart patterns from all subgraph outputs into UIPayloads. Models: `qwen3.6-plus` for all roles (chatModel temp 0.7, routerModel temp 0, rewriteModel temp 0).
+- **AskGraph** (`src/main/services/langgraph/research-agent.ts`): Simplified StateGraph with `classify` node routing to 3 targets (`browserSubgraph`, `desktopAgent`, `documentSubgraph`) -> `postProcessNode` -> END. `browserSubgraphNode` is a smart wrapper that handles fast-path, comparison, form, chart, external search, internal knowledge, and general chat inline before delegating to `executeBrowserSubgraph` for actual browser intent. `desktopAgentNode` and `documentSubgraphNode` check intent and fall back to inline LLM if not their domain; `desktopAgentNode` is a node in name only — it makes one call to `runPiDesktopTask`. `postProcessNode` detects markdown tables and extracts comparison/form/chart patterns from all subgraph outputs into UIPayloads. Models: `qwen3.6-plus` for all roles (chatModel temp 0.7, routerModel temp 0, rewriteModel temp 0).
 
 - **BrowserSubgraph** (`src/main/services/browser/browser-subgraph.ts`, 8 nodes): Memory -> skillRouter -> loadSkills -> planner -> executeSubtask <-> verifier loop. 5 recovery strategies (retry, alternative, replan, skip, abort). Skill catalog: web-navigation, form-filling, data-extraction, web-scraping, authentication, visual-interaction.
 
-- **DesktopSubgraph** (`src/main/services/desktop/desktop-subgraph.ts`, 7 nodes): Memory -> planner -> executeSubtask <-> verifier loop with `delegateToBrowser` for cross-agent delegation. Verifier uses UIA accessibility tree + screenshot fallback. Conditional routers check `requiresBrowser` flag on next subtask.
+- **Pi desktop agent** (`src/main/services/pi/agent.ts`): one `Agent` loop over 32 TypeBox tools with `toolExecution: "parallel"`, replacing the old 7-node desktop subgraph and its hand-rolled ReAct loop. Typed `AgentEvent`s are translated by `pi/events.ts` into a bridge (text deltas, tool start/end, final answer). The only automatic check is the pixel verifier, and it runs only for a tool whose result sets `details.verifies` (`close_window`); the verdict is fed back with `agent.steer()`. There is **no** approval gate — every tool runs without asking. A turn is stopped by `abortPiDesktopRun()` from the chat pump's `finally`, and `withAbort` (`pi/abort.ts`) settles the node even if the model never answers.
 
 - **DocumentSubgraph** (`src/main/services/document/document-subgraph.ts`, 9 nodes): Memory -> classifyAction (read/create/modify) -> planner/executeAction. Dual cross-agent delegation via `delegateToBrowser` and `delegateToDesktop`. Supports docx, xlsx, pptx, pdf formats.
 
@@ -31,11 +31,11 @@ flowchart TD
     Start([__start__]) --> classify
 
     classify -->|browser| browserSubgraph
-    classify -->|desktop| desktopSubgraph
+    classify -->|desktop| desktopAgent
     classify -->|document| documentSubgraph
 
     browserSubgraph --> postProcessNode
-    desktopSubgraph --> postProcessNode
+    desktopAgent --> postProcessNode
     documentSubgraph --> postProcessNode
     postProcessNode --> End([END])
 
@@ -58,27 +58,16 @@ flowchart TD
         bMemStore --> bEnd([END])
     end
 
-    %% ============= DESKTOP SUBGRAPH (7 nodes) =============
-    subgraph DesktopSubgraph["Desktop Subgraph — 7 nodes"]
+    %% ============= DESKTOP (no subgraph — one Pi Agent loop) =============
+    subgraph DesktopAgent["Desktop — Pi agent, 32 tools, no graph"]
         direction TB
-        dMemory[Memory Retrieve] --> dPlan[Planner]
-        dPlan -->|has subtasks| dExec[Execute Subtask]
-        dPlan -->|no subtasks| dMemStore[Memory Store]
-        dExec -->|success, next needs browser| dDelegate[Delegate To Browser]
-        dExec -->|success, verify| dVerify[Verifier]
-        dExec -->|error| dRecovery[Recovery]
-        dVerify -->|passed + more, next needs browser| dDelegate
-        dVerify -->|passed + more, execute| dExec
-        dVerify -->|passed + done| dMemStore
-        dVerify -->|score < 0.3| dRecovery
-        dDelegate -->|next also browser| dDelegate
-        dDelegate -->|more desktop subtasks| dExec
-        dDelegate -->|done| dMemStore
-        dDelegate -->|error| dRecovery
-        dRecovery -->|retry/alternative| dExec
-        dRecovery -->|replan| dPlan
-        dRecovery -->|skip/abort| dMemStore
-        dMemStore --> dEnd([END])
+        dTools[32 TypeBox tools] --> dVerifyGate{details.verifies?}
+        dVerifyGate -->|close_window only| dVerify[Pixel Verifier]
+        dVerify -->|score < 0.5 / hard reject| dSteer[agent.steer() corrective]
+        dSteer --> dTools
+        dVerifyGate -->|everything else| dTools
+        dCancel[Turn cancel<br/>abortPiDesktopRun + withAbort] -.settles.-> dTools
+        dEnd2([END])
     end
 
     %% ============= DOCUMENT SUBGRAPH (9 nodes) =============
@@ -121,13 +110,13 @@ flowchart TD
     end
 ```
 
-**MCP Services**: `src/main/services/mcp/client.ts` — MultiServerMCPClient for external MCP server integration, cleaned up on `will-quit`.
+**MCP Services**: `src/main/services/mcp/client.ts` — `MCPAdapter` (2.x; was `MultiServerMCPClient`) for external MCP server integration, released as the `mcp` step of the shutdown list in `src/main/main.ts` (bounded, ordered teardown before `app.exit(0)` — see `src/main/lifecycle.ts`).
 
 **Browser Automation**: `src/main/services/browser/stateful-browser-agent.ts` — Playwright-based agent with session manager (`browser-session-manager.ts`). Chromium installed via `npx playwright install chromium` at startup.
 
-**Desktop Automation**: `src/main/services/desktop/` — Windows-only ReAct loop with 28 LangChain tools, Win32 FFI (koffi), PowerShell UIA accessibility tree, Electron desktopCapturer screenshots, pixel-diff verifier. Supports cross-agent browser delegation for hybrid desktop+web tasks.
+**Desktop Automation**: the agent is `src/main/services/pi/` (one Pi `Agent` loop, 32 TypeBox tools, event bridge, pixel verifier); the native substrate it drives is `src/main/services/desktop/` — Win32 FFI (koffi), native UI Automation through `node-winautomation`, Electron desktopCapturer screenshots, tesseract OCR. There is no desktop subgraph, no planner, no recovery ladder and no cross-agent browser delegation from the desktop path any more.
 
-**Database**: better-sqlite3 via `src/main/services/database/database-manager.ts` — stores desktop agent trajectories and failure memories for experience-based retrieval, including cross-agent delegation metadata.
+**Database**: `sql.js` via `src/main/services/database/database-manager.ts` — stores desktop agent trajectories and failure memories for experience-based retrieval, including cross-agent delegation metadata. (`better-sqlite3` is not in `package.json`; it was declared, imported by nothing, and removed.)
 
 ## Changelog
 

@@ -28,7 +28,7 @@ flowchart LR
   OS["Win32 / UIA / OCR<br/>koffi · libwin32 · node-winautomation · tesseract.js"]:::ext
   DB["userData stores<br/>desktop-agent.db (sql.js)<br/>browser-memory/trajectories.db<br/>preferences.json"]:::store
 
-  M -- "stdio JSON-RPC<br/>MultiServerMCPClient (client.ts)" --> MCP
+  M -- "stdio JSON-RPC<br/>MCPAdapter (client.ts)" --> MCP
   MCP -- "Playwright MCP server" --> CH
   M -- "child_process.exec" --> ES
   M -- "HTTPS (@langchain/openai)" --> LLM
