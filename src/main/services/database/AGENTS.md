@@ -27,7 +27,8 @@ sql.js persistence for the desktop/document agent learning loop: trajectory reco
 - **File location**: single db file at `app.getPath('userData')/desktop-agent.db` (`database-manager.ts:57-58`), dir created on demand (`:70`). The path is fixed at construction; there is no runtime relocation and no second file. Nothing else opens it.
 - **Access pattern**: module-level singleton via `initializeDatabaseManager` / `getDatabaseManager` (re-exported `index.ts:6-9`); there is no second connection and no pooling — all writes serialise through it.
 - **Stats**: `getDatabaseStats` (`schema.ts`, re-exported `index.ts:12`) counts tables/trajectories/failures from `sqlite_master`; `dbSizeBytes` is hardwired 0 (`:217`) — do not build features on it. The boot health check is `dbManager.stats()` (`main.ts:80`), logging trajectory/failure counts.
-- **Callers**: boot initialises the manager at `src/main/main.ts:77-84` inside `try/catch` — failure degrades to `log.warn`, app runs without persistence. The live consumers are `desktop/desktop-memory.ts` (`getDatabaseManager()` at `:26,47,63`) and `document/document-memory.ts` (`:22,47`); importers are `:8` in each. No other in-repo callers.
+- **Callers**: boot initialises the manager at `src/main/main.ts:77-84` inside `try/catch` - failure degrades to `log.warn`, app runs without persistence. **The desktop writer is gone**: `desktop/desktop-memory.ts` was deleted at the Pi cutover and the Pi agent does not record trajectories, so tables 1-3 now receive **no writes at all**. The one live consumer is `document/document-memory.ts` (`:22,47`), which still calls `getDatabaseManager()`. The tables, migrations and manager methods all survive and are still correct; they are just unwritten. Do not delete them on that basis - the schema is a contract, the missing writer is a gap.
+- **`close()` is on the quit path, and is deliberately last.** It shipped with **zero** production callers (only `database-manager.test.ts`), leaving the sql.js handle unclosed at exit. It is now the `database` step of `buildShutdownSteps()` in `src/main/main.ts`, ordered last because it calls `persistToDisk()` and should capture anything written during teardown. Because boot wraps init in `try/catch` and degrades to a warn, the manager may not exist — the step catches `getDatabaseManager()`'s "not initialized" throw and logs at debug, because a database that never opened is not a shutdown failure. A new persistent handle in this folder follows the same rule: register its release with `main.ts` in the change that acquires it.
 
 ## Work Guidance
 
@@ -42,7 +43,7 @@ sql.js persistence for the desktop/document agent learning loop: trajectory reco
 
 ## Verification
 
-- Nothing in `database/` is tested. Gates: `npm run typecheck`, then `npm run dev` and confirm the `Applied migration …` / `All migrations complete. Schema version: N` log lines from the runner. `node_modules` may be absent — `npm install` first; `sql.js` needs the native-dep step noted in the root rail.
+- `database-manager.test.ts` covers the sql.js layer. Gates: `npm run typecheck`, then `npm run dev` and confirm the `Applied migration …` / `All migrations complete. Schema version: N` log lines from the runner. `node_modules` is installed here, so all three gates run; `sql.js` is pure JS + wasm and needs no native-dep step (root rail Stack).
 - After adding a migration, the smoke check is the new `Applied migration <id>` line once (and only once) plus `getDatabaseStats().tableCount` incrementing — current truth is 4 tables (`desktop_trajectories`, `desktop_trajectory_steps`, `desktop_failures`, `migrations`).
 
 ## Child DOX Index
