@@ -8,6 +8,7 @@ import { getSystemInfo, getPlatform, getPlatformName, isWindows, isMacOS, isLinu
 import { registerChatHandlers } from './chat-handlers';
 import { registerMCPHandlers } from './mcp-handlers';
 import { isCommandSafe } from './command-guard';
+import { isSafeSearchQuery, isUsablePath } from './file-guard';
 import { createLogger } from '../utils/logger';
 
 const execAsync = promisify(exec);
@@ -63,13 +64,18 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  // Both of these used to answer a failure with `'compact'`. That is not a neutral default: the
+  // renderer lays the palette out for the mode it is told, so a swallowed error made main report an
+  // ordinary read as a compact window while the real bounds were still expanded — and the caller
+  // had no way to tell a lie from a fact. Both now re-throw, like `window:setMode` already did;
+  // the one consumer (`useWindowMode`'s mount read) already catches and keeps its own state.
   ipcMain.handle('window:getMode', () => {
     try {
       const mode = getWindowMode();
       return mode;
     } catch (error) {
       log.error('Error in getMode:', error);
-      return 'compact';
+      throw error;
     }
   });
 
@@ -78,7 +84,7 @@ export function registerIPCHandlers(): void {
       return toggleWindowMode();
     } catch (error) {
       log.error('Error in toggleMode:', error);
-      return 'compact';
+      throw error;
     }
   });
 
@@ -95,20 +101,39 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  /**
+   * The drag handle's per-frame height request. It used to write `Math.round(height)` straight into
+   * `setBounds`, which made this the one channel that could move the window anywhere the renderer
+   * named — past the work area, past the expanded ceiling, to `NaN`. The clamp is main's
+   * (`windowManager.clampExpandedHeight`) and the reply carries the height actually applied, so the
+   * drag can never drift from what the window really holds.
+   */
   ipcMain.handle('window:resizeHeight', (_, height: number) => {
     try {
       const mainWindow = getMainWindow();
-      if (mainWindow) {
-        const currentBounds = mainWindow.getBounds();
-        mainWindow.setBounds({
-          x: currentBounds.x,
-          y: currentBounds.y,
-          width: currentBounds.width,
-          height: Math.round(height),
-        });
+      if (!mainWindow) return { success: false, error: 'No palette window' };
+      // The handle is only mounted in `expanded`; a resize while compact or custom would fight the
+      // hard size lock those modes install, leaving bounds the lock then snaps back.
+      if (getWindowMode() !== 'expanded') {
+        log.warn('Ignored a resize request outside expanded mode');
+        return { success: false, error: 'Only the expanded palette can be resized' };
       }
+      const clamped = windowManager.clampExpandedHeight(height);
+      if (clamped === null) {
+        log.warn('Rejected a non-numeric resize height');
+        return { success: false, error: 'height must be a finite number' };
+      }
+      const currentBounds = mainWindow.getBounds();
+      mainWindow.setBounds({
+        x: currentBounds.x,
+        y: currentBounds.y,
+        width: currentBounds.width,
+        height: clamped,
+      });
+      return { success: true, height: clamped };
     } catch (error) {
       log.error('Error in resizeHeight:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
     }
   });
 
@@ -125,6 +150,17 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  /**
+   * One animation frame of the page, used as the clock for the height tween. One-way `send`, not
+   * `invoke`: the reply would be a promise allocated 60× a second for no reader, since what the
+   * renderer is waiting for is the next `setBounds`, which it sees as its own resized height.
+   * Takes no argument and can move nothing on its own — `windowManager` ignores it unless a tween
+   * is in flight, so it is not a second, unvalidated way to resize the window.
+   */
+  ipcMain.on('window:animationFrame', () => {
+    windowManager.onAnimationFrame();
+  });
+
   // Command execution handler
   ipcMain.handle('command:execute', async (_, command: string): Promise<{ success: boolean; output?: string; error?: string }> => {
     if (!isCommandSafe(command)) {
@@ -132,7 +168,15 @@ export function registerIPCHandlers(): void {
       return { success: false, error: 'Command not allowed for security reasons' };
     }
     try {
-      const { stdout, stderr } = await execAsync(command);
+      // Both bounds are load-bearing, and this was the only `exec` in the tree carrying neither.
+      // `exec` defaults to `timeout: 0`, so a command that never exits held the IPC call — and its
+      // shell — open indefinitely; the 1 MB default buffer then failed a merely chatty command
+      // with a truncation error instead of a result. These match the other two exec sites
+      // (`utils/esRunner.ts`, `services/pi/toolbox.ts`).
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
       if (stderr) {
         return { success: false, error: stderr };
       }
@@ -164,11 +208,7 @@ export function registerIPCHandlers(): void {
   // Open file/folder handler - validates path to prevent arbitrary file access
   ipcMain.handle('file:open', async (_, path: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (!path || typeof path !== 'string' || path.length > 1000) {
-        return { success: false, error: 'Invalid path' };
-      }
-      // Reject paths with known dangerous patterns
-      if (path.includes('\\\\') && !path.startsWith('\\\\')) {
+      if (!isUsablePath(path)) {
         return { success: false, error: 'Invalid path' };
       }
       const result = await shell.openPath(path);
@@ -185,6 +225,12 @@ export function registerIPCHandlers(): void {
 
   // Reveal file in folder handler
   ipcMain.handle('file:revealInFolder', async (_, path: string): Promise<void> => {
+    // This channel used to reach `shell.showItemInFolder` with no check at either layer, so the
+    // renderer could name any path on any drive without main looking at it once.
+    if (!isUsablePath(path)) {
+      log.warn('Blocked file:revealInFolder with an unusable path');
+      return;
+    }
     shell.showItemInFolder(path);
   });
 
@@ -282,6 +328,13 @@ export function registerIPCHandlers(): void {
     category?: string;
   }>> => {
     try {
+      // The metacharacter blocklist lived only in `preload.ts`, and preload is renderer-reachable:
+      // invoking the channel directly shipped the raw string into an `es.exe` command line.
+      if (!isSafeSearchQuery(query)) {
+        log.warn('Blocked file:search with an unsafe query');
+        return [];
+      }
+
       log.debug('Searching files for query:', query);
       
       // Only available on Windows
@@ -342,7 +395,7 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('dialog:openFile', async (_, options?: { 
     defaultPath?: string; 
     filters?: Array<{ name: string; extensions: string[] }> 
-  }): Promise<{ path?: string; cancelled?: boolean }> => {
+  }): Promise<{ path?: string; cancelled?: boolean; error?: string }> => {
     try {
       const mainWindow = getMainWindow();
       const result = await electronDialog.showOpenDialog(mainWindow!, {
@@ -358,13 +411,13 @@ export function registerIPCHandlers(): void {
       return { path: result.filePaths[0] };
     } catch (error) {
       log.error('Dialog openFile error:', error);
-      return { cancelled: true };
+      return { error: error instanceof Error ? error.message : 'Dialog failed' };
     }
   });
 
   ipcMain.handle('dialog:openFolder', async (_, options?: { 
     defaultPath?: string 
-  }): Promise<{ path?: string; cancelled?: boolean }> => {
+  }): Promise<{ path?: string; cancelled?: boolean; error?: string }> => {
     try {
       const mainWindow = getMainWindow();
       const result = await electronDialog.showOpenDialog(mainWindow!, {
@@ -379,7 +432,7 @@ export function registerIPCHandlers(): void {
       return { path: result.filePaths[0] };
     } catch (error) {
       log.error('Dialog openFolder error:', error);
-      return { cancelled: true };
+      return { error: error instanceof Error ? error.message : 'Dialog failed' };
     }
   });
 }

@@ -208,3 +208,23 @@ export class BrowserSkillLoaderService {
 }
 
 export const browserSkillLoader = new BrowserSkillLoaderService();
+
+/**
+ * One-shot skill text for a query: match the catalog against the query, load each
+ * matched skill, and join the sections. Empty string when nothing matches (or the
+ * skills directory is missing) so the caller can splice the result straight into a
+ * prompt. Never throws — a skill failure must not fail the turn that wanted it.
+ */
+export async function buildBrowserSkillSection(query: string): Promise<string> {
+  try {
+    const catalog = browserSkillLoader.getCatalog();
+    const matched = browserSkillLoader.matchSkills(query, catalog);
+    if (matched.length === 0) return "";
+    const sections = await Promise.all(matched.map((skill) => browserSkillLoader.loadSkill(skill.name)));
+    return sections
+      .filter((section): section is string => typeof section === "string" && section.length > 0)
+      .join("\n\n---\n\n");
+  } catch {
+    return "";
+  }
+}

@@ -6,7 +6,7 @@ const sharp = (await import('sharp')).default;
 const { createWorker } = await import('tesseract.js');
 
 // Production calls createWorker('eng') with no workerPath/langPath/corePath overrides
-// (windows-adapter.ts:14, desktop-tools.ts:329), so every one of those resolution paths is
+// (windows-adapter.ts:14, and the OCR worker it spawns), so every one of those resolution paths is
 // inside this dependency's defaults. This renders real text and reads it back.
 const TEXT = 'Qyther OCR Probe 42';
 

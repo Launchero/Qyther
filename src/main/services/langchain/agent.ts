@@ -1,17 +1,11 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
 import { EventEmitter } from 'events';
-import dotenv from 'dotenv';
 import { mcpService } from '../mcp/client';
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { isPiConfigured } from '../pi/provider';
 import { statefulBrowserAgent } from '../browser/stateful-browser-agent';
 import { browserSessionManager } from '../browser/browser-session-manager';
 import { createLogger } from '../../utils/logger';
-/* eslint-disable @typescript-eslint/no-explicit-any -- LLM agent config shapes are highly dynamic */
 
 const log = createLogger('LangChain');
-
-dotenv.config();
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -65,11 +59,49 @@ export interface StreamChunk {
 }
 
 class LangChainAgent extends EventEmitter {
-  private chatModel: ChatOpenAI | null = null;
+  /**
+   * The model itself is Pi's (`../pi/provider.ts`); this store holds nothing but
+   * transcripts. What used to live here — a `ChatOpenAI` and a ReAct `agentExecutor` —
+   * was the second, renderer-unreachable way to reach a model, and it is gone: the one
+   * live path is the Pi ask loop (`../pi/ask-turn.ts`).
+   */
   private sessions: Map<string, ChatSession> = new Map();
+  /**
+   * Published whenever the *visible* list (`listSessions()`: sessions that have messages, newest
+   * first) can change. The renderer used to poll `chat:listSessions` for this, and a `useEffect`
+   * whose dependency was a fresh closure every render turned that into an unbounded IPC loop; the
+   * push is what replaces the polling entirely, so a stale transcript list is now impossible.
+   */
+  private sessionsChangedNotifier: ((sessions: ChatSession[]) => void) | null = null;
+
+  private publishSessions(): void {
+    const notifier = this.sessionsChangedNotifier;
+    if (!notifier) return;
+    // Synchronous on purpose. Awaiting `listSessions()` here left a floating promise per mutation, so
+    // two rapid changes could publish out of order and a test could not observe the push without an
+    // extra tick; `visibleSessions()` is already in memory.
+    try {
+      notifier(this.visibleSessions());
+    } catch (error) {
+      log.error('Failed to publish the session list:', error);
+    }
+  }
+
+  /**
+   * The one definition of "the sessions the renderer lists": non-empty, newest first. `listSessions`
+   * and every push read it, so the two cannot disagree about what is visible.
+   */
+  private visibleSessions(): ChatSession[] {
+    return Array.from(this.sessions.values())
+      .filter(session => session.messages.length > 0)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+
+  setSessionsChangedNotifier(notifier: ((sessions: ChatSession[]) => void) | null): void {
+    this.sessionsChangedNotifier = notifier;
+  }
   private currentSessionId: string | null = null;
   private isInitialized: boolean = false;
-  private agentExecutor: any = null;
   private useMCP: boolean = false;
   private browserModeEnabled: boolean = false; // Manual override flag
   private browserAgentInitialized: boolean = false;
@@ -81,41 +113,21 @@ class LangChainAgent extends EventEmitter {
     super();
   }
 
+  /**
+   * Latch-only: the model client is Pi's and is built lazily on the first turn
+   * (`../pi/ask-turn.ts`), so there is nothing to construct here. `isReady()` asks
+   * Pi's own config predicate, which is what `chat:initialize`'s envelope reports on.
+   */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       return;
     }
 
-    try {
-      const apiKey = process.env.API_KEY;
-      const baseURL = process.env.BASE_URL;
-      const model = process.env.MODEL || 'qwen3.5-plus';
-
-      if (!apiKey) {
-        log.warn('API_KEY not found in environment. Chat functionality will be limited.');
-        this.isInitialized = true;
-        return;
-      }
-
-      this.chatModel = new ChatOpenAI({
-        model: model,
-        apiKey,
-        configuration: {
-          baseURL: baseURL,
-        },
-        streaming: true,
-        temperature: 0.7,
-      });
-      
-      log.info('ChatOpenAI configured with baseURL:', baseURL);
-      log.info('Model:', model);
-
-      this.isInitialized = true;
-      log.info('Agent initialized with model:', model);
-    } catch (error) {
-      log.error('Failed to initialize:', error);
-      throw error;
+    if (!isPiConfigured()) {
+      log.warn('API_KEY/BASE_URL not found in environment. Chat functionality will be limited.');
     }
+
+    this.isInitialized = true;
   }
 
   async createSession(title: string = 'New Chat'): Promise<string> {
@@ -154,9 +166,7 @@ class LangChainAgent extends EventEmitter {
   }
 
   async listSessions(): Promise<ChatSession[]> {
-    return Array.from(this.sessions.values())
-      .filter(session => session.messages.length > 0) // Only return sessions with messages
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    return this.visibleSessions();
   }
 
   async switchSession(sessionId: string): Promise<void> {
@@ -171,240 +181,9 @@ class LangChainAgent extends EventEmitter {
     if (this.currentSessionId === sessionId) {
       this.currentSessionId = null;
     }
+    this.publishSessions();
   }
 
-  async sendMessage(content: string, onChunk?: (chunk: string) => void): Promise<string> {
-    const startTime = Date.now();
-    
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    if (!this.chatModel) {
-      const errorMessage = 'Chat model not initialized. Please check your API configuration.';
-      this.addMessage('assistant', errorMessage);
-      return errorMessage;
-    }
-
-    if (!this.currentSessionId) {
-      await this.createSession('New Chat');
-    }
-
-    const isBrowserQuery = this.browserModeEnabled || this.requiresBrowserAutomation(content);
-    
-    log.debug('Browser mode enabled:', this.browserModeEnabled);
-    log.debug('Is browser query (auto-detect):', this.requiresBrowserAutomation(content));
-    log.debug('Has active browser session:', this.currentBrowserSessionId);
-    log.debug('Final isBrowserQuery:', isBrowserQuery);
-    
-    if (isBrowserQuery) {
-      log.info('Routing to browser agent:', content);
-      
-      if (!this.browserAgentInitialized) {
-        log.debug('Initializing browser agent...');
-        await this.initializeBrowserAgent();
-      }
-      
-      log.debug('Browser agent ready:', statefulBrowserAgent.isReady());
-      
-      if (statefulBrowserAgent.isReady()) {
-        // Reuse existing session or create new one
-        let sessionId = this.currentBrowserSessionId;
-        if (!sessionId) {
-          sessionId = await browserSessionManager.createSession();
-          this.currentBrowserSessionId = sessionId;
-          log.info('Created NEW browser session:', sessionId);
-        } else {
-          log.info('Reusing EXISTING browser session:', sessionId);
-        }
-        
-        let fullResponse = '';
-        
-        try {
-          log.info('Executing browser task...');
-          const stream = await statefulBrowserAgent.executeTask(content, sessionId);
-          
-          log.debug('Starting to read stream...');
-          for await (const chunk of stream) {
-            log.debug('Received chunk:', chunk.slice(0, 50));
-            fullResponse += chunk;
-            if (onChunk) {
-              onChunk(chunk);
-            }
-          }
-          
-          log.info('Stream complete, response length:', fullResponse.length);
-          
-          // Add P2 metadata for browser queries
-          const durationMs = Date.now() - startTime;
-          const estimatedTokens = Math.floor(fullResponse.length / 4);
-          const p2Metadata = {
-            reasoning: {
-              steps: [
-                {
-                  stepNumber: 1,
-                  action: 'Parse user query',
-                  reasoning: 'Analyzing request to determine required browser actions',
-                  confidence: 95,
-                },
-                {
-                  stepNumber: 2,
-                  action: 'Execute browser automation',
-                  reasoning: 'Navigating web pages and extracting information',
-                  confidence: 90,
-                },
-                {
-                  stepNumber: 3,
-                  action: 'Process and format results',
-                  reasoning: 'Compiling extracted data into coherent response',
-                  confidence: 85,
-                },
-              ],
-            },
-            metrics: {
-              tokensUsed: estimatedTokens,
-              inputTokens: Math.floor(estimatedTokens * 0.3),
-              outputTokens: Math.floor(estimatedTokens * 0.7),
-              estimatedCost: (estimatedTokens * 0.0002) / 1000, // Approximate cost
-              durationMs,
-              model: process.env.MODEL || 'qwen3.6-plus',
-            },
-          };
-          
-          // Add AI response to history with P2 metadata
-          this.addMessage('assistant', fullResponse, p2Metadata);
-          
-          // Reset inactivity timeout
-          this.resetBrowserSessionTimeout();
-          
-          // DO NOT close the session - keep it alive for follow-up queries
-          // Session will be closed when user starts a new conversation or explicitly closes it
-          
-          return fullResponse;
-        } catch (error) {
-          log.error('Browser agent error:', error);
-          // Only close session on error
-          await statefulBrowserAgent.closeSession(sessionId);
-          await browserSessionManager.closeSession();
-          this.currentBrowserSessionId = null;
-          throw error;
-        }
-      } else {
-        log.warn('Browser agent not ready, falling back to standard chat');
-      }
-    } else {
-      log.debug('Not a browser query, using standard chat');
-    }
-
-    // Add user message to history
-    this.addMessage('user', content);
-
-    // Get conversation history
-    const session = await this.getCurrentSession();
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    const messages: BaseMessage[] = [
-      new SystemMessage('You are a helpful AI assistant integrated into a desktop application. Provide clear, concise, and accurate responses. Format your answers with markdown when appropriate.'),
-      ...session.messages
-        .filter(m => m.role !== 'system')
-        .map(m => m.role === 'user' 
-          ? new HumanMessage(m.content)
-          : new AIMessage(m.content)
-        ),
-    ];
-
-    try {
-      if (this.useMCP && this.agentExecutor) {
-        const result = await this.agentExecutor.invoke({
-          messages,
-        });
-        
-        const fullResponse = result.messages[result.messages.length - 1].content;
-        
-        if (onChunk) {
-          onChunk(fullResponse);
-        }
-        
-        // Add P2 metadata for MCP queries
-        const durationMs = Date.now() - startTime;
-        const estimatedTokens = Math.floor(fullResponse.length / 4);
-        const p2Metadata = {
-          metrics: {
-            tokensUsed: estimatedTokens,
-            inputTokens: Math.floor(estimatedTokens * 0.3),
-            outputTokens: Math.floor(estimatedTokens * 0.7),
-            estimatedCost: (estimatedTokens * 0.0002) / 1000,
-            durationMs,
-            model: process.env.MODEL || 'qwen3.6-plus',
-          },
-        };
-        
-        this.addMessage('assistant', fullResponse, p2Metadata);
-        return fullResponse;
-      } else {
-        // Fallback to direct model call (existing streaming code)
-        let fullResponse = '';
-        
-        // Stream the response
-        const stream = await this.chatModel.stream(messages);
-        
-        for await (const chunk of stream) {
-          if (chunk.content) {
-            const contentStr = typeof chunk.content === 'string' 
-              ? chunk.content 
-              : JSON.stringify(chunk.content);
-            
-            fullResponse += contentStr;
-            
-            if (onChunk) {
-              onChunk(contentStr);
-            }
-          }
-        }
-
-        // Add P2 metadata for standard queries
-        const durationMs = Date.now() - startTime;
-        const estimatedTokens = Math.floor(fullResponse.length / 4);
-        const p2Metadata = {
-          metrics: {
-            tokensUsed: estimatedTokens,
-            inputTokens: Math.floor(estimatedTokens * 0.3),
-            outputTokens: Math.floor(estimatedTokens * 0.7),
-            estimatedCost: (estimatedTokens * 0.0002) / 1000,
-            durationMs,
-            model: process.env.MODEL || 'qwen3.6-plus',
-          },
-        };
-        
-        // Add AI response to history with P2 metadata
-        this.addMessage('assistant', fullResponse, p2Metadata);
-
-        return fullResponse;
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while processing your request';
-      log.error('Error sending message:', error);
-      this.addMessage('assistant', errorMessage);
-      return errorMessage;
-    }
-  }
-
-  private   requiresBrowserAutomation(query: string): boolean {
-    const browserKeywords = [
-      'browse', 'search web', 'navigate', 'visit', 'click',
-      'fill form', 'screenshot', 'extract from', 'scrape',
-      'open url', 'go to', 'type into', 'hover over',
-      'scroll', 'press key', 'select option', 'drag',
-      'wait for', 'handle dialog', 'switch tab',
-      'web page', 'website', 'webpage', 'browser',
-      'sitemap', 'crawl', 'extract links', 'get all pages'
-    ];
-    return browserKeywords.some(keyword => 
-      query.toLowerCase().includes(keyword)
-    );
-  }
 
   async initializeBrowserAgent(config?: { headed?: boolean }): Promise<void> {
     try {
@@ -455,6 +234,8 @@ class LangChainAgent extends EventEmitter {
     }
 
     this.sessions.set(this.currentSessionId, session);
+    // First message makes a session *appear* in the list, and every message re-sorts it.
+    this.publishSessions();
   }
 
   addMessagePublic(role: 'user' | 'assistant' | 'system', content: string, metadata?: Partial<Omit<ChatMessage, 'role' | 'content' | 'timestamp'>>): void {
@@ -471,21 +252,23 @@ class LangChainAgent extends EventEmitter {
       session.messages = [];
       session.updatedAt = new Date();
       this.sessions.set(this.currentSessionId, session);
+      // An emptied session drops out of the visible list.
+      this.publishSessions();
     }
   }
 
+  /**
+   * Connect the shared MCP service and record whether anything is available.
+   * This used to build a ReAct `agentExecutor` over the tools; that executor is gone —
+   * the Pi ask agent binds the MCP family directly (`../pi/tools/mcp-tools.ts`), so
+   * connecting is all that is left for this path to do. `mcp-handlers.ts` still calls
+   * it before reading status.
+   */
   async initializeMCP(): Promise<void> {
     try {
       await mcpService.initialize();
-      const tools = mcpService.getTools();
-      
-      if (tools.length > 0 && this.chatModel) {
-        // Create ReAct agent with MCP tools
-        this.agentExecutor = createReactAgent({
-          llm: this.chatModel,
-          tools,
-        });
-        this.useMCP = true;
+      this.useMCP = mcpService.getTools().length > 0;
+      if (this.useMCP) {
         log.info('MCP tools integrated successfully');
       }
     } catch (error) {
@@ -498,8 +281,13 @@ class LangChainAgent extends EventEmitter {
     return this.useMCP;
   }
 
+  /**
+   * Readiness is Pi's config predicate, not a model instance held here — this class
+   * stores transcripts only. `chat:initialize`'s envelope reads this and reports
+   * `retryable: false`, since `initialize()` latches and cannot pick up a late key.
+   */
   isReady(): boolean {
-    return this.isInitialized && !!this.chatModel;
+    return this.isInitialized && isPiConfigured();
   }
 
   getBrowserSessionStatus(): { 
@@ -552,6 +340,15 @@ class LangChainAgent extends EventEmitter {
 
   async cleanupBrowserAgent(): Promise<void> {
     try {
+      // Release the inactivity timer FIRST. This method nulls `currentBrowserSessionId` without
+      // clearing `browserSessionTimeout`, so the 5-minute handle survived and later fired
+      // `closeBrowserSession()` against an already-null session — a live timer outliving the work
+      // it was watching. `closeBrowserSession` clears it at the top for the same reason.
+      if (this.browserSessionTimeout) {
+        clearTimeout(this.browserSessionTimeout);
+        this.browserSessionTimeout = null;
+      }
+
       await statefulBrowserAgent.cleanup();
       await browserSessionManager.closeSession();
       this.browserAgentInitialized = false;

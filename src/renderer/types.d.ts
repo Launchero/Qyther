@@ -1,4 +1,7 @@
-// Define ElectronAPI type locally to avoid cross-context imports
+// Shared boundary types are `import type` only: erased at build, so this stays free of
+// any runtime dependency on the main process.
+import type { TurnEnvelope } from '../shared/ipc/turn';
+import type { ChatSessionSummary } from '../shared/ipc/sessions';
 
 export interface ChatMetrics {
   tokensUsed: number;
@@ -7,10 +10,6 @@ export interface ChatMetrics {
   estimatedCost: number;
   durationMs: number;
   model: string;
-}
-
-export interface ReasoningTrace {
-  steps: Array<{ stepNumber: number; action: string; reasoning: string; confidence: number }>;
 }
 
 export interface UIPayload {
@@ -26,7 +25,7 @@ export interface Source {
   excerpt: string;
 }
 
-export interface ThinkingStepData {
+export interface ThinkingStepData extends TurnEnvelope {
   type: string;
   step: string;
   status: string;
@@ -35,19 +34,12 @@ export interface ThinkingStepData {
   update?: boolean;
 }
 
-export interface StreamChunkData {
+export interface StreamChunkData extends TurnEnvelope {
   chunk: string;
   isComplete: boolean;
   error?: string;
   metrics?: ChatMetrics;
-  reasoning?: ReasoningTrace;
   thinkingSteps?: ThinkingStepData[];
-  selfCorrected?: boolean;
-  iterationsUsed?: number;
-  validationScore?: number;
-  qualityScore?: number;
-  confidence?: number;
-  verificationSkipped?: boolean;
   fullContent?: string | null;
   uiPayloads?: UIPayload[];
   sources?: Source[];
@@ -86,6 +78,7 @@ export interface ElectronAPI {
     setCustomDimensions: (width: number, height: number) => Promise<void>;
     resizeHeight: (height: number) => Promise<void>;
     getHeight: () => Promise<number>;
+    animationFrame: () => void;
   };
 
   // Command execution
@@ -132,8 +125,8 @@ export interface ElectronAPI {
 
   // Dialog API
   dialog: {
-    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ path?: string; cancelled?: boolean }>;
-    openFolder: (options?: { defaultPath?: string }) => Promise<{ path?: string; cancelled?: boolean }>;
+    openFile: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ path?: string; cancelled?: boolean; error?: string }>;
+    openFolder: (options?: { defaultPath?: string }) => Promise<{ path?: string; cancelled?: boolean; error?: string }>;
   };
 
   // Debug logging
@@ -151,8 +144,7 @@ export interface ElectronAPI {
 
   // Chat API
   chat: {
-    initialize: () => Promise<{ success: boolean; ready: boolean; error?: string }>;
-    sendMessage: (content: string, sessionId?: string) => Promise<{ success: boolean; response?: string; error?: string }>;
+    initialize: () => Promise<{ success: boolean; ready: boolean; error?: string; retryable?: boolean }>;
     sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) => Promise<{ success: boolean; response?: string; error?: string }>;
     createSession: (title?: string) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
     getCurrentSession: () => Promise<ChatSession | null>;
@@ -162,21 +154,12 @@ export interface ElectronAPI {
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     clearHistory: () => Promise<{ success: boolean; error?: string }>;
     isReady: () => Promise<boolean>;
-    resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) => Promise<{ success: boolean; error?: string }>;
+    cancelTurn: (threadId: string) => Promise<{ success: boolean; error?: string }>;
+    onTurnStarted: (callback: (data: TurnEnvelope & { threadId: string }) => void) => () => void;
+    onSessionsChanged: (callback: (sessions: ChatSessionSummary[]) => void) => () => void;
     onStreamChunk: (callback: (data: StreamChunkData) => void) => () => void;
-    onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => () => void;
     onThinkingStep: (callback: (data: ThinkingStepData) => void) => () => void;
-    onUIPayloadStarted: (callback: (data: { type: string }) => void) => () => void;
-    onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => () => void;
-    onUIPayloadReset: (callback: () => void) => () => void;
-    onFormSubmit: (callback: (data: { formTitle: string; formData: Record<string, unknown> }) => void) => () => void;
-    onDesktopConfirmationRequest: (callback: (data: {
-      threadId: string;
-      interruptPayload: { type: string; action: string; description: string };
-      pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
-      planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
-    }) => void) => () => void;
-    onAgentChange: (callback: (data: { label: string }) => void) => () => void;
+    onAgentChange: (callback: (data: { label: string } & TurnEnvelope) => void) => () => void;
   };
 
   // MCP API

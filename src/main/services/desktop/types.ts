@@ -67,6 +67,13 @@ export interface DesktopAdapter {
   maximizeWindow(hWnd: unknown): Promise<boolean>;
   restoreWindow(hWnd: unknown): Promise<boolean>;
   closeWindow(hWnd: unknown): Promise<boolean>;
+  /**
+   * Release the native resources the adapter opened — the tesseract worker and the
+   * input-simulation FFI state. Optional so a stub adapter implements only the 18 tool
+   * methods; `WindowsDesktopAdapter` implements it, and `PiDesktopAgent.dispose()` (via
+   * `closePiDesktopAgent()`, wired into `app.on('will-quit')`) is its only caller.
+   */
+  cleanup?(): Promise<void>;
 }
 
 export type DangerLevel = 'safe' | 'reviewable' | 'dangerous';
@@ -150,24 +157,6 @@ export interface VerificationIntent {
   targetControlType?: string;
   expectedValue?: string | boolean | number;
   confidence: number;
-}
-
-export interface PendingAction {
-  tool: DesktopToolName;
-  args: Record<string, unknown>;
-  dangerLevel: DangerLevel;
-  sessionId: string;
-  timestamp: number;
-}
-
-export interface DesktopActionDeniedEvent {
-  type: 'action_denied';
-  action: {
-    tool: string;
-    args: Record<string, unknown>;
-    sessionId: string;
-    confirmationId: string;
-  };
 }
 
 // ── Hierarchical Subgraph Types (Task 2) ─────────────────────────────────────

@@ -1,13 +1,25 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
-import { MemorySaver } from '@langchain/langgraph';
-import { MCPAdapter } from '@langchain/mcp-adapters';
-/* eslint-disable @typescript-eslint/no-explicit-any -- Browser/MCP tool results are highly dynamic */
+/**
+ * Pi-native stateful browser agent: one `Agent` per task over the `browser_*` Pi tools.
+ *
+ * This replaces the LangChain `createReactAgent` + `MemorySaver` executor. What changed is
+ * the loop, not the surface: every public method keeps its signature because `browser-handlers.ts`
+ * and `langchain/agent.ts` call them from outside this subtree. Pi's loop already is
+ * plan→act→observe, so the deleted `browser-subgraph.ts` planner/verifier/recovery ladder has
+ * no replacement here — recovery is whatever the model does with a tool error, and tools never
+ * throw, so every failure arrives as readable text the model can act on.
+ *
+ * Tools come only from the shared `mcpService` connection, converted by
+ * `pi/tools/browser-tools.ts`. The old in-repo fallback that spawned its own
+ * `npx @playwright/mcp` child is deleted: a second connection is a second child process,
+ * and `cleanup()` below must never kill the shared one (it belongs to the `mcp` shutdown step).
+ */
 import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
+import { Agent, type AgentEvent } from '@earendil-works/pi-agent-core';
 import { createLogger } from '../../utils/logger';
-import { mcpService } from '../mcp/client';
+import { getPiModel, getPiStreamFn } from '../pi/provider';
+import type { PiTool } from '../pi/toolbox';
+import { getBrowserToolbox } from '../pi/tools/browser-tools';
 
 const log = createLogger('BrowserAgent');
 
@@ -15,7 +27,7 @@ dotenv.config();
 
 export interface BrowserAgentState {
   sessionId: string;
-  messages: BaseMessage[];
+  messages: unknown[];
   browserUrl?: string;
   stepCount: number;
   maxSteps: number;
@@ -30,20 +42,55 @@ export interface BrowserTaskProgress {
   message: string;
 }
 
+/** Prompt the model drives against. The skill slot is filled per call, never stored. */
+function buildBrowserSystemPrompt(sessionId: string, skillContext: string): string {
+  const skillInstructions = skillContext
+    ? `\n\nSKILL INSTRUCTIONS:\n${skillContext}\n\nFollow the skill instructions above for this task.`
+    : '';
+  return `You are a browser automation assistant. You can navigate web pages, click elements, fill forms, and extract information.
+
+Important guidelines:
+- Use browser_navigate to go to URLs
+- Use browser_snapshot to see what's on the page
+- Use browser_click to interact with elements
+- Use browser_type to fill in text fields
+- Be concise and efficient
+- Complete the task in as few steps as possible
+- Report progress clearly to the user${skillInstructions}
+
+Current session: ${sessionId}`;
+}
+
+/** Pi's `message_update` arm carries the inner assistant event; only `text_delta` streams. */
+function textDeltaOf(event: AgentEvent): string | null {
+  if (event.type !== 'message_update') return null;
+  const inner = event.assistantMessageEvent as { type?: string; delta?: string };
+  return inner?.type === 'text_delta' && inner.delta ? inner.delta : null;
+}
+
+/** One drain tick when no event is queued yet. Short-lived by construction. */
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+type ToolTransition = Extract<AgentEvent, { type: 'tool_execution_start' } | { type: 'tool_execution_end' }>;
+
+/** Mutable counters the queue consumer folds tool transitions into. */
+interface DrainStats {
+  steps: number;
+  lastUrl: string | undefined;
+}
+
 export class StatefulBrowserAgent extends EventEmitter {
-  private agentExecutor: any = null;
-  private checkpointer: MemorySaver;
   private headedMode: boolean = false;
-  private browserTools: any[] = [];
-  private fallbackClient: MCPAdapter | null = null;
-  private usingFallback = false;
+  private browserTools: PiTool[] = [];
   private isInitialized: boolean = false;
   private readonly maxSteps: number = 10;
-  private readonly stepTimeout: number = 30000; // 30 seconds
 
   constructor() {
     super();
-    this.checkpointer = new MemorySaver();
   }
 
   async initialize(config?: { headed?: boolean }): Promise<void> {
@@ -54,69 +101,16 @@ export class StatefulBrowserAgent extends EventEmitter {
     try {
       this.headedMode = config?.headed ?? false;
 
-      // Try to get browser tools from shared mcpService first
-      if (mcpService.isInitialized() && mcpService.getTools().length > 0) {
-        const allTools = mcpService.getTools();
-        this.browserTools = allTools.filter((tool: any) =>
-          tool.name?.startsWith('browser_')
-        );
-        this.usingFallback = false;
-        log.info(`Loaded ${this.browserTools.length} browser tools from shared mcpService`);
-      } else {
-        // Fallback: create own Playwright client if mcpService not initialized
-        log.warn('mcpService not initialized, creating fallback Playwright client');
-        // 2.x validates config strictly, so the bare connections record this used to pass
-        // is now rejected; connections belong under `servers`.
-        this.fallbackClient = new MCPAdapter({
-          servers: {
-            playwright: {
-              command: 'npx',
-              args: ['@playwright/mcp@latest'],
-              transport: 'stdio' as const,
-            },
-          },
-          // Without this the tools arrive as playwright_browser_navigate and the
-          // startsWith('browser_') filter below matches nothing.
-          prefixToolNameWithServerName: false,
-        });
-
-        const allTools = await this.fallbackClient.listTools();
-        this.browserTools = allTools.filter((tool: any) =>
-          tool.name?.startsWith('browser_')
-        );
-        this.usingFallback = true;
-        log.info(`Loaded ${this.browserTools.length} browser tools from fallback client`);
-      }
-
+      // Single connection: the shared mcpService client owns the Playwright stdio child.
+      this.browserTools = await getBrowserToolbox();
       if (this.browserTools.length === 0) {
         throw new Error('No browser tools found from Playwright MCP server');
       }
-
       log.info(`Loaded ${this.browserTools.length} browser tools`);
 
-      const apiKey = process.env.API_KEY;
-      const baseURL = process.env.BASE_URL;
-      const model = process.env.MODEL || 'qwen3.6-plus';
-
-      if (!apiKey) {
-        throw new Error('API_KEY not found in environment');
+      if (!getPiModel()) {
+        throw new Error('Pi model is not configured (MODEL/BASE_URL/API_KEY)');
       }
-
-      const chatModel = new ChatOpenAI({
-        model: model,
-        apiKey,
-        configuration: {
-          baseURL: baseURL,
-        },
-        temperature: 0.7,
-      });
-
-      // Create ReAct agent with tools
-      this.agentExecutor = createReactAgent({
-        llm: chatModel,
-        tools: this.browserTools as any,
-        checkpointSaver: this.checkpointer,
-      });
 
       this.isInitialized = true;
       log.info('Initialized successfully');
@@ -133,36 +127,11 @@ export class StatefulBrowserAgent extends EventEmitter {
   }
 
   async executeTask(
-    task: string, 
+    task: string,
     sessionId: string,
     onProgress?: (progress: BrowserTaskProgress) => void
   ): Promise<AsyncGenerator<string>> {
-    if (!this.isInitialized) {
-      throw new Error('Browser agent not initialized');
-    }
-
-    const messages: BaseMessage[] = [
-      new SystemMessage(`You are a browser automation assistant. You can navigate web pages, click elements, fill forms, and extract information. 
-      
-Important guidelines:
-- Use browser_navigate to go to URLs
-- Use browser_snapshot to see what's on the page
-- Use browser_click to interact with elements
-- Use browser_type to fill in text fields
-- Be concise and efficient
-- Complete the task in as few steps as possible
-- Report progress clearly to the user
-
-Current session: ${sessionId}`),
-      new HumanMessage(task),
-    ];
-
-    const stream = this.agentExecutor.streamEvents(
-      { messages },
-      { version: "v2", configurable: { thread_id: sessionId } }
-    );
-
-    return this.createStreamFromEvents(stream, sessionId, onProgress);
+    return this.executeTaskStream(task, sessionId, onProgress);
   }
 
   async *executeTaskStream(
@@ -179,122 +148,133 @@ Current session: ${sessionId}`),
     const skillContext = typeof skillContextOrOnProgress === 'string' ? skillContextOrOnProgress : '';
     const progressCallback = typeof skillContextOrOnProgress === 'function' ? skillContextOrOnProgress : onProgress;
 
-    const skillInstructions = skillContext
-      ? `\n\nSKILL INSTRUCTIONS:\n${skillContext}\n\nFollow the skill instructions above for this task.`
-      : '';
+    const model = getPiModel();
+    if (!model) {
+      throw new Error('Pi model is not configured (MODEL/BASE_URL/API_KEY)');
+    }
 
-    const messages: BaseMessage[] = [
-      new SystemMessage(`You are a browser automation assistant. You can navigate web pages, click elements, fill forms, and extract information.
-      
-Important guidelines:
-- Use browser_navigate to go to URLs
-- Use browser_snapshot to see what's on the page
-- Use browser_click to interact with elements
-- Use browser_type to fill in text fields
-- Be concise and efficient
-- Complete the task in as few steps as possible
-- Report progress clearly to the user${skillInstructions}
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: buildBrowserSystemPrompt(sessionId, skillContext),
+        model,
+        tools: this.browserTools,
+        thinkingLevel: 'off',
+      },
+      streamFn: getPiStreamFn(),
+      sessionId,
+      toolExecution: 'sequential',
+    });
 
-Current session: ${sessionId}`),
-      new HumanMessage(task),
-    ];
-
-    const stream = this.agentExecutor.streamEvents(
-      { messages },
-      { version: "v2", configurable: { thread_id: sessionId } }
-    );
-
-    yield* this.createStreamFromEvents(stream, sessionId, progressCallback);
+    yield* this.drainPiRun(agent, task, progressCallback);
   }
 
   /**
-   * Get all MCP browser tools for use by verifier and other components.
+   * Get all browser tools for exact-name lookup.
+   * The verifier that used this is deleted; the shape stays for out-of-subtree callers.
    */
-  async getMcpTools(): Promise<any[]> {
+  async getMcpTools(): Promise<PiTool[]> {
     return this.browserTools;
   }
 
-  private async *createStreamFromEvents(
-    stream: AsyncIterable<any>,
-    sessionId: string,
+  /**
+   * Bridge Pi's callback events into the yielded-token + progress-callback shape the IPC
+   * handler reads. The listener only queues; progress and tokens are derived in the loop
+   * so one tool maps to exactly one start and one end report.
+   */
+  private async *drainPiRun(
+    agent: Agent,
+    task: string,
     onProgress?: (progress: BrowserTaskProgress) => void
   ): AsyncGenerator<string> {
-    let stepCount = 0;
-    let lastUrl: string | undefined;
+    const queue: AgentEvent[] = [];
+    let done = false;
+    let failure: unknown = null;
+    const unsubscribe = agent.subscribe((event) => {
+      queue.push(event);
+    });
+    const run = agent
+      .prompt(task)
+      .catch((error: unknown) => { failure = error; })
+      .finally(() => { done = true; });
 
+    const stats: DrainStats = { steps: 0, lastUrl: undefined };
     try {
-      for await (const event of stream) {
-        const eventName = event.event;
-        const toolName = event.name as string | undefined;
-
-        if (eventName === "on_tool_start") {
-          stepCount++;
-          const status = this.inferStatusFromTool(toolName);
-          const url = this.extractUrlFromToolInput(event.data?.input);
-          if (url) lastUrl = url;
-
-          const progress: BrowserTaskProgress = {
-            step: stepCount,
-            maxSteps: this.maxSteps,
-            status,
-            url,
-            message: `Executing ${toolName}`,
-          };
-
-          if (onProgress) onProgress(progress);
-          this.emit('progress', progress);
-        } else if (eventName === "on_tool_end") {
-          stepCount++;
-          const progress: BrowserTaskProgress = {
-            step: stepCount,
-            maxSteps: this.maxSteps,
-            status: 'complete',
-            url: lastUrl,
-            message: `Completed ${toolName}`,
-          };
-
-          if (onProgress) onProgress(progress);
-          this.emit('progress', progress);
-        } else if (eventName === "on_chat_model_stream") {
-          const content = event.data?.chunk?.content;
-          if (content) {
-            const textContent = typeof content === 'string'
-              ? content
-              : Array.isArray(content)
-                ? content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
-                : '';
-
-            if (textContent) {
-              yield textContent;
-            }
-          }
-        }
-      }
-
-      // Emit completion
-      const completionProgress: BrowserTaskProgress = {
-        step: stepCount,
-        maxSteps: this.maxSteps,
-        status: 'complete',
-        url: lastUrl,
-        message: 'Task completed',
-      };
-
-      if (onProgress) onProgress(completionProgress);
-      this.emit('progress', completionProgress);
+      yield* this.consumeQueue(queue, () => done, stats, onProgress);
+      await run;
+      if (failure) throw failure;
     } catch (error) {
       const errorProgress: BrowserTaskProgress = {
-        step: stepCount,
+        step: stats.steps,
         maxSteps: this.maxSteps,
         status: 'error',
-        url: lastUrl,
+        url: stats.lastUrl,
         message: error instanceof Error ? error.message : 'Unknown error',
       };
 
       if (onProgress) onProgress(errorProgress);
       this.emit('progress', errorProgress);
       throw error;
+    } finally {
+      unsubscribe();
     }
+
+    const completionProgress: BrowserTaskProgress = {
+      step: stats.steps,
+      maxSteps: this.maxSteps,
+      status: 'complete',
+      url: stats.lastUrl,
+      message: 'Task completed',
+    };
+
+    if (onProgress) onProgress(completionProgress);
+    this.emit('progress', completionProgress);
+  }
+
+  private async *consumeQueue(
+    queue: AgentEvent[],
+    isDone: () => boolean,
+    stats: DrainStats,
+    onProgress?: (progress: BrowserTaskProgress) => void
+  ): AsyncGenerator<string> {
+    while (!isDone() || queue.length > 0) {
+      const event = queue.shift();
+      if (!event) {
+        await pause(20);
+        continue;
+      }
+      const delta = textDeltaOf(event);
+      if (delta) {
+        yield delta;
+      } else if (event.type === 'tool_execution_start' || event.type === 'tool_execution_end') {
+        stats.steps += 1;
+        stats.lastUrl = this.emitToolProgress(event, stats.steps, stats.lastUrl, onProgress);
+      }
+    }
+  }
+
+  private emitToolProgress(
+    event: ToolTransition,
+    step: number,
+    lastUrl: string | undefined,
+    onProgress?: (progress: BrowserTaskProgress) => void
+  ): string | undefined {
+    const started = event.type === 'tool_execution_start';
+    let url = lastUrl;
+    if (started) {
+      const found = this.extractUrlFromToolInput(event.args);
+      if (found) url = found;
+    }
+    const progress: BrowserTaskProgress = {
+      step,
+      maxSteps: this.maxSteps,
+      status: started ? this.inferStatusFromTool(event.toolName) : 'complete',
+      url,
+      message: `${started ? 'Executing' : 'Completed'} ${event.toolName}`,
+    };
+
+    if (onProgress) onProgress(progress);
+    this.emit('progress', progress);
+    return url;
   }
 
   private inferStatusFromTool(toolName: string | undefined): BrowserTaskProgress['status'] {
@@ -306,49 +286,34 @@ Current session: ${sessionId}`),
     return 'navigating';
   }
 
-  private extractUrlFromToolInput(input: any): string | undefined {
-    if (input && typeof input === 'object') {
-      return input.url || input.href || undefined;
+  private extractUrlFromToolInput(input: unknown): string | undefined {
+    if (input !== null && typeof input === 'object') {
+      const record = input as Record<string, unknown>;
+      const url = record.url ?? record.href;
+      return typeof url === 'string' ? url : undefined;
     }
     return undefined;
   }
 
   async closeSession(sessionId: string): Promise<void> {
     log.info(`Closing session: ${sessionId}`);
-    
-    if (this.agentExecutor) {
-      try {
-        await this.agentExecutor.invoke(
-          {
-            messages: [new HumanMessage('Close the browser session')],
-          },
-          {
-            configurable: {
-              thread_id: sessionId,
-            },
-          }
-        );
-      } catch (error) {
-        log.warn('Error closing browser:', error);
-      }
+    // Pi runs are stateless — no transcript to close. The one durable effect the old
+    // close had was leaving the page open behind it, so close the page directly when the
+    // server exposes a close tool. The Playwright child itself is never touched here.
+    const closer = this.browserTools.find((tool) => tool.name === 'browser_close');
+    if (!closer) return;
+    try {
+      await closer.execute('close-session', {});
+    } catch (error) {
+      log.warn('Error closing browser:', error);
     }
   }
 
   async cleanup(): Promise<void> {
     log.info('Cleaning up resources');
-
-    if (this.usingFallback && this.fallbackClient) {
-      try {
-        await this.fallbackClient.close();
-        this.fallbackClient = null;
-      } catch (error) {
-        log.error('Error closing fallback MCP client:', error);
-      }
-    }
-
-    this.agentExecutor = null;
+    // Nothing to close: runs are per-task Agents and the Playwright child belongs to
+    // mcpService (released by the `mcp` shutdown step). Reset the flags only.
     this.browserTools = [];
-    this.usingFallback = false;
     this.isInitialized = false;
   }
 
@@ -361,9 +326,9 @@ Current session: ${sessionId}`),
       'wait for', 'handle dialog', 'switch tab',
       'web page', 'website', 'webpage', 'browser'
     ];
-    
+
     const lowerQuery = query.toLowerCase();
-    return browserKeywords.some(keyword => 
+    return browserKeywords.some(keyword =>
       lowerQuery.includes(keyword)
     );
   }
@@ -371,18 +336,18 @@ Current session: ${sessionId}`),
   isReady(): boolean {
     return this.isInitialized;
   }
-  
+
   async extractAllLinks(_sessionId: string): Promise<string[]> {
     try {
-      const evaluateTool = this.browserTools.find((t: any) => t.name === 'browser_evaluate');
-      
+      const evaluateTool = this.browserTools.find((tool) => tool.name === 'browser_evaluate');
+
       if (!evaluateTool) {
         log.warn('browser_evaluate tool not found, using alternative method');
         // Fallback: return empty array
         return [];
       }
-      
-      const result = await evaluateTool.invoke({
+
+      const result = await evaluateTool.execute('extract-links', {
         script: `() => {
           const links = Array.from(document.querySelectorAll('a[href]'));
           return links
@@ -391,10 +356,13 @@ Current session: ${sessionId}`),
             .filter((href, index, self) => self.indexOf(href) === index); // Remove duplicates
         }`
       });
-      
-      const links = JSON.parse(result as string);
-      log.info(`Extracted ${links.length} links`);
-      return links;
+
+      const body = (result.content[0] as { text?: string } | undefined)?.text ?? '';
+      const links: unknown = JSON.parse(body);
+      if (!Array.isArray(links)) return [];
+      const urls = links.filter((link): link is string => typeof link === 'string');
+      log.info(`Extracted ${urls.length} links`);
+      return urls;
     } catch (error) {
       log.error('Error extracting links:', error);
       return [];

@@ -317,11 +317,15 @@ export class AccessibilityTreeAdapter {
     };
   }
 
-  cleanup(): void {
+  async cleanup(): Promise<void> {
     try {
-      import('./uia-native').then(({ cleanupNativeUIA }) => cleanupNativeUIA());
+      // Await the dynamic import so the shutdown step observes the cleanup. The previous
+      // fire-and-forget `.then()` returned void immediately, so `disposeDesktopRuntime` did
+      // not wait for `cleanupNativeUIA` and a rejected import became an unhandled rejection.
+      const { cleanupNativeUIA } = await import('./uia-native');
+      cleanupNativeUIA();
     } catch {
-      // Ignore cleanup errors
+      // Ignore cleanup errors — teardown must never block quit.
     }
     this.isInitialized = false;
   }

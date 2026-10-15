@@ -1,10 +1,9 @@
-import type { RunnableToolLike } from "@langchain/core/runnables";
-import type { DynamicStructuredTool } from "@langchain/core/tools";
+import type { PiTool } from "../pi/toolbox";
 import { createLogger } from "../../utils/logger";
 
 const log = createLogger('MCPRouter');
 
-type MCPTool = RunnableToolLike | DynamicStructuredTool;
+type MCPTool = PiTool;
 
 /**
  * Maps intent names to MCP tool name prefixes.

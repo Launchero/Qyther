@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { TurnEnvelope } from '../shared/ipc/turn';
+import type { ChatSessionSummary } from '../shared/ipc/sessions';
 
 // #region agent log
 const PRELOAD_LOGGING_ENABLED = process.env.LOG_PRELOAD === 'true';
@@ -60,6 +62,13 @@ ipcRenderer.on('window:modeChanged', (_event, mode: WindowMode) => {
   window.dispatchEvent(new CustomEvent('electron-window-mode-changed', { detail: mode }));
 });
 
+// The geometry behind `modeChanged` only holds when the height tween finishes. Main measures it
+// and sends this afterwards, so anything that must wait for the window (the harness, an
+// autoscroll, a focus move) can wait on a fact instead of polling innerHeight.
+ipcRenderer.on('window:modeSettled', (_event, detail: { mode: WindowMode; height: number }) => {
+  window.dispatchEvent(new CustomEvent('electron-window-mode-settled', { detail }));
+});
+
 // Listen for screenshot capture requests from main process
 ipcRenderer.on('desktop:screenshot:capture', async (_event, reqId: string) => {
   try {
@@ -90,15 +99,6 @@ interface StreamMetrics {
   model: string;
 }
 
-interface StreamReasoning {
-  steps: Array<{
-    stepNumber: number;
-    action: string;
-    reasoning: string;
-    confidence: number;
-  }>;
-}
-
 interface StreamThinkingStep {
   type: string;
   step: string;
@@ -108,18 +108,11 @@ interface StreamThinkingStep {
   update?: boolean;
 }
 
-interface StreamChunkData {
+interface StreamChunkData extends TurnEnvelope {
   chunk: string;
   isComplete: boolean;
   metrics?: StreamMetrics;
-  reasoning?: StreamReasoning;
   thinkingSteps?: StreamThinkingStep[];
-  selfCorrected?: boolean;
-  iterationsUsed?: number;
-  validationScore?: number;
-  qualityScore?: number;
-  confidence?: number;
-  verificationSkipped?: boolean;
   uiPayloads?: UIPayloadForRenderer[];
   sources?: SourceItem[];
 }
@@ -137,7 +130,7 @@ interface SourceItem {
   excerpt: string;
 }
 
-interface ThinkingStepData {
+interface ThinkingStepData extends TurnEnvelope {
   type: string;
   step: string;
   status: string;
@@ -177,6 +170,8 @@ export const electronAPI = {
     setCustomDimensions: (width: number, height: number) => ipcRenderer.invoke('window:setCustomDimensions', width, height),
     resizeHeight: (height: number) => ipcRenderer.invoke('window:resizeHeight', height),
     getHeight: () => ipcRenderer.invoke('window:getHeight'),
+    // A page frame, offered as the clock for the window height tween. See `window:animationFrame`.
+    animationFrame: () => ipcRenderer.send('window:animationFrame'),
   },
 
   // Command execution
@@ -263,8 +258,6 @@ export const electronAPI = {
   // Chat API
   chat: {
     initialize: () => ipcRenderer.invoke('chat:initialize'),
-    sendMessage: (content: string, sessionId?: string) =>
-      ipcRenderer.invoke('chat:sendMessage', { content, sessionId }),
     sendStreamMessage: (content: string, sessionId?: string, attachmentPaths?: Array<{ name: string; path: string; type: string }>) =>
       ipcRenderer.invoke('chat:sendStreamMessage', { content, sessionId, attachmentPaths }),
     createSession: (title?: string) => ipcRenderer.invoke('chat:createSession', title),
@@ -275,20 +268,26 @@ export const electronAPI = {
     deleteSession: (sessionId: string) => ipcRenderer.invoke('chat:deleteSession', sessionId),
     clearHistory: () => ipcRenderer.invoke('chat:clearHistory'),
     isReady: () => ipcRenderer.invoke('chat:isReady'),
-    resumeGraph: (threadId: string, resumeValue: { confirmed: boolean }) =>
-      ipcRenderer.invoke('chat:resumeGraph', { threadId, resumeValue }),
+    cancelTurn: (threadId: string) => ipcRenderer.invoke('chat:cancelTurn', { threadId }),
+    onTurnStarted: (callback: (data: TurnEnvelope & { threadId: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: TurnEnvelope & { threadId: string }) => callback(data);
+      ipcRenderer.on('chat:turn-started', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:turn-started', handler);
+      };
+    },
+    onSessionsChanged: (callback: (sessions: ChatSessionSummary[]) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, sessions: ChatSessionSummary[]) => callback(sessions);
+      ipcRenderer.on('chat:sessions-changed', handler);
+      return () => {
+        ipcRenderer.removeListener('chat:sessions-changed', handler);
+      };
+    },
     onStreamChunk: (callback: (data: StreamChunkData) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: StreamChunkData) => callback(data);
       ipcRenderer.on('chat:stream-chunk', handler);
       return () => {
         ipcRenderer.removeListener('chat:stream-chunk', handler);
-      };
-    },
-    onStreamReplace: (callback: (data: { content: string; isComplete: boolean }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { content: string; isComplete: boolean }) => callback(data);
-      ipcRenderer.on('chat:stream-replace', handler);
-      return () => {
-        ipcRenderer.removeListener('chat:stream-replace', handler);
       };
     },
     onThinkingStep: (callback: (data: ThinkingStepData) => void) => {
@@ -298,46 +297,8 @@ export const electronAPI = {
         ipcRenderer.removeListener('chat:thinking-step', handler);
       };
     },
-    onUIPayloadStarted: (callback: (data: { type: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { type: string }) => callback(data);
-      ipcRenderer.on('chat:ui-payload-started', handler);
-      return () => {
-        ipcRenderer.removeListener('chat:ui-payload-started', handler);
-      };
-    },
-    onUIPayloadProgress: (callback: (data: { progress: number; message: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { progress: number; message: string }) => callback(data);
-      ipcRenderer.on('chat:ui-payload-progress', handler);
-      return () => {
-        ipcRenderer.removeListener('chat:ui-payload-progress', handler);
-      };
-    },
-    onUIPayloadReset: (callback: () => void) => {
-      const handler = (_event: Electron.IpcRendererEvent) => callback();
-      ipcRenderer.on('chat:ui-payload-reset', handler);
-      return () => {
-        ipcRenderer.removeListener('chat:ui-payload-reset', handler);
-      };
-    },
-    onDesktopConfirmationRequest: (callback: (data: {
-      threadId: string;
-      interruptPayload: { type: string; action: string; description: string };
-      pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
-      planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
-    }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: {
-        threadId: string;
-        interruptPayload: { type: string; action: string; description: string };
-        pendingAction: { id: string; type: string; description: string; timestamp: Date; success: boolean; reversible: boolean };
-        planActions: Array<{ type: string; description: string; success: boolean; result?: string }>;
-      }) => callback(data);
-      ipcRenderer.on('desktop:confirmation-request', handler);
-      return () => {
-        ipcRenderer.removeListener('desktop:confirmation-request', handler);
-      };
-    },
-    onAgentChange: (callback: (data: { label: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { label: string }) => callback(data);
+    onAgentChange: (callback: (data: { label: string } & TurnEnvelope) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { label: string } & TurnEnvelope) => callback(data);
       ipcRenderer.on('chat:agent-change', handler);
       return () => {
         ipcRenderer.removeListener('chat:agent-change', handler);

@@ -2,6 +2,7 @@ import { ipcMain, app, safeStorage } from 'electron';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { createLogger } from '../utils/logger';
+import { checkBaseUrl } from './api-config-guard';
 
 const log = createLogger('ApiConfig');
 
@@ -100,6 +101,14 @@ function maskKey(key: string): string {
 }
 
 async function testApiConnection(config: ApiConfig): Promise<{ success: boolean; error?: string }> {
+  // Checked here, in main, rather than in preload: preload is renderer-reachable, so a guard there
+  // is not a boundary. Nothing is fetched and no key is put on the wire until the URL passes.
+  const checked = checkBaseUrl(config?.baseUrl);
+  if (!checked.ok) {
+    log.warn('Rejected api-config:test baseUrl:', checked.reason);
+    return { success: false, error: checked.reason };
+  }
+
   try {
     const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -133,6 +142,14 @@ async function testApiConnection(config: ApiConfig): Promise<{ success: boolean;
 
 export function registerApiConfigHandlers(): void {
   ipcMain.handle('api-config:save', async (_, config: ApiConfig) => {
+    // The stored baseUrl is what every later chat request hits, with the real key attached, so a
+    // rejected URL has to be rejected before it is persisted — not only at test time.
+    const checked = checkBaseUrl(config?.baseUrl);
+    if (!checked.ok) {
+      log.warn('Rejected api-config:save baseUrl:', checked.reason);
+      return { success: false, error: checked.reason };
+    }
+
     const saved = saveEncryptedConfig(config);
     if (saved) {
       log.info('API config saved (encrypted)');
