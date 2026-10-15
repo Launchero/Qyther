@@ -1,26 +1,27 @@
 /*
  * =============================================================================
- * Z-INDEX SCALE
+ * Z-INDEX SCALE — the eight layers the app actually stacks in
  * =============================================================================
- * 
- * PURPOSE: This file contains z-index tokens for the shadcn design system.
- * 
- * Current usage in App.tsx: z-0 (overlay), z-10 (CommandPalette), z-20 (overlays)
+ *
+ * PURPOSE: One stacking order for every surface, consumed as
+ * `z-[var(--z-layer)]` in JSX and `z-index: var(--z-layer)` in CSS.
+ *
+ * Radix portals append to `document.body`, i.e. to the root stacking context.
+ * Anything that must sit above a dialog therefore has to be in that same root
+ * context: no ancestor of it may hold a z-index with a transform-origin
+ * animation parked on it, and the palette container holds no layer at all
+ * since the transparent overlay was deleted. Toasts are rendered into a portal
+ * for exactly this reason.
  */
 
 @theme {
-  /* Z-index scale */
-  --z-base: 0;
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-overlay: 30;      /* Currently z-10 in App.tsx line 163 */
-  --z-modal: 40;         /* Currently z-20 in App.tsx line 179 */
-  --z-popover: 50;
-  --z-tooltip: 60;
-  --z-toast: 70;
-  
-  /* Component-specific */
-  --z-command-palette: var(--z-overlay);
-  --z-command-palette-overlay: var(--z-base);
-  --z-command-palette-modal: var(--z-modal);
+  --z-canvas: 0;      /* page content, list rows, the palette interior */
+  --z-raised: 10;     /* sticky header inside a surface, result-row hover chrome */
+  --z-sticky: 20;     /* the window resize handle, mode tab underline */
+  --z-sunken: 25;     /* scrims that dim a surface without leaving the window */
+  --z-overlay: 30;    /* full-window overlays: drag-and-drop, modal backdrop */
+  --z-modal: 40;      /* Radix Dialog content (MCPToolModal, ShortcutsReference) */
+  --z-popover: 50;    /* DropdownMenu, Popover */
+  --z-tooltip: 60;    /* Tooltip — above everything it can point at */
+  --z-toast: 70;      /* the notification region, the top layer */
 }

@@ -2,46 +2,82 @@
  * =============================================================================
  * TYPOGRAPHY SCALE
  * =============================================================================
- * 
- * PURPOSE: This file contains typography tokens for the command palette UI.
- * 
- * DESIGN RATIONALE (based on Linear/2026 best practices):
- * - Primary labels: text-sm (14px) medium weight
- * - Secondary/metadata: text-xs (12px) regular, muted
- * - Input/body: text-base (16px) - minimum readable size for desktop
- * - Badges/labels: text-xs (12px) - minimum readable
- * - Headings: text-lg/xl (18-20px)
- * 
- * REMOVED: text-3xs (8px) - unreadable on most screens
- * REMOVED: text-3xl/4xl (30-36px) - unused in compact UI
- * 
- * Source: Typography Best Practices 2026
+ *
+ * PURPOSE: One type system: a measured size scale where each step carries its
+ * own line-height and tracking, so `text-lg` is a *style*, not just a number.
+ *
+ * DESIGN RATIONALE:
+ * - UI chrome is a proportional sans; mono is reserved for code, file paths,
+ *   key labels and command strings. A mono body face at 14px reads as a
+ *   terminal, not as a product, and its fixed advance width makes every text
+ *   column ragged. The terminal character survives in `--font-mono`.
+ * - The stack is system-first: `system-ui`/Segoe UI Variable on Windows renders
+ *   hint-crisp with zero network cost. JetBrains Mono stays for code, loaded
+ *   from `index.html`; if that link fails, code falls back to Cascadia/Consolas
+ *   and the rest of the app is unaffected.
+ * - Primary UI text: text-sm (14px) medium. Metadata: text-xs (12px) regular,
+ *   muted. Body/prose: text-base (16px) with a relaxed measure.
+ * - 12px is the accessibility floor. `--text-2xs`, `--text-xs-custom` and
+ *   `--text-11px` used to render 9/10/11px text; they are kept as aliases of
+ *   12px so no existing `var()` reference silently drops, not as new sizes.
+ *
+ * Tailwind v4 applies the `--text-*--line-height` / `--text-*--tracking`
+ * companions with the size, so a component never restates a leading or tracking
+ * value by hand.
  */
 
 @theme {
   /* Font families */
-  --font-display: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Arial', sans-serif;
-  --font-body: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Arial', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-  
-  /* Font sizes - Simplified 6-size scale */
-  --text-xs: 0.75rem;      /* 12px - Badges, labels, secondary metadata */
-  --text-sm: 0.875rem;     /* 14px - Result titles, primary labels */
-  --text-base: 1rem;       /* 16px - Input, body text (minimum desktop) */
-  --text-lg: 1.125rem;     /* 18px - Icons, emphasized text */
-  --text-xl: 1.25rem;      /* 20px - Section headings, welcome titles */
-  --text-2xl: 1.5rem;      /* 24px - Large headings */
-  
+  --font-sans: system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: system-ui, -apple-system, 'Segoe UI Variable Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, Consolas, monospace;
+
+  /* Size scale — each rung carries its own leading and tracking */
+  --text-xs: 0.75rem;              /* 12px — labels, metadata, the floor */
+  --text-xs--line-height: 1.35;
+  --text-xs--letter-spacing: 0.01em;
+  --text-sm: 0.875rem;             /* 14px — primary UI text */
+  --text-sm--line-height: 1.45;
+  --text-sm--letter-spacing: 0.005em;
+  --text-base: 1rem;               /* 16px — chat prose, inputs */
+  --text-base--line-height: 1.65;
+  --text-base--letter-spacing: 0;
+  --text-lg: 1.125rem;             /* 18px — h3, in-card headings */
+  --text-lg--line-height: 1.4;
+  --text-lg--letter-spacing: -0.011em;
+  --text-xl: 1.25rem;              /* 20px — h2, welcome titles */
+  --text-xl--line-height: 1.3;
+  --text-xl--letter-spacing: -0.016em;
+  --text-2xl: 1.5rem;              /* 24px — h1, the page title */
+  --text-2xl--line-height: 1.2;
+  --text-2xl--letter-spacing: -0.022em;
+
+  /* 12px floor aliases for the old sub-12px escape hatches */
+  --text-2xs: 0.75rem;
+  --text-xs-custom: 0.75rem;
+  --text-11px: 0.75rem;
+
+  /* Inline code sits inside 16px prose; an absolute rung makes it read as a
+     different kind of text rather than as a span of this one. */
+  --text-code-inline: 0.9em;
+
   /* Font weights */
   --font-normal: 400;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  
-  /* Line heights */
+
+  /* Letter spacing, for the cases that are not a size rung (uppercase labels) */
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-label: 0.06em;   /* uppercase micro-labels need more space to stay legible */
+
+  /* Line heights, for the cases that are not a size rung */
   --leading-none: 1;
   --leading-tight: 1.25;
   --leading-normal: 1.5;
-  --leading-relaxed: 1.75;
-  --leading-loose: 2;
+  --leading-relaxed: 1.65;
+  --leading-loose: 1.8;
 }

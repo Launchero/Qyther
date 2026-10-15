@@ -1,27 +1,40 @@
 /*
  * =============================================================================
- * SHADOW SCALE
+ * ELEVATION SCALE — shadow and ring
  * =============================================================================
- * 
- * PURPOSE: This file contains shadow tokens for the shadcn design system.
+ *
+ * PURPOSE: Depth is expressed as a tinted shadow plus, where it matters, a
+ * surface lightness step (see `semantic/theme.css`). Shadows are `oklch()` with
+ * a small chroma toward the brand hue: pure black alpha reads as grey dirt on a
+ * cool-white surface and is the fastest way for a light theme to look cheap.
+ *
+ * Every floating surface must consume exactly one of these. `ui/` primitives are
+ * pristine, so the assignment happens through `[data-slot]` rules in
+ * `globals.css`, not by editing the primitive source.
  */
 
 @theme {
   /* Shadow scale */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  
-  /* Component-specific (from mockups) */
-  --shadow-command-palette: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* Mockup line 82 */
-  --shadow-shortcut-key: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* Mockup line 290 */
-  
-  /* Focus ring tokens */
+  --shadow-sm: 0 1px 2px 0 oklch(0.2 0.02 250 / 0.06), 0 1px 3px -1px oklch(0.2 0.02 250 / 0.08);
+  --shadow-md: 0 2px 4px -2px oklch(0.2 0.02 250 / 0.10), 0 4px 12px -4px oklch(0.2 0.02 250 / 0.12);
+  --shadow-lg: 0 4px 8px -4px oklch(0.2 0.02 250 / 0.12), 0 12px 28px -8px oklch(0.2 0.02 250 / 0.18);
+  --shadow-xl: 0 8px 16px -6px oklch(0.2 0.02 250 / 0.14), 0 20px 44px -12px oklch(0.2 0.02 250 / 0.24);
+  --shadow-2xl: 0 24px 64px -16px oklch(0.15 0.02 250 / 0.35);
+
+  /* One elevation per surface class — the depth contract */
+  --shadow-command-palette: var(--shadow-lg); /* Mockup line 82, re-solved to the scale */
+  --shadow-popover: var(--shadow-md);         /* dropdown menu, popover */
+  --shadow-dialog: var(--shadow-xl);          /* modal content */
+  --shadow-tooltip: var(--shadow-md);
+  --shadow-toast: var(--shadow-lg);
+  --shadow-shortcut-key: 0 1px 0 0 oklch(0.2 0.02 250 / 0.12); /* Mockup line 290 */
+  --shadow-inset: inset 0 1px 0 0 oklch(1 0 0 / 0.04);         /* top light on a raised bar */
+
+  /* Focus ring tokens — --ring-color must stay theme-aware, so it defers to the
+     semantic --ring rather than pinning to a primitive brand step. */
   --ring-offset: 2px;
   --ring-width: 2px;
   --ring-width-focus: 3px;
-  --ring-color: var(--color-brand-500);
+  --ring-color: var(--ring);
   --ring-offset-color: transparent;
 }

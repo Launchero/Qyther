@@ -2,16 +2,30 @@
  * =============================================================================
  * SEMANTIC THEME MAPPINGS
  * =============================================================================
- * 
+ *
  * PURPOSE: This file contains semantic theme mappings for the shadcn design system.
- * 
+ *
  * CRITICAL: Use @layer theme for proper cascade control
- * Use @variant dark for dark mode overrides
- * 
+ * Dark mode overrides live in the `.dark` block below; the Tailwind variant is
+ * declared once as @custom-variant dark in globals.css
+ *
  * TOKEN HIERARCHY:
  * 1. Base tokens (tokens/colors.css) → Raw values
  * 2. Semantic tokens (this file) → Purpose-driven names
  * 3. Component tokens → Component-specific variants
+ *
+ * ELEVATION MODEL: a surface is identified by its lightness step, its border and
+ * its shadow together, in both themes.
+ *   light: background 0.975 < sidebar 0.965 < muted fill 0.955 < card 1.0 = popover 1.0
+ *     — in light, "up" means whiter; popover separation is carried by shadow and border.
+ *   dark:  background 0.145 < sidebar 0.175 < card 0.205 < muted fill 0.245 < popover 0.275
+ *     — in dark, "up" means lighter.
+ * `--border` is a decorative divider and is allowed to be quiet. `--input` is the
+ * boundary of an interactive control, which WCAG 1.4.11 holds to 3:1, so the two
+ * are deliberately different values and must not be merged into one.
+ *
+ * Font families and the base radius are declared once, in `tokens/typography.css`
+ * and `tokens/radius.css`. This file used to restate both and drifted.
  */
 
 /* Map semantic tokens to Tailwind utilities */
@@ -48,7 +62,20 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-info-soft: var(--info-soft);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-agent-browser: var(--agent-browser);
+  --color-agent-document: var(--agent-document);
+  --color-scrim: var(--scrim);
+
   /* File type semantic tokens (for ResultItem.tsx) */
   --color-file-typescript: var(--file-typescript);
   --color-file-javascript: var(--file-javascript);
@@ -60,91 +87,123 @@
 /* Light/dark theme definitions with proper cascade control */
 @layer theme {
   :root {
-    /* Base radius */
-    --radius: 0.625rem;
-    
-    /* Font families */
-    --font-display: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Arial', sans-serif;
-    --font-body: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Arial', sans-serif;
-    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-    
     /* Semantic color tokens (light mode) */
-    --background: oklch(1 0 0);
+    --background: oklch(0.975 0.003 250);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.715 0.143 230.923);
+    --primary: oklch(0.54 0.115 230.923);  /* AA as text on card and as a background for primary-foreground */
     --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
+    --secondary: oklch(0.955 0.005 250);
     --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
+    --muted: oklch(0.955 0.005 250);
+    --muted-foreground: oklch(0.53 0 0);
+    --accent: oklch(0.955 0.005 250);
     --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
+    --destructive: oklch(0.5 0.245 27.325);
     --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.715 0.143 230.923);
-    --chart-1: oklch(0.715 0.143 230.923);
+    --success: oklch(0.48 0.15 149.579);   /* --color-green-500 hue, darkened for AA on card */
+    --success-foreground: oklch(0.985 0 0);
+    --warning: oklch(0.46 0.17 84.43);     /* --color-yellow-500 hue, darkened for AA on card */
+    --warning-foreground: oklch(0.985 0 0);
+    --info: oklch(0.515 0.119 254.1);      /* --color-blue-500 hue, darkened for AA on card and on muted */
+    --info-foreground: oklch(0.985 0 0);
+    /* Soft tints: a status background the pairs above can sit on. Never a raw
+       primitive tint — a primitive has no `.dark` half. */
+    --success-soft: color-mix(in oklch, var(--success) 12%, transparent);
+    --warning-soft: color-mix(in oklch, var(--warning) 14%, transparent);
+    --info-soft: color-mix(in oklch, var(--info) 12%, transparent);
+    --destructive-soft: color-mix(in oklch, var(--destructive) 12%, transparent);
+    /* Agent identity pills. Purple clears 4.5:1 only in light and orange only in
+       dark, so each theme carries its own lightness — same shape as --file-*. */
+    --agent-browser: oklch(0.55 0.19 300);
+    --agent-document: oklch(0.55 0.15 60);
+    /* Decorative divider vs control boundary — see the elevation note above. */
+    --border: oklch(0.862 0.006 250);
+    --input: oklch(0.642 0.012 250);
+    --ring: oklch(0.54 0.115 230.923);
+    --scrim: oklch(0.25 0.01 250 / 0.45);
+    --chart-1: oklch(0.54 0.115 230.923);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --sidebar: oklch(0.985 0 0);
+    --chart-4: oklch(0.67 0.189 84.429);
+    --chart-5: oklch(0.673 0.188 70.08);
+    --sidebar: oklch(0.965 0.004 250);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.715 0.143 230.923);
+    --sidebar-primary: oklch(0.54 0.115 230.923);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent: oklch(0.955 0.005 250);
     --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.715 0.143 230.923);
-    
+    --sidebar-border: oklch(0.862 0.006 250);
+    --sidebar-ring: oklch(0.54 0.115 230.923);
+
     /* File type semantic tokens */
-    --file-typescript: oklch(0.604 0.119 254.1);
-    --file-javascript: oklch(0.842 0.189 84.43);
-    --file-python: oklch(0.842 0.189 84.43);
-    --file-rust: oklch(0.588 0.158 162.48);
-    --file-go: oklch(0.6 0.118 184.704);
+    --file-typescript: oklch(0.545 0.119 254.1);
+    --file-javascript: oklch(0.48 0.189 84.43);
+    --file-python: oklch(0.48 0.189 84.43);
+    --file-rust: oklch(0.48 0.158 162.48);
+    --file-go: oklch(0.48 0.118 184.704);
   }
-  
+
   /* Dark mode overrides using .dark class selector */
   .dark {
-    --background: oklch(0.145 0 0);
+    --background: oklch(0.145 0.008 250);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: oklch(0.205 0.008 250);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: oklch(0.275 0.008 250);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.715 0.143 230.923);
     --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
+    --secondary: oklch(0.245 0.008 250);
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
+    --muted: oklch(0.245 0.008 250);
+    --muted-foreground: oklch(0.72 0.008 250);
+    --accent: oklch(0.245 0.008 250);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
+    /* A near-white label on a light-red fill measured 2.73:1. Every other dark
+       foreground is dark for exactly this reason. */
+    --destructive-foreground: oklch(0.205 0 0);
+    --success: oklch(0.7 0.17 149.579);
+    --success-foreground: oklch(0.205 0 0);
+    --warning: oklch(0.8 0.16 84.43);
+    --warning-foreground: oklch(0.205 0 0);
+    --info: oklch(0.75 0.15 254.1);
+    --info-foreground: oklch(0.205 0 0);
+    --success-soft: color-mix(in oklch, var(--success) 16%, transparent);
+    --warning-soft: color-mix(in oklch, var(--warning) 16%, transparent);
+    --info-soft: color-mix(in oklch, var(--info) 16%, transparent);
+    --destructive-soft: color-mix(in oklch, var(--destructive) 18%, transparent);
+    --agent-browser: oklch(0.75 0.17 300);
+    --agent-document: oklch(0.78 0.15 60);
+    /* Opaque, not alpha: an alpha border over a plate that changes with the
+       theme cannot be reasoned about, and it measured 1.25:1. */
+    --border: oklch(0.395 0.01 250);
+    --input: oklch(0.525 0.012 250);
     --ring: oklch(0.715 0.143 230.923);
+    --scrim: oklch(0 0 0 / 0.6);
     --chart-1: oklch(0.715 0.143 230.923);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
+    --sidebar: oklch(0.175 0.008 250);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.715 0.143 230.923);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-primary-foreground: oklch(0.205 0 0);
+    --sidebar-accent: oklch(0.245 0.008 250);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-border: oklch(0.395 0.01 250);
     --sidebar-ring: oklch(0.715 0.143 230.923);
-    
-    /* File type colors stay the same in dark mode (language colors should remain consistent) */
+
+    /* File types keep their language hue in dark; only lightness is raised for AA on the dark card */
+    --file-typescript: oklch(0.75 0.119 254.1);
+    --file-javascript: oklch(0.8 0.16 84.43);
+    --file-python: oklch(0.8 0.16 84.43);
+    --file-rust: oklch(0.72 0.15 162.48);
+    --file-go: oklch(0.72 0.13 184.704);
   }
 }

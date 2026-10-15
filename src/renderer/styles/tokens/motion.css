@@ -2,43 +2,71 @@
  * =============================================================================
  * MOTION TOKENS
  * =============================================================================
- * 
- * PURPOSE: This file contains motion tokens for the shadcn design system.
- * 
- * Critical for: Mode transitions, hover states, loading animations
+ *
+ * PURPOSE: One timing model for the whole renderer: a duration scale, an easing
+ * scale, and an `--animate-*` shorthand per entry/exit.
+ *
+ * Every entry/exit animation is declared here as an `--animate-*` shorthand and
+ * consumed whole (`animation: var(--animate-scale-in)` in CSS, `animate-scale-in`
+ * in JSX). Re-composing a keyframe name with a hand-written duration and easing is
+ * how `.welcome-fade-out` shipped invalid, so it is not done in component CSS.
+ * `--duration-*` / `--easing-*` exist for the transitions that are not an entry or
+ * exit — those are composed per property in the file that owns the class.
+ *
+ * ENTRY SHORTHANDS USE `backwards`, NOT `both`. `both` parks the keyframe's final
+ * `transform` on the element for its whole life, which permanently creates a
+ * stacking context and a containing block: a `position: fixed` toast inside an
+ * animated branch stops being viewport-fixed and is trapped in that branch's
+ * z-layer. `backwards` holds the start state across a stagger delay and then
+ * releases the element, so the same animation never re-parents anything.
  */
 
 @theme {
-  /* Duration scale */
-  --duration-75: 75ms;
+  /* Duration scale — micro feedback, standard reveal, macro/layout morph */
   --duration-100: 100ms;
-  --duration-150: 150ms;   /* Fast */
-  --duration-200: 200ms;   /* Normal */
-  --duration-300: 300ms;   /* Slow */
-  --duration-500: 500ms;
-  --duration-700: 700ms;
-  --duration-1000: 1000ms;
-  
-  /* Easing curves */
-  --easing-linear: linear;
-  --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);  /* Mockup line 242 */
-  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --easing-snap: cubic-bezier(0.4, 0, 0.6, 1);
-  
-  /* Animation tokens */
+  --duration-150: 150ms;   /* Fast: reveals, view swaps, focus and hover feedback */
+  --duration-200: 200ms;   /* Normal: list entry, panels, toasts */
+  --duration-300: 300ms;   /* Slow: welcome content, layout morphs */
+  --duration-500: 500ms;   /* Macro: the auto-collapse confirmation flash */
+
+  /* Easing scale. Motion hierarchy: things entering decelerate, things leaving
+     accelerate, things the user moved by hand track the pointer linearly. */
+  --easing-smooth: cubic-bezier(0.22, 1, 0.36, 1);   /* default enter/resolve: swift out, long settle */
+  --easing-enter: cubic-bezier(0.16, 1, 0.3, 1);     /* entrances that should feel weightless */
+  --easing-exit: cubic-bezier(0.4, 0, 1, 1);         /* exits leave faster than they arrived */
+  --easing-spring: cubic-bezier(0.34, 1.32, 0.5, 1); /* subtle overshoot: summon, toasts, toggles */
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);     /* state changes inside a surface */
+  --easing-linear: linear;  /* Only for a meter that must track elapsed time */
+
+  /* Looping state indicators */
   --animate-spin: spin 1s linear infinite;
   --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-bounce: bounce 1s ease-in-out infinite;
   --animate-cursor-blink: cursorBlink 1s step-end infinite;
-  
-  /* Transition presets */
-  --transition-fast: var(--duration-150) var(--easing-smooth);
-  --transition-normal: var(--duration-200) var(--easing-smooth);
-  --transition-slow: var(--duration-300) var(--easing-smooth);
+  --animate-typing-dots: typingDots 1.4s var(--easing-standard) infinite;
+  --animate-progress-pulse: progressPulse 2s var(--easing-standard) infinite;
+  --animate-agent-pulse: agentPulse 2s var(--easing-standard) infinite;
 
-  /* Panel expansion transitions (from mockup) */
-  --transition-morph: var(--duration-300) var(--easing-smooth);
-  --transition-morph-slow: var(--duration-500) var(--easing-smooth);
+  /* Entry / exit shorthands */
+  --animate-fade-in: fadeIn var(--duration-200) var(--easing-enter) backwards;
+  --animate-scale-in: scaleIn var(--duration-150) var(--easing-spring) backwards;
+  --animate-slide-up-fade: slideUpFade var(--duration-200) var(--easing-enter) backwards;
+  --animate-slide-down-fade: slideDownFade var(--duration-200) var(--easing-enter) backwards;
+  --animate-error-shake: errorShake var(--duration-300) var(--easing-standard);
+  --animate-welcome-enter: welcomeEnter var(--duration-300) var(--easing-enter) backwards;
+  --animate-view-enter: viewEnter var(--duration-150) var(--easing-standard) backwards;
+  --animate-palette-reveal: paletteReveal var(--duration-150) var(--easing-spring) backwards;
+  --animate-toast-enter: toastEnter var(--duration-200) var(--easing-spring) backwards;
+  --animate-toast-exit: toastExit var(--duration-150) var(--easing-exit) forwards;
+  /* The auto-collapse confirmation flash. Its keyframe paints semantic colours,
+     so the keyframe itself stays in `globals.css` and only the gesture lives here. */
+  --animate-collapse-flash: collapsePulse var(--duration-500) var(--easing-standard) forwards;
+
+  /* Floating surfaces (dialog, popover, menu, tooltip) enter and leave on one
+     pair so every surface in the app has the same physical behaviour. */
+  --animate-surface-enter: surfaceEnter var(--duration-150) var(--easing-spring) backwards;
+  --animate-surface-exit: surfaceExit var(--duration-100) var(--easing-exit) forwards;
+  --animate-scrim-enter: fadeIn var(--duration-200) var(--easing-standard) backwards;
+  --animate-scrim-exit: fadeOut var(--duration-150) var(--easing-standard) forwards;
 
   /* Stagger delay presets for sequential animations */
   --stagger-50: 50ms;
@@ -47,14 +75,6 @@
   --stagger-150: 150ms;
   --stagger-200: 200ms;
   --stagger-300: 300ms;
-
-  /* Animation shorthand tokens */
-  --animate-slide-up-fade: slideUpFade var(--duration-200) var(--easing-smooth) both;
-  --animate-slide-down-fade: slideDownFade var(--duration-200) var(--easing-smooth) both;
-  --animate-scale-in: scaleIn var(--duration-150) var(--easing-smooth) both;
-  --animate-error-shake: errorShake var(--duration-300) var(--easing-smooth);
-  --animate-typing-dots: typingDots 1.4s ease-in-out infinite;
-  --animate-fade-out-up: fadeOutUp var(--duration-250) var(--easing-smooth) both;
 }
 
 @keyframes spin {
@@ -67,25 +87,26 @@
   50% { opacity: 0.5; }
 }
 
-@keyframes bounce {
-  0%, 100% { transform: translateY(-25%); }
-  50% { transform: translateY(0); }
-}
-
 @keyframes cursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* ========================================================================
-   ADDITIONAL KEYFRAMES FOR ASK MODE ANIMATIONS
-   These define the design system and are exempt from hardcoded values rule.
-   rem values match existing spacing tokens:
-     0.75rem = --spacing-3 (12px)
-     0.375rem = --spacing-1-5 (6px)
-     0.25rem = --spacing-1 (4px)
-     1rem = --spacing-4 (16px)
-     0.5rem = --spacing-2 (8px)
+   KEYFRAME GEOMETRY
+   Travel distances are spacing values on purpose: 0.5rem (12px) reads as a
+   section entering, 0.25rem (4px) as a row inside a surface. Anything larger
+   than 12px is a page-level move, which the compact palette never makes.
    ======================================================================== */
 
 @keyframes slideUpFade {
@@ -94,13 +115,18 @@
 }
 
 @keyframes slideDownFade {
-  from { opacity: 0; transform: translateY(-0.75rem); }
+  from { opacity: 0; transform: translateY(-0.5rem); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes welcomeEnter {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes errorShake {
@@ -112,11 +138,57 @@
 }
 
 @keyframes typingDots {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-0.375rem); }
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.55; }
+  30% { transform: translateY(-0.25rem); opacity: 1; }
 }
 
-@keyframes fadeOutUp {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-1rem); }
+@keyframes progressPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes agentPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+/* ========================================================================
+   SURFACE AND VIEW KEYFRAMES
+   `paletteReveal` is the Alt+Space summon: the window is transparent and
+   frameless, so it grows inside its own shadow rather than being painted over.
+   `viewEnter` is the small-travel swap used inside the 100px compact palette.
+   `surfaceEnter/Exit` is the one popover/menu/dialog gesture; it is authored
+   here so the four Radix primitives share it through `data-slot` rules instead
+   of each carrying its own `tw-animate-css` composition.
+   `toastEnter/Exit` rise from the bottom-anchored `.toast-region`.
+   ======================================================================== */
+
+@keyframes paletteReveal {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes viewEnter {
+  from { opacity: 0; transform: translateY(0.25rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes surfaceEnter {
+  from { opacity: 0; transform: translateY(-0.25rem) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes surfaceExit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-0.125rem) scale(0.98); }
+}
+
+@keyframes toastEnter {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toastExit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(0.5rem) scale(0.97); }
 }

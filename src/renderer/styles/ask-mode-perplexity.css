@@ -54,10 +54,10 @@
     gap: var(--spacing-1-5);
     padding: var(--spacing-1-5) var(--spacing-3);
     background: var(--primary);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     flex-shrink: 0;
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth);
   }
   
   .mode-pill:hover {
@@ -86,7 +86,8 @@
     background: var(--secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-input);
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: border-color var(--duration-150) var(--easing-smooth),
+                box-shadow var(--duration-150) var(--easing-smooth);
   }
 
   .search-container:focus-within {
@@ -118,20 +119,22 @@
     background: var(--secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-input);
-    transition: all var(--duration-300) var(--easing-smooth);
+    transition: border-color var(--duration-300) var(--easing-smooth),
+                box-shadow var(--duration-300) var(--easing-smooth),
+                border-radius var(--duration-300) var(--easing-smooth);
     position: relative;
     min-height: var(--container-input-height);
   }
 
   .unified-input-container:focus-within {
     border-color: var(--ring);
-    box-shadow: 0 0 0 2px var(--ring);
+    box-shadow: 0 0 0 var(--ring-width) var(--ring);
   }
 
   .unified-input-container.expanded-input {
     align-items: flex-end;
     padding: var(--spacing-2) var(--spacing-3-5);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
   }
 
   .unified-input {
@@ -180,7 +183,10 @@
     border: 1px solid transparent;
     border-radius: var(--radius-chip);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: opacity var(--duration-150) var(--easing-smooth),
+                max-width var(--duration-150) var(--easing-smooth),
+                background-color var(--duration-150) var(--easing-smooth),
+                border-color var(--duration-150) var(--easing-smooth);
     flex-shrink: 0;
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
@@ -217,7 +223,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--duration-200) var(--easing-smooth);
+    transition: opacity var(--duration-200) var(--easing-smooth),
+                filter var(--duration-200) var(--easing-smooth),
+                transform var(--duration-200) var(--easing-smooth);
     flex-shrink: 0;
     opacity: 0.4;
     pointer-events: none;
@@ -244,7 +252,8 @@
     display: flex;
     gap: var(--spacing-1);
     flex-shrink: 0;
-    transition: all var(--duration-300) var(--easing-smooth);
+    transition: opacity var(--duration-300) var(--easing-smooth),
+                width var(--duration-300) var(--easing-smooth);
   }
 
   .shortcut-keys.hidden {
@@ -257,7 +266,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
+    min-width: var(--spacing-6);
     padding: var(--spacing-1) var(--spacing-2);
     background: var(--muted);
     border: 1px solid var(--border);
@@ -265,7 +274,7 @@
     font-size: var(--text-xs);
     font-family: var(--font-mono);
     color: var(--muted-foreground);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    box-shadow: var(--shadow-shortcut-key);
   }
 
   /* Context Indicator Badges - Compact Mode */
@@ -282,11 +291,12 @@
     gap: var(--spacing-1);
     padding: var(--spacing-1) var(--spacing-2);
     background: var(--muted);
-    border-radius: var(--radius-full);
-    font-size: var(--text-xs-custom);
+    border-radius: var(--radius-chip);
+    font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .context-badge:hover {
@@ -300,16 +310,16 @@
   }
 
   .mcp-status-dot {
-    width: 1px;
+    width: var(--spacing-1);
     height: var(--spacing-1);
-    border-radius: 50%;
-    background: var(--color-green-active);
+    border-radius: var(--radius-full);
+    background: var(--success);
   }
 
   .code-block-lang-dot {
     width: var(--spacing-1-5);
     height: var(--spacing-1-5);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
   }
 
   .input-icon {
@@ -338,7 +348,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                border-color var(--duration-150) var(--easing-smooth);
     flex-shrink: 0;
   }
 
@@ -376,7 +387,7 @@
   }
 
   .messages-area::-webkit-scrollbar {
-    width: 6px;
+    width: var(--spacing-1);
   }
 
   .messages-area::-webkit-scrollbar-track {
@@ -385,7 +396,7 @@
 
   .messages-area::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    border-radius: var(--radius-xs);
+    border-radius: var(--radius-full);
   }
 
   /* Messages Header with New Chat button */
@@ -408,7 +419,8 @@
     background: color-mix(in oklch, var(--primary) 10%, transparent);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .messages-new-chat-btn:hover {
@@ -476,7 +488,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 4px 8px;
+    padding: var(--spacing-0) var(--spacing-1) var(--spacing-2);
     border-bottom: 1px solid var(--border);
     margin-bottom: var(--spacing-2);
   }
@@ -486,11 +498,11 @@
     font-weight: var(--font-semibold);
     color: var(--muted-foreground);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--tracking-label);
   }
 
   .new-chat-btn {
-    font-size: var(--text-11px);
+    font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--primary);
     cursor: pointer;
@@ -515,7 +527,7 @@
     padding: var(--spacing-2) var(--spacing-2-5);
     border-radius: var(--radius-chip);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth);
   }
 
   .recent-chat-item:hover {
@@ -553,7 +565,9 @@
     border-radius: var(--radius);
     text-align: left;
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: border-color var(--duration-150) var(--easing-smooth),
+                background-color var(--duration-150) var(--easing-smooth),
+                transform var(--duration-150) var(--easing-smooth);
   }
 
   .suggestion-card:hover {
@@ -605,7 +619,7 @@
   .message-user-bubble code {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    background: rgb(0 0 0 / 0.15);
+    background: oklch(0 0 0 / 0.15);
     padding: var(--spacing-1) var(--spacing-1-5);
     border-radius: var(--radius-xs);
   }
@@ -636,12 +650,13 @@
     padding: var(--spacing-1) var(--spacing-2);
     background: var(--muted);
     border: 1px solid var(--border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: border-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .source-chip:hover {
@@ -698,7 +713,8 @@
     font-weight: var(--font-semibold);
     vertical-align: super;
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: filter var(--duration-150) var(--easing-smooth),
+                transform var(--duration-150) var(--easing-smooth);
   }
 
   .citation:hover {
@@ -735,39 +751,16 @@
   .code-block-lang-dot {
     width: var(--spacing-1-5);
     height: var(--spacing-1-5);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
   }
 
   .code-block-lang-dot.ts {
-    background: var(--color-code-ts-dot);
+    background: var(--file-typescript);
   }
 
   .code-block-actions {
     display: flex;
     gap: var(--spacing-1);
-  }
-
-  .code-action-btn {
-    padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-xs);
-    border: none;
-    background: var(--color-gray-800);
-    color: var(--color-code-line);
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
-    font-family: var(--font-body);
-  }
-
-  .code-action-btn:hover {
-    background: var(--color-gray-750);
-    color: var(--color-gray-100);
-  }
-
-  .code-action-btn.primary {
-    background: var(--primary);
-    color: var(--primary-foreground);
   }
 
   .code-block pre {
@@ -809,7 +802,8 @@
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: border-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
     font-family: var(--font-body);
   }
 
@@ -837,7 +831,7 @@
     font-weight: var(--font-semibold);
     color: var(--muted-foreground);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--tracking-label);
     margin-bottom: var(--spacing-2);
   }
 
@@ -856,7 +850,8 @@
     font-size: var(--text-xs);
     color: var(--foreground);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .related-item:hover {
@@ -918,7 +913,7 @@
     display: inline-flex;
     align-items: center;
     padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
   }
@@ -986,7 +981,8 @@
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     user-select: none;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .task-cost-summary::-webkit-details-marker {
@@ -1156,7 +1152,8 @@
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     user-select: none;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .token-breakdown-summary::-webkit-details-marker {
@@ -1233,7 +1230,7 @@
 
   .token-bar {
     display: flex;
-    height: 8px;
+    height: var(--spacing-2);
     border-radius: var(--radius-full);
     overflow: hidden;
     background: var(--accent);
@@ -1337,7 +1334,8 @@
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     user-select: none;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .reasoning-summary::-webkit-details-marker {
@@ -1405,21 +1403,21 @@
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
   }
 
   .confidence-high {
-    background: var(--color-green-muted);
-    color: var(--color-green-active);
+    background: var(--success-soft);
+    color: var(--success);
   }
 
   .confidence-medium {
-    background: color-mix(in oklch, var(--color-yellow-500) 20%, transparent);
-    color: var(--color-yellow-500);
+    background: var(--warning-soft);
+    color: var(--warning);
   }
 
   .confidence-low {
-    background: color-mix(in oklch, var(--destructive) 20%, transparent);
+    background: var(--destructive-soft);
     color: var(--destructive);
   }
 
@@ -1447,7 +1445,7 @@
     padding: var(--spacing-3) var(--padding-section-xl);
     background: var(--secondary);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--destructive);
+    border-left: var(--spacing-1) solid var(--destructive);
     border-radius: var(--radius-lg);
     border-bottom-left-radius: var(--radius-xs);
   }
@@ -1492,7 +1490,10 @@
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                border-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth),
+                filter var(--duration-150) var(--easing-smooth);
     font-family: var(--font-body);
   }
 
@@ -1521,6 +1522,70 @@
     height: var(--spacing-3);
   }
 
+  /* ========================================================================
+     CHAT ERROR BANNER (ChatErrorBanner.tsx) — the destructive-pair surface.
+     These eight classes were referenced from JSX and defined in no stylesheet,
+     so the role="alert" row painted as bare left-aligned text.
+     ======================================================================== */
+  .chat-error-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--gap-block);
+    padding: var(--padding-card);
+    background: var(--destructive-soft);
+    border: 1px solid var(--destructive);
+    border-radius: var(--radius-card);
+    color: var(--foreground);
+  }
+
+  .chat-error-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--gap-inline);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-error-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--icon-size-md);
+    height: var(--icon-size-md);
+    flex-shrink: 0;
+    color: var(--destructive);
+  }
+
+  .chat-error-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .chat-error-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-error-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--foreground);
+    margin-bottom: var(--spacing-1);
+  }
+
+  .chat-error-message {
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    color: var(--foreground);
+  }
+
+  .chat-error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-inline);
+    margin-top: var(--gap-block);
+  }
+
   /* Search Web Toggle */
   .search-web-toggle {
     display: flex;
@@ -1529,12 +1594,14 @@
     padding: var(--spacing-1) var(--spacing-2);
     background: var(--secondary);
     border: 1px solid var(--border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                border-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .search-web-toggle:hover {
@@ -1560,14 +1627,15 @@
     gap: var(--spacing-2);
     background: var(--secondary);
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     padding: var(--spacing-2) var(--spacing-3);
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: border-color var(--duration-150) var(--easing-smooth),
+                box-shadow var(--duration-150) var(--easing-smooth);
   }
 
   .input-wrapper:focus-within {
     border-color: var(--ring);
-    box-shadow: 0 0 0 3px var(--ring);
+    box-shadow: 0 0 0 var(--ring-width-focus) var(--ring);
   }
 
   .chat-input {
@@ -1604,7 +1672,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth);
   }
 
   .input-action-btn:hover {
@@ -1625,9 +1693,13 @@
     background: var(--secondary);
     border-radius: var(--radius-lg);
     border-bottom-left-radius: var(--radius-xs);
-    font-size: var(--text-xs);
-    line-height: 1.6;
+    /* Chat prose is the only running text in the app: it gets the base rung and
+       the measure cap, not the 14px UI rung. Typography is declared once — the
+       duplicate `.answer-content` block in ANSWER LAYOUT used to restate it. */
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
     color: var(--foreground);
+    max-width: var(--measure-readable);
   }
 
   .answer-content p {
@@ -1651,17 +1723,17 @@
     margin-bottom: var(--spacing-1);
   }
 
-  .answer-content code {
+  /* Inline code only: `:not(pre code)` keeps the chip off the block-level code
+     that `.code-block code` resets, which this rule otherwise out-specifies.
+     Derived from `--foreground`, so the chip moves with the theme on its own —
+     this used to need the file's only `.dark` rule (a white 8% plate) to work. */
+  .answer-content code:not(pre code) {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    background: rgb(0 0 0 / 0.06);
+    background: color-mix(in oklch, var(--foreground) 8%, transparent);
+    border: 1px solid color-mix(in oklch, var(--foreground) 14%, transparent);
     padding: var(--spacing-1) var(--spacing-2);
     border-radius: var(--radius-xs);
-  }
-
-  .dark .answer-content code {
-    background: rgb(255 255 255 / 0.08);
-    border: 1px solid rgb(255 255 255 / 0.06);
   }
 
   /* ========================================================================
@@ -1686,7 +1758,7 @@
   }
 
   .thinking-steps-label {
-    letter-spacing: 0.02em;
+    letter-spacing: var(--tracking-wide);
   }
 
   .thinking-steps-list {
@@ -1782,17 +1854,17 @@
   .step-badge {
     display: inline-block;
     padding: var(--spacing-1) var(--spacing-1-5);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     margin-left: var(--spacing-1);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-label);
   }
 
   .step-badge.retry {
-    background: color-mix(in oklch, var(--color-yellow-500) 20%, transparent);
-    color: var(--color-yellow-500);
+    background: var(--warning-soft);
+    color: var(--warning);
   }
 
   .step-badge.validation {
@@ -1801,8 +1873,8 @@
   }
 
   .step-badge.replan {
-    background: var(--color-green-muted);
-    color: var(--color-green-active);
+    background: var(--success-soft);
+    color: var(--success);
   }
 
   /* ========================================================================
@@ -1860,7 +1932,9 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                border-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
     font-family: var(--font-body);
   }
 
@@ -1878,36 +1952,38 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 10px;
+    height: var(--spacing-2-5);
     cursor: ns-resize;
-    z-index: 50;
+    z-index: var(--z-sticky);
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding-bottom: 3px;
+    padding-bottom: var(--spacing-1);
     pointer-events: auto;
   }
 
   .window-resize-handle::after {
     content: '';
-    width: 48px;
-    height: 4px;
+    width: var(--spacing-12);
+    height: var(--spacing-1);
     border-radius: var(--radius-xs);
     background-color: var(--foreground);
     opacity: 0.85;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: width var(--duration-150) var(--easing-smooth),
+                opacity var(--duration-150) var(--easing-smooth),
+                background-color var(--duration-150) var(--easing-smooth);
     pointer-events: none;
   }
 
   .window-resize-handle:hover::after {
     opacity: 1;
-    width: 64px;
+    width: var(--spacing-16);
   }
 
   .window-resize-handle:active::after {
     background-color: var(--primary);
     opacity: 1;
-    width: 80px;
+    width: 80px; /* no --spacing-20 rung exists; see the 4pt scale in tokens/spacing.css */
   }
 
   /* ========================================================================
@@ -1920,13 +1996,9 @@
     flex-direction: column;
   }
 
-  /* Primary answer content — always first, full prominence */
-  .answer-content {
-    padding: var(--spacing-3) var(--spacing-4);
-    font-size: var(--text-sm);
-    line-height: 1.6;
-    color: var(--foreground);
-  }
+  /* `.answer-content` (plate, prose rung and measure) is declared once, above,
+     with its descendant rules. This section used to restate it at a second,
+     smaller size — the later copy silently won and the 12px rule was dead. */
 
   /* Streaming cursor animation */
   .streaming-cursor {
@@ -2150,7 +2222,8 @@
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
     user-select: none;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth),
+                color var(--duration-150) var(--easing-smooth);
   }
 
   .task-metrics-summary::-webkit-details-marker {
@@ -2270,13 +2343,22 @@
     font-weight: var(--font-normal);
   }
 
+  /* Referenced by Transparency/TaskMetrics.tsx beside `.legend-color`, and
+     previously defined in no stylesheet — the swatch label rendered as raw text. */
+  .legend-label {
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    color: var(--foreground);
+    white-space: nowrap;
+  }
+
   .token-visualization {
     margin-bottom: var(--spacing-3);
   }
 
   .token-bar {
     display: flex;
-    height: 8px;
+    height: var(--spacing-2);
     border-radius: var(--radius-full);
     overflow: hidden;
     background: var(--accent);
@@ -2406,9 +2488,9 @@
     align-items: center;
     gap: var(--spacing-1);
     padding: var(--spacing-1) var(--spacing-2);
-    background: var(--color-green-subtle);
-    color: var(--color-green-active);
-    border-radius: var(--radius-full);
+    background: var(--success-soft);
+    color: var(--success);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     margin-top: var(--spacing-2);
@@ -2422,7 +2504,7 @@
   .thinking-step-detail-badge {
     display: inline-block;
     padding: var(--spacing-1) var(--spacing-1-5);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     margin-left: var(--spacing-1);
@@ -2439,7 +2521,7 @@
     align-items: center;
     gap: var(--spacing-1);
     padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     line-height: 1.4;
@@ -2451,18 +2533,18 @@
   }
 
   .confidence-badge--high {
-    background: color-mix(in oklch, var(--color-green-500) 15%, transparent);
-    color: var(--color-green-500);
+    background: var(--success-soft);
+    color: var(--success);
   }
 
   .confidence-badge--medium {
-    background: color-mix(in oklch, var(--color-yellow-500) 15%, transparent);
-    color: var(--color-yellow-500);
+    background: var(--warning-soft);
+    color: var(--warning);
   }
 
   .confidence-badge--low {
-    background: color-mix(in oklch, var(--color-red-500) 15%, transparent);
-    color: var(--color-red-500);
+    background: var(--destructive-soft);
+    color: var(--destructive);
   }
 
   /* ========================================================================
@@ -2502,8 +2584,8 @@
     width: var(--spacing-3);
     height: var(--spacing-3);
     border-radius: var(--radius-xs);
-    background: color-mix(in oklch, var(--color-yellow-500) 20%, transparent);
-    color: var(--color-yellow-500);
+    background: var(--warning-soft);
+    color: var(--warning);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2525,7 +2607,7 @@
     font-weight: var(--font-semibold);
     color: var(--muted-foreground);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-label);
   }
 
   .debug-path {
@@ -2570,14 +2652,14 @@
     display: inline-block;
     padding: var(--spacing-1) var(--spacing-2);
     border-radius: var(--radius-xs);
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     text-transform: uppercase;
     font-weight: var(--font-medium);
   }
 
   .debug-step-status.completed {
-    background: color-mix(in oklch, var(--color-green-500) 15%, transparent);
-    color: var(--color-green-500);
+    background: var(--success-soft);
+    color: var(--success);
   }
 
   .debug-step-status.in_progress {
@@ -2586,8 +2668,8 @@
   }
 
   .debug-step-status.error {
-    background: color-mix(in oklch, var(--color-red-500) 15%, transparent);
-    color: var(--color-red-500);
+    background: var(--destructive-soft);
+    color: var(--destructive);
   }
 
   /* ========================================================================
@@ -2603,7 +2685,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: background-color var(--duration-150) var(--easing-smooth);
     flex-shrink: 0;
   }
 
@@ -2629,9 +2711,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: var(--z-overlay);
     pointer-events: none;
-    animation: fadeIn var(--duration-150) var(--easing-smooth);
+    animation: var(--animate-fade-in);
   }
 
   .drag-drop-zone {
@@ -2666,7 +2748,7 @@
   /* Drag-over state on input container */
   .unified-input-container.drag-over {
     border-color: var(--ring);
-    box-shadow: 0 0 0 2px var(--ring);
+    box-shadow: 0 0 0 var(--ring-width) var(--ring);
   }
 
   .attach-trigger-inline.drag-over-active {
@@ -2686,78 +2768,72 @@
     align-items: center;
     gap: var(--spacing-1);
     padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-chip);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
     line-height: 1;
     white-space: nowrap;
-    transition: all var(--duration-200) var(--easing-smooth);
+    transition: background-color var(--duration-200) var(--easing-smooth),
+                color var(--duration-200) var(--easing-smooth);
   }
 
+  /* The hue is carried by the dot and the icon; the label stays on `--foreground`
+     because an accent on its own 14% tint measures 3.87:1 (browser, light) and
+     4.31:1 (document, light) — under the 4.5:1 legibility contract. */
   .agent-indicator__label {
     font-weight: var(--font-medium);
+    color: var(--foreground);
   }
 
   .agent-indicator__dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
+    width: var(--spacing-1-5);
+    height: var(--spacing-1-5);
+    border-radius: var(--radius-full);
     flex-shrink: 0;
   }
 
   .agent-indicator__dot--pulse {
-    animation: agentPulse 2s ease-in-out infinite;
+    animation: var(--animate-agent-pulse);
   }
 
   .agent-indicator--research {
-    background: color-mix(in oklch, var(--color-blue-500) 12%, transparent);
-    color: var(--color-blue-500);
+    background: color-mix(in oklch, var(--info) 14%, transparent);
+    color: var(--info);
   }
   .agent-indicator--research .agent-indicator__dot {
-    background: var(--color-blue-500);
+    background: var(--info);
   }
 
   .agent-indicator--general {
-    background: color-mix(in oklch, var(--color-green-500) 12%, transparent);
-    color: var(--color-green-500);
+    background: color-mix(in oklch, var(--success) 14%, transparent);
+    color: var(--success);
   }
   .agent-indicator--general .agent-indicator__dot {
-    background: var(--color-green-500);
+    background: var(--success);
   }
 
   .agent-indicator--browser {
-    background: color-mix(in oklch, var(--color-purple-500) 12%, transparent);
-    color: var(--color-purple-500);
+    background: color-mix(in oklch, var(--agent-browser) 14%, transparent);
+    color: var(--agent-browser);
   }
   .agent-indicator--browser .agent-indicator__dot {
-    background: var(--color-purple-500);
+    background: var(--agent-browser);
   }
 
   .agent-indicator--desktop {
-    background: color-mix(in oklch, var(--color-yellow-500) 12%, transparent);
-    color: var(--color-yellow-500);
+    background: color-mix(in oklch, var(--warning) 14%, transparent);
+    color: var(--warning);
   }
   .agent-indicator--desktop .agent-indicator__dot {
-    background: var(--color-yellow-500);
+    background: var(--warning);
   }
 
   .agent-indicator--document {
-    background: color-mix(in oklch, var(--color-orange-500) 12%, transparent);
-    color: var(--color-orange-500);
+    background: color-mix(in oklch, var(--agent-document) 14%, transparent);
+    color: var(--agent-document);
   }
   .agent-indicator--document .agent-indicator__dot {
-    background: var(--color-orange-500);
-  }
-
-  @keyframes agentPulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.4;
-      transform: scale(1.4);
-    }
+    background: var(--agent-document);
   }
 
   /* ========================================================================
@@ -2772,35 +2848,38 @@
   .chip-icon.code-dot {
     width: var(--spacing-2);
     height: var(--spacing-2);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--primary);
   }
 
   .chip-icon.image-dot {
     width: var(--spacing-2);
     height: var(--spacing-2);
-    border-radius: 50%;
-    background: var(--color-green-active);
+    border-radius: var(--radius-full);
+    background: var(--success);
   }
 
   .chip-icon.pdf-icon {
-    color: var(--color-red-500);
+    color: var(--destructive);
   }
 
   .chip-icon.spreadsheet-icon {
-    color: var(--color-green-500);
+    color: var(--success);
   }
 
   .chip-icon.presentation-icon {
-    color: var(--color-yellow-500);
+    color: var(--warning);
   }
 
   .chip-icon.ebook-icon {
-    color: var(--color-mist-600);
+    color: var(--muted-foreground);
   }
 
   /* ========================================================================
      ANIMATION UTILITIES
+     Every entry here consumes a whole `--animate-*` shorthand from
+     tokens/motion.css. Composing a keyframe name with a duration and easing by
+     hand is what let `.welcome-fade-out` ship against a token that did not exist.
      ======================================================================== */
 
   /* Typing indicator dots (replaces animate-bounce) */
@@ -2810,21 +2889,20 @@
     background: var(--muted-foreground);
     border-radius: var(--radius-full);
     display: inline-block;
-    animation: typingDots 1.4s ease-in-out infinite;
+    animation: var(--animate-typing-dots);
   }
 
-  .typing-dot:nth-child(1) { animation-delay: 0s; }
-  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  .typing-dot:nth-child(2) { animation-delay: var(--stagger-75); }
+  .typing-dot:nth-child(3) { animation-delay: var(--stagger-150); }
 
   /* Welcome state entrance */
   .welcome-state {
-    animation: fadeIn var(--duration-300) var(--easing-smooth) both;
+    animation: var(--animate-welcome-enter);
   }
 
   /* Welcome suggestion card stagger */
   .suggestion-card {
-    animation: scaleIn var(--duration-150) var(--easing-smooth) both;
+    animation: var(--animate-scale-in);
   }
 
   .suggestion-card:nth-child(1) { animation-delay: var(--stagger-100); }
@@ -2834,7 +2912,7 @@
 
   /* "From Your Search" chips stagger */
   .recent-search-chip {
-    animation: slideUpFade var(--duration-200) var(--easing-smooth) both;
+    animation: var(--animate-slide-up-fade);
   }
 
   .recent-search-chip:nth-child(1) { animation-delay: var(--stagger-200); }
@@ -2844,17 +2922,17 @@
 
   /* Error banner entrance */
   .error-banner-enter {
-    animation: slideDownFade var(--duration-200) var(--easing-smooth) both;
+    animation: var(--animate-slide-down-fade);
   }
 
   /* Error icon shake */
   .error-icon-shake {
-    animation: errorShake var(--duration-300) var(--easing-smooth);
+    animation: var(--animate-error-shake);
   }
 
   /* Related questions stagger (CSS-only, no JS needed) */
   .related-question-item {
-    animation: slideUpFade var(--duration-200) var(--easing-smooth) both;
+    animation: var(--animate-slide-up-fade);
   }
 
   .related-question-item:nth-child(1) { animation-delay: var(--stagger-50); }
@@ -2863,26 +2941,102 @@
   .related-question-item:nth-child(4) { animation-delay: var(--stagger-200); }
   .related-question-item:nth-child(n+5) { animation-delay: var(--stagger-200); }
 
-  /* Welcome fade-out transition */
-  .welcome-fade-out {
-    animation: fadeOutUp var(--duration-250) var(--easing-smooth) both;
+  /* ========================================================================
+     ASK MODE EXPANDED SHELL - loading and not-ready surfaces
+     ======================================================================== */
+  .ask-mode-expanded {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    min-height: var(--spacing-0);
+    overflow: hidden;
+    /* Containing block for UnifiedCommandBar's .drag-drop-overlay (inset: 0); the ready
+       branch used to restate this as an inline style — the class is the only source now. */
+    position: relative;
   }
 
-  /* Reduced motion support - comprehensive */
-  @media (prefers-reduced-motion: reduce) {
-    .typing-dot,
-    .welcome-state,
-    .suggestion-card,
-    .recent-search-chip,
-    .error-banner-enter,
-    .error-icon-shake,
-    .related-question-item,
-    .welcome-fade-out {
-      animation: none !important;
-      opacity: 1 !important;
-      transform: none !important;
-    }
+  .chat-loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: var(--spacing-3);
+    padding: var(--spacing-6);
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+    text-align: center;
   }
+
+  .loading-spinner {
+    width: var(--spacing-8);
+    height: var(--spacing-8);
+    border: var(--spacing-1) solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: var(--radius-full);
+    animation: var(--animate-spin);
+  }
+
+  .chat-not-ready {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+    margin: auto;
+    max-width: var(--suggestion-grid-max-width);
+    padding: var(--spacing-6);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .chat-not-ready-title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-tight);
+    color: var(--foreground);
+  }
+
+  .chat-not-ready-body {
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    color: var(--muted-foreground);
+  }
+
+  .chat-not-ready-list {
+    margin: var(--spacing-0);
+    padding-inline-start: var(--spacing-5);
+    list-style: disc;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    color: var(--foreground);
+  }
+
+  .chat-not-ready-list li + li {
+    margin-block-start: var(--spacing-1);
+  }
+
+  .chat-not-ready-list code {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: var(--spacing-0) var(--spacing-1);
+    background: var(--muted);
+    border-radius: var(--radius-micro);
+  }
+
+  .chat-not-ready-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-2);
+  }
+
+  /* Reduced motion needs no mirror here: every animation in this file consumes an
+     `--animate-*` shorthand (neutralised by the `:root` reset in globals.css) or is a
+     loop whose 0%/100% frame is the neutral state, which the blanket duration reset in
+     globals.css parks it on. */
 
   /* ========================================================================
      CHAT MESSAGE ACTIONS

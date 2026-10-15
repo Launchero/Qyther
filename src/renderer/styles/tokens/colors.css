@@ -2,22 +2,28 @@
  * =============================================================================
  * BASE COLOR PRIMITIVES
  * =============================================================================
- * 
+ *
  * PURPOSE: This file contains color tokens for the shadcn design system.
- * 
+ *
  * RULES:
  * 1. No arbitrary values in components (e.g., p-[17px], bg-[#ff0000])
  * 2. Use tokens: var(--spacing-4), var(--color-primary)
  * 3. Add new tokens here, not in components
  * 4. All colors in OKLCH format for perceptual consistency
  * 5. Document mockup specs when extracting (e.g., "Mockup line 78")
- * 
+ *
  * TOKEN HIERARCHY:
  * - Base tokens (this file): Raw values (e.g., --color-mist-500)
  * - Semantic tokens (semantic/theme.css): Purpose-driven (e.g., --primary)
  * - Component tokens: Component-specific (e.g., --button-bg)
- * 
+ *
  * NEVER SKIP THE SEMANTIC LAYER - This is what makes refactors safe.
+ *
+ * A primitive has no `.dark` half, so it is the same colour in both themes.
+ * That is fine for a fill that is always on its own dark plate (code blocks) and
+ * fatal for text: `--color-green-500` measured 2.40:1 on a light card and 7.70:1
+ * on a dark one. Anything a user reads is a semantic pair in
+ * `semantic/theme.css`, never a primitive from this file.
  */
 
 @theme {
@@ -33,7 +39,7 @@
   --color-mist-800: oklch(0.35 0.1 250);
   --color-mist-900: oklch(0.25 0.11 250);
   --color-mist-950: oklch(0.15 0.12 250);
-  
+
   /* Neutral grays for UI elements */
   --color-gray-50: oklch(0.985 0 0);
   --color-gray-100: oklch(0.97 0 0);
@@ -45,20 +51,26 @@
   --color-gray-700: oklch(0.35 0 0);
   --color-gray-800: oklch(0.25 0 0);
   --color-gray-900: oklch(0.15 0 0);
-  
-  /* Brand colors (from current primary: oklch(0.715 0.143 230.923)) */
-  --color-brand-50: oklch(0.97 0.03 252);
-  --color-brand-100: oklch(0.94 0.06 252);
-  --color-brand-500: oklch(0.715 0.143 230.923); /* Current primary */
-  --color-brand-600: oklch(0.65 0.12 252);
-  --color-brand-700: oklch(0.55 0.14 252);
-  
-  /* Functional colors */
+
+  /* Brand colors (light `--primary` is brand-600 darkened to clear AA as text) */
+  --color-brand-50: oklch(0.97 0.02 252);
+  --color-brand-100: oklch(0.94 0.045 252);
+  --color-brand-200: oklch(0.885 0.075 252);
+  --color-brand-300: oklch(0.82 0.1 252);
+  --color-brand-400: oklch(0.75 0.13 252);
+  --color-brand-500: oklch(0.715 0.143 230.923);
+  --color-brand-600: oklch(0.62 0.135 252);
+  --color-brand-700: oklch(0.54 0.115 252);
+  --color-brand-800: oklch(0.45 0.1 252);
+  --color-brand-900: oklch(0.35 0.085 252);
+
+  /* Functional colors — fills only. As text use --success/--warning/--info/
+     --destructive from the semantic layer. */
   --color-red-500: oklch(0.637 0.237 25.331);
   --color-green-500: oklch(0.723 0.194 149.579);
   --color-yellow-500: oklch(0.842 0.189 84.43);
   --color-blue-500: oklch(0.604 0.119 254.1);
-  
+
   /* Chart colors (from current theme) */
   --color-chart-1: oklch(0.715 0.143 230.923);
   --color-chart-2: oklch(0.6 0.118 184.704);
@@ -66,19 +78,32 @@
   --color-chart-4: oklch(0.828 0.189 84.429);
   --color-chart-5: oklch(0.769 0.188 70.08);
 
-  /* Code block colors */
-  --color-code-ts-dot: oklch(0.604 0.119 254.1);   /* TypeScript indicator */
-  --color-code-bg: oklch(0.16 0 0);                  /* Code block pre background */
-  --color-code-header: oklch(0.2 0 0);               /* Code block header background */
-  --color-code-text: oklch(0.85 0 0);                /* Code text color */
-  --color-code-line: oklch(0.7 0 0);                 /* Code header text */
-  
-  /* Semantic color variants (used in ask-mode components) */
-  --color-green-active: oklch(0.75 0.15 145);        /* Active green for MCP/status indicators */
-  --color-green-muted: oklch(0.75 0.15 145 / 0.2);   /* Muted green for backgrounds */
-  --color-green-subtle: oklch(0.75 0.15 145 / 0.15); /* Subtle green for subtle backgrounds */
-  
+  /* DEPRECATED status aliases. These exist only so a stylesheet that has not
+     been migrated yet cannot drop silently — a custom property that does not
+     resolve makes the whole declaration vanish, which is how `--color-
+     purple-500` shipped an untinted agent pill. New code uses the semantic
+     pairs in `semantic/theme.css` (`--success`, `--warning`, `--info`,
+     `--destructive`) and their `-soft` tints. Migrate the remaining consumers
+     in `ask-mode-perplexity.css` and `globals.css`, then delete these. */
+  --color-green-active: var(--success);
+  --color-green-muted: var(--success-soft);
+  --color-green-subtle: var(--success-soft);
+  --color-code-ts-dot: var(--color-brand-400);
+
+  /* Code block colors — always a dark plate in both themes, so a primitive is
+     correct here; the text on it measures 11.95:1. */
+  --color-code-bg: oklch(0.16 0.008 250);
+  --color-code-header: oklch(0.2 0.008 250);
+  --color-code-text: oklch(0.87 0.01 250);
+  --color-code-line: oklch(0.7 0.01 250);
+
   /* Extended gray scale for code blocks and overlays */
   --color-gray-750: oklch(0.3 0 0);                  /* Hover state for code action buttons */
   --color-gray-850: oklch(0.2 0 0 / 0.6);            /* Drag-drop overlay */
+
+  /* Agent identity hues — the raw hue only. The readable pairs
+     (--agent-browser, --agent-document) live in semantic/theme.css, because a
+     single lightness cannot clear 4.5:1 in both themes. */
+  --color-purple-500: oklch(0.6 0.19 300);
+  --color-orange-500: oklch(0.7 0.17 60);
 }

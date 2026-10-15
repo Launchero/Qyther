@@ -13,18 +13,59 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Reduced motion: `none` for every entry/exit shorthand, `0ms` for the durations and
+ * stagger delays they compose from, then the blanket rule for what bypasses the token
+ * path. See `AGENTS.md` — an animation whose keyframe ends in a meaningful visual state
+ * also needs its class in the per-file mirrors below, because zeroing a duration leaves
+ * the element parked on the keyframe's first frame instead of its settled one.
+ */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --animate-spin: 0ms;
-    --animate-pulse: 0ms;
-    --animate-bounce: 0ms;
-    --animate-cursor-blink: 0ms;
-    --animate-slide-up-fade: 0ms;
-    --animate-slide-down-fade: 0ms;
-    --animate-scale-in: 0ms;
-    --animate-error-shake: 0ms;
-    --animate-typing-dots: 0ms;
-    --animate-fade-out-up: 0ms;
+    --animate-spin: none;
+    --animate-pulse: none;
+    --animate-cursor-blink: none;
+    --animate-typing-dots: none;
+    --animate-progress-pulse: none;
+    --animate-agent-pulse: none;
+    --animate-fade-in: none;
+    --animate-scale-in: none;
+    --animate-slide-up-fade: none;
+    --animate-slide-down-fade: none;
+    --animate-error-shake: none;
+    --animate-welcome-enter: none;
+    --animate-view-enter: none;
+    --animate-palette-reveal: none;
+    --animate-toast-enter: none;
+    --animate-toast-exit: none;
+    --animate-surface-enter: none;
+    --animate-surface-exit: none;
+    --animate-scrim-enter: none;
+    --animate-scrim-exit: none;
+    --animate-collapse-flash: none;
+
+    --duration-100: 0ms;
+    --duration-150: 0ms;
+    --duration-200: 0ms;
+    --duration-300: 0ms;
+    --duration-500: 0ms;
+
+    --stagger-50: 0ms;
+    --stagger-75: 0ms;
+    --stagger-100: 0ms;
+    --stagger-150: 0ms;
+    --stagger-200: 0ms;
+    --stagger-300: 0ms;
+  }
+
+  /* Literal durations outside the token path (Tailwind duration-* utilities, per-file keyframes) */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -63,11 +104,29 @@
 
   .command-palette-scrollbar::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    border-radius: 4px;
+    border-radius: var(--radius-full);
   }
 
   .command-palette-scrollbar::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
+  }
+
+  /* ========================================================================
+     SURFACE AND VIEW MOTION
+     ======================================================================== */
+
+  /* Alt+Space summon: the frameless transparent window has no Win32 open animation of
+     its own, so the card itself fades and grows. Applied and restarted by
+     hooks/useWindowReveal, deliberately never through `className`. */
+  .palette-revealing {
+    animation: var(--animate-palette-reveal);
+  }
+
+  /* A view mounting into the palette's body slot. Each branch of CommandPaletteBody carries
+     its own React key so the node remounts instead of being reused in place — without the
+     key this would run once and never again. */
+  .view-enter {
+    animation: var(--animate-view-enter);
   }
 
   /* Mode toggle button */
@@ -81,65 +140,9 @@
     height: 28px;
     padding: 0 8px;
     font-size: 12px;
-    border-radius: calc(var(--radius) - 2px);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border-radius: var(--radius-shortcut-key);
+    box-shadow: var(--shadow-shortcut-key);
   }
-
-  /* ========================================================================
-     PROCESS INDICATOR (phase dots bar)
-     ======================================================================== */
-  .process-indicator {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-3);
-    padding: var(--spacing-2) var(--spacing-4);
-    font-size: var(--text-xs);
-    color: var(--muted-foreground);
-    border-bottom: 1px solid var(--border);
-    background: var(--muted);
-    flex-shrink: 0;
-  }
-  .phase-dots { display: flex; gap: 8px; align-items: center; }
-  .phase-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--muted-foreground);
-    opacity: 0.3;
-    transition: all var(--duration-300) var(--easing-smooth);
-    position: relative;
-  }
-  .phase-dot.active { opacity: 1; background: var(--primary); animation: phasePulse 1.5s ease-in-out infinite; }
-  .phase-dot.completed {
-    opacity: 1;
-    background: var(--color-green-500);
-    animation: none;
-  }
-  .phase-dot.completed::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; background: var(--card); }
-  .phase-dot.completed::before {
-    content: '\2713';
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 6px;
-    color: var(--color-green-500);
-    font-weight: bold;
-    z-index: 1;
-  }
-  @keyframes phasePulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
-  .phase-label { flex: 1; font-weight: 500; }
-  .phase-label.typing::after {
-    content: '';
-    display: inline-block;
-    width: 6px;
-    height: 10px;
-    background: var(--primary);
-    margin-left: 2px;
-    animation: cursorBlink 0.8s ease-in-out infinite;
-  }
-  .phase-time { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted-foreground); }
 
   /* ========================================================================
      CITATION BRACKETS
@@ -154,13 +157,14 @@
     margin: 0 1px;
     background: var(--primary);
     color: var(--primary-foreground);
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     font-weight: 600;
     vertical-align: super;
     cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth);
+    transition: filter var(--duration-150) var(--easing-smooth),
+                transform var(--duration-150) var(--easing-smooth);
   }
   .citation:hover { filter: brightness(1.2); transform: scale(1.1); }
 
@@ -190,7 +194,7 @@
      TASK METRICS (with token visualization)
      ======================================================================== */
   .task-metrics-display { margin-top: var(--spacing-3); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--secondary); }
-  .task-metrics-summary { display: flex; align-items: center; gap: var(--spacing-2); padding: var(--spacing-2) var(--spacing-3); cursor: pointer; list-style: none; font-size: var(--text-xs); color: var(--muted-foreground); user-select: none; transition: all var(--duration-150) var(--easing-smooth); }
+  .task-metrics-summary { display: flex; align-items: center; gap: var(--spacing-2); padding: var(--spacing-2) var(--spacing-3); cursor: pointer; list-style: none; font-size: var(--text-xs); color: var(--muted-foreground); user-select: none; transition: background-color var(--duration-150) var(--easing-smooth), color var(--duration-150) var(--easing-smooth); }
   .task-metrics-summary::-webkit-details-marker { display: none; }
   .task-metrics-summary::marker { display: none; content: ''; }
   .task-metrics-summary:hover { background: var(--accent); color: var(--foreground); }
@@ -214,7 +218,7 @@
   .token-segment.output-tokens { background: var(--accent-foreground); opacity: 0.5; }
   .token-legend { display: flex; gap: var(--spacing-4); }
   .legend-item { display: flex; align-items: center; gap: var(--spacing-1); font-size: var(--text-xs); color: var(--muted-foreground); }
-  .legend-color { width: 10px; height: 10px; border-radius: 2px; }
+  .legend-color { width: 10px; height: 10px; border-radius: var(--radius-xs); }
   .legend-color.input-tokens { background: var(--primary); }
   .legend-color.output-tokens { background: var(--accent-foreground); opacity: 0.5; }
 
@@ -227,33 +231,32 @@
   /* ========================================================================
      CONFIDENCE BADGE (variants)
      ======================================================================== */
-  .confidence-badge { display: inline-flex; align-items: center; gap: var(--spacing-1); padding: 2px var(--spacing-2); border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; line-height: 1.4; white-space: nowrap; margin-top: var(--spacing-2); }
-  .confidence-badge--high { background: color-mix(in oklch, var(--color-green-500) 15%, transparent); color: var(--color-green-500); }
-  .confidence-badge--medium { background: color-mix(in oklch, var(--color-yellow-500) 15%, transparent); color: var(--color-yellow-500); }
-  .confidence-badge--low { background: color-mix(in oklch, var(--color-red-500) 15%, transparent); color: var(--color-red-500); }
+  .confidence-badge { display: inline-flex; align-items: center; gap: var(--spacing-1); padding: 2px var(--spacing-2); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; line-height: 1.4; white-space: nowrap; margin-top: var(--spacing-2); }
+  .confidence-badge--high { background: var(--success-soft); color: var(--success); }
+  .confidence-badge--medium { background: var(--warning-soft); color: var(--warning); }
+  .confidence-badge--low { background: var(--destructive-soft); color: var(--destructive); }
 
   /* ========================================================================
      QUALITY BADGE
      ======================================================================== */
-  .quality-badge { display: inline-flex; align-items: center; gap: var(--spacing-1); padding: 2px 8px; background: color-mix(in oklch, var(--color-green-active) 15%, transparent); color: var(--color-green-active); border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; margin-top: var(--spacing-2); }
+  .quality-badge { display: inline-flex; align-items: center; gap: var(--spacing-1); padding: 2px 8px; background: var(--success-soft); color: var(--success); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; margin-top: var(--spacing-2); }
   .quality-badge-iterations { opacity: 0.7; }
 
   /* ========================================================================
      STREAMING CURSOR
      ======================================================================== */
   .streaming-cursor { display: inline-block; animation: var(--animate-cursor-blink); color: var(--primary); font-weight: 700; }
-  @keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
   /* ========================================================================
      ERROR BANNER
      ======================================================================== */
-  .error-banner { display: flex; align-items: center; gap: var(--spacing-3); padding: var(--spacing-3) var(--spacing-4); background: color-mix(in oklch, var(--color-red-500) 10%, transparent); border: 1px solid color-mix(in oklch, var(--color-red-500) 30%, transparent); border-radius: var(--radius-md); margin: var(--spacing-3) 0; }
+  .error-banner { display: flex; align-items: center; gap: var(--spacing-3); padding: var(--spacing-3) var(--spacing-4); background: var(--destructive-soft); border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent); border-radius: var(--radius-md); margin: var(--spacing-3) 0; }
   .error-banner-content { flex: 1; }
-  .error-banner-title { font-size: var(--text-xs); font-weight: 600; color: var(--color-red-500); margin-bottom: 2px; }
+  .error-banner-title { font-size: var(--text-xs); font-weight: 600; color: var(--destructive); margin-bottom: 2px; }
   .error-banner-text { font-size: var(--text-xs); color: var(--muted-foreground); }
-  .error-retry-btn { padding: 6px 14px; background: var(--color-red-500); color: var(--destructive-foreground); border: none; border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 600; cursor: pointer; font-family: var(--font-body); transition: all var(--duration-150) var(--easing-smooth); }
+  .error-retry-btn { padding: 6px 14px; background: var(--destructive); color: var(--destructive-foreground); border: none; border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 600; cursor: pointer; font-family: var(--font-body); transition: filter var(--duration-150) var(--easing-smooth); }
   .error-retry-btn:hover { filter: brightness(1.1); }
-  .error-new-btn { padding: 6px 14px; background: var(--secondary); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 500; cursor: pointer; font-family: var(--font-body); transition: all var(--duration-150) var(--easing-smooth); }
+  .error-new-btn { padding: 6px 14px; background: var(--secondary); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 500; cursor: pointer; font-family: var(--font-body); transition: background-color var(--duration-150) var(--easing-smooth); }
   .error-new-btn:hover { background: var(--accent); }
 
   /* ========================================================================
@@ -268,7 +271,7 @@
      ======================================================================== */
   .context-chips-above-input { display: flex; gap: var(--spacing-2); padding: 0 var(--spacing-4); margin-top: var(--spacing-2); flex-wrap: wrap; }
   .context-chips-above-input.visible { display: flex; }
-  .context-chip-above { display: inline-flex; align-items: center; gap: var(--spacing-1-5); padding: var(--spacing-1) var(--spacing-1-5) var(--spacing-1) var(--spacing-2); background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; color: var(--foreground); transition: all var(--duration-150) var(--easing-smooth); max-width: 200px; flex-shrink: 0; }
+  .context-chip-above { display: inline-flex; align-items: center; gap: var(--spacing-1-5); padding: var(--spacing-1) var(--spacing-1-5) var(--spacing-1) var(--spacing-2); background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; color: var(--foreground); transition: border-color var(--duration-150) var(--easing-smooth), background-color var(--duration-150) var(--easing-smooth); max-width: 200px; flex-shrink: 0; }
   .context-chip-above:hover { border-color: var(--ring); background: var(--accent); }
   .context-chip-above svg { width: var(--spacing-3); height: var(--spacing-3); flex-shrink: 0; }
   .context-chip-above[data-file-type="code"] { border-left: 2px solid var(--color-blue-500); }
@@ -278,11 +281,11 @@
   .context-chip-above[data-file-type="presentation"] { border-left: 2px solid var(--color-yellow-500); }
   .context-chip-above[data-file-type="ebook"] { border-left: 2px solid var(--color-mist-600); }
   .context-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-  .context-chip-remove { width: var(--spacing-3); height: var(--spacing-3); cursor: pointer; opacity: 0.5; border-radius: var(--radius-xs); transition: all var(--duration-150) var(--easing-smooth); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .context-chip-remove { width: var(--spacing-3); height: var(--spacing-3); cursor: pointer; opacity: 0.5; border-radius: var(--radius-xs); transition: opacity var(--duration-150) var(--easing-smooth), background-color var(--duration-150) var(--easing-smooth); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .context-chip-remove:hover { opacity: 1; background: color-mix(in oklch, var(--foreground) 10%, transparent); }
-  .mcp-chip { display: flex; align-items: center; gap: 4px; padding: var(--spacing-1) var(--spacing-2); background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; cursor: pointer; transition: all var(--duration-150) var(--easing-smooth); }
+  .mcp-chip { display: flex; align-items: center; gap: 4px; padding: var(--spacing-1) var(--spacing-2); background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; cursor: pointer; transition: border-color var(--duration-150) var(--easing-smooth), color var(--duration-150) var(--easing-smooth), background-color var(--duration-150) var(--easing-smooth); }
   .mcp-chip:hover { border-color: var(--ring); color: var(--foreground); background: var(--accent); }
-  .mcp-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-green-500); }
+  .mcp-chip-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--success); }
 
   /* ========================================================================
      RELATED QUESTIONS
@@ -290,37 +293,34 @@
   .related-questions { margin-top: var(--spacing-4); padding-top: var(--spacing-3); border-top: 1px solid var(--border); }
   .related-title { font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--spacing-2); padding: 0 var(--spacing-4); }
   .related-list { display: flex; flex-direction: column; gap: 4px; }
-  .related-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: calc(var(--radius) - 2px); font-size: var(--text-xs); color: var(--foreground); cursor: pointer; transition: all var(--duration-150) var(--easing-smooth); }
+  .related-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-md); font-size: var(--text-xs); color: var(--foreground); cursor: pointer; transition: background-color var(--duration-150) var(--easing-smooth), color var(--duration-150) var(--easing-smooth); }
   .related-item:hover { background: var(--accent); color: var(--primary); }
 
   /* ========================================================================
      ACTION BAR
      ======================================================================== */
   .action-bar { display: flex; gap: 6px; margin-top: var(--spacing-3); flex-wrap: wrap; padding: 0 var(--spacing-4); }
-  .action-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--background); border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); font-size: var(--text-xs); font-weight: 500; color: var(--muted-foreground); cursor: pointer; transition: all var(--duration-150) var(--easing-smooth); font-family: var(--font-body); }
+  .action-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: var(--text-xs); font-weight: 500; color: var(--muted-foreground); cursor: pointer; transition: border-color var(--duration-150) var(--easing-smooth), color var(--duration-150) var(--easing-smooth); font-family: var(--font-body); }
   .action-btn:hover { border-color: var(--ring); color: var(--primary); }
 
   /* ========================================================================
      GENERATIVE UI
      ======================================================================== */
-  .generative-ui-container { margin: var(--spacing-3) 0; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  /* Cross-fades in over the skeleton it replaces; opacity only, because auto-animate
+     owns the layout of this element's ancestors. */
+  .generative-ui-container { margin: var(--spacing-3) 0; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; animation: var(--animate-fade-in); }
   .generative-ui-title { font-size: var(--text-sm); font-weight: 600; padding: var(--spacing-3); border-bottom: 1px solid var(--border); background: var(--muted); color: var(--foreground); }
 
   /* Data Table */
   .data-table-controls { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-2) var(--spacing-3); border-bottom: 1px solid var(--border); background: var(--card); }
   .export-buttons { display: flex; gap: var(--spacing-2); }
-  .export-btn {
-    display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm);
-    font-size: var(--text-xs); color: var(--muted-foreground); cursor: pointer; transition: all var(--duration-150) var(--easing-smooth); font-family: var(--font-body);
-  }
-  .export-btn:hover { border-color: var(--ring); color: var(--primary); }
   .filter-input { display: flex; gap: var(--spacing-2); align-items: center; }
   .filter-input input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--background); color: var(--foreground); font-size: var(--text-xs); font-family: var(--font-body); outline: none; width: 140px; }
   .filter-input input:focus { border-color: var(--ring); }
   .filter-column-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--background); color: var(--foreground); font-size: var(--text-xs); font-family: var(--font-body); outline: none; }
   .data-table-wrapper { overflow-x: auto; }
   .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
-  .data-table th { background: var(--muted); padding: 8px 12px; text-align: left; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  .data-table th { background: var(--muted); padding: var(--spacing-2) var(--spacing-3); text-align: left; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); user-select: none; }
   .data-table th:hover { background: var(--accent); }
   .data-table th.sortable { position: relative; }
   .data-table th .sort-indicator { margin-left: 4px; }
@@ -332,10 +332,10 @@
   .row-count { font-size: var(--text-xs); color: var(--muted-foreground); }
 
   /* Badges */
-  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; }
-  .badge-green { background: color-mix(in oklch, var(--color-green-500) 15%, transparent); color: var(--color-green-500); }
-  .badge-yellow { background: color-mix(in oklch, var(--color-yellow-500) 15%, transparent); color: var(--color-yellow-500); }
-  .badge-red { background: color-mix(in oklch, var(--color-red-500) 15%, transparent); color: var(--color-red-500); }
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 500; }
+  .badge-green { background: var(--success-soft); color: var(--success); }
+  .badge-yellow { background: var(--warning-soft); color: var(--warning); }
+  .badge-red { background: var(--destructive-soft); color: var(--destructive); }
   .badge-primary { background: var(--primary); color: var(--primary-foreground); }
 
   /* Comparison Table */
@@ -356,12 +356,12 @@
   .comparison-item-label { font-weight: 500; }
   .comparison-cell { white-space: nowrap; }
   .comparison-row td:first-child { font-weight: 500; }
-  .comparison-value.highlighted { color: var(--color-green-500); font-weight: 600; }
-  .best-badge { display: inline-flex; padding: 1px 6px; background: color-mix(in oklch, var(--color-green-500) 15%, transparent); color: var(--color-green-500); border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700; margin-left: 4px; }
+  .comparison-value.highlighted { color: var(--success); font-weight: 600; }
+  .best-badge { display: inline-flex; padding: 1px 6px; background: var(--success-soft); color: var(--success); border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 700; margin-left: 4px; }
   .comparison-footer { padding: var(--spacing-2) var(--spacing-3); border-top: 1px solid var(--border); }
   .comparison-legend { font-size: var(--text-xs); color: var(--muted-foreground); }
   .legend-item { display: flex; align-items: center; gap: var(--spacing-1); }
-  .legend-badge.highlighted { color: var(--color-green-500); font-weight: 600; }
+  .legend-badge.highlighted { color: var(--success); font-weight: 600; }
 
   /* Form Preview */
   .form-preview-container { padding: var(--spacing-3); }
@@ -374,14 +374,6 @@
   .form-field-input:focus { border-color: var(--ring); box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 20%, transparent); }
   .form-field-checkbox { width: 16px; height: 16px; accent-color: var(--primary); }
   .form-actions { display: flex; gap: var(--spacing-2); margin-top: var(--spacing-4); }
-  .form-btn-cancel, .form-btn-confirm {
-    display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); font-size: var(--text-xs); font-weight: 500; cursor: pointer;
-    transition: all var(--duration-150) var(--easing-smooth); font-family: var(--font-body); border: 1px solid var(--border);
-  }
-  .form-btn-cancel { background: var(--card); color: var(--muted-foreground); }
-  .form-btn-cancel:hover { background: var(--accent); }
-  .form-btn-confirm { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
-  .form-btn-confirm:hover { filter: brightness(1.1); }
 
   /* Generative Fallback */
   .generative-ui-fallback { padding: var(--spacing-3); border: 1px dashed var(--border); border-radius: var(--radius-md); background: var(--muted); }
@@ -450,21 +442,16 @@
   .skeleton-default { padding: var(--spacing-2) var(--spacing-3); }
   .skeleton-line { height: 18px; margin: var(--spacing-2) 0; border-radius: var(--radius-sm); }
 
-  /* Shimmer Animation */
+  /* Skeleton base fill ONLY. `shimmer` is a `@utility` in `shadcn/tailwind.css` (imported at `:3`),
+     and a Tailwind utility lands in the `utilities` layer, which outranks this `components` layer
+     regardless of specificity — so the `animation`, gradient `background` and `background-size`
+     once declared here were always overridden by the library's shimmer. Verified in the running
+     app: the computed `animation-name` on these nodes is `tw-shimmer`, not the local `shimmer`,
+     and the library's `background-image` wins too. `background-color` is the single property only
+     this rule supplies — `.skeleton-row|-line|-label…` set no fill — so removing it would render
+     the skeleton invisible. Anything else added here must expect to lose the layer battle. */
   .shimmer {
-    animation: shimmer 1.5s infinite;
-    background: linear-gradient(
-      90deg,
-      var(--muted) 25%,
-      var(--accent) 50%,
-      var(--muted) 75%
-    );
-    background-size: 200% 100%;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    background-color: var(--muted);
   }
 
   /* Progress Indicator */
@@ -491,8 +478,8 @@
     height: 100%;
     background: linear-gradient(90deg, var(--primary), var(--accent));
     border-radius: var(--radius-full);
-    transition: width 0.3s var(--easing-smooth);
-    animation: progressPulse 2s ease-in-out infinite;
+    transition: width var(--duration-300) var(--easing-smooth);
+    animation: var(--animate-progress-pulse);
   }
 
   .progress-message {
@@ -500,11 +487,6 @@
     color: var(--muted-foreground);
     white-space: nowrap;
     flex-shrink: 0;
-  }
-
-  @keyframes progressPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
   }
 
   /* Stage-specific progress colors */
@@ -535,27 +517,318 @@
 
   /* Thinking step badges */
   .step-badge.chart { background: color-mix(in oklch, var(--color-chart-1) 20%, transparent); color: var(--color-chart-1); }
-  .step-badge.compare { background: color-mix(in oklch, var(--color-blue-500) 20%, transparent); color: var(--color-blue-500); }
-  .step-badge.form { background: color-mix(in oklch, var(--color-yellow-500) 20%, transparent); color: var(--color-yellow-500); }
+  .step-badge.compare { background: var(--info-soft); color: var(--info); }
+  .step-badge.form { background: var(--warning-soft); color: var(--warning); }
 
-  /* Reduced motion for shimmer/progress */
+  /* ========================================================================
+     TOASTS
+     ======================================================================== */
+  .toast-region {
+    position: fixed;
+    inset-block-end: var(--spacing-4);
+    inset-inline-end: var(--spacing-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    max-width: var(--recent-chats-max-width);
+    z-index: var(--z-toast);
+  }
+
+  .toast-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+  }
+
+  .toast {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    background: var(--popover);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-toast);
+    overflow: hidden;
+    cursor: pointer;
+    animation: var(--animate-toast-enter);
+  }
+
+  /* Applied by ToastProvider while the toast drains out; removal waits for this to
+     finish, so it must stay in step with the provider's exit delay. */
+  .toast[data-state="exit"] {
+    animation: var(--animate-toast-exit);
+    pointer-events: none;
+  }
+
+  .toast-success { --toast-accent: var(--success); }
+  .toast-error { --toast-accent: var(--destructive); }
+  .toast-info { --toast-accent: var(--info); }
+  .toast-warning { --toast-accent: var(--warning); }
+
+  .toast-icon {
+    display: flex;
+    align-items: center;
+    color: var(--toast-accent);
+    flex-shrink: 0;
+  }
+  .toast-icon svg {
+    width: var(--icon-size-md);
+    height: var(--icon-size-md);
+  }
+
+  .toast-message {
+    flex: 1;
+    min-width: var(--spacing-0);
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
+  }
+
+  .toast-dismiss-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-6);
+    height: var(--spacing-6);
+    padding: var(--spacing-0);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--muted-foreground);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color var(--duration-150) var(--easing-smooth);
+  }
+  .toast-dismiss-btn:hover { color: var(--foreground); }
+  .toast-dismiss-btn:focus-visible { outline: var(--ring-width) solid var(--ring); }
+  .toast-dismiss-btn svg {
+    width: var(--icon-size-sm);
+    height: var(--icon-size-sm);
+  }
+
+  .toast-progress-bar {
+    position: absolute;
+    inset-inline: var(--spacing-0);
+    inset-block-end: var(--spacing-0);
+    height: var(--spacing-1);
+    background: var(--muted);
+  }
+
+  .toast-progress-fill {
+    height: 100%;
+    background: var(--toast-accent);
+    transform-origin: left center;
+    animation-name: toastDrain;
+    animation-timing-function: var(--easing-linear);  /* duration is the toast payload, not a design value */
+    animation-fill-mode: forwards;
+  }
+
+  .toast[data-paused="true"] .toast-progress-fill {
+    animation-play-state: paused;
+  }
+
+  @keyframes toastDrain {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+
+  /* Reduced motion for the one loop that keeps its duration outside the token path:
+     `.toast-progress-fill` is timed by the toast payload, so the `:root` shorthand reset
+     cannot reach it. `.progress-bar` no longer needs a mirror here — it consumes
+     `--animate-progress-pulse`, which the `:root` block above already sets to `none`.
+     `.shimmer` is deliberately NOT listed: an `animation: none` written in this `components` layer
+     loses to the shadcn `@utility shimmer` in the `utilities` layer, so it would be a lie. The
+     blanket `*, *::before, *::after { animation-duration: 0ms !important }` at `:54-63` is what
+     actually stops the library animation — `!important` reverses the layer order. */
   @media (prefers-reduced-motion: reduce) {
-    .shimmer { animation: none; }
-    .progress-bar { animation: none; }
+    .toast-progress-fill { animation: none; }
   }
 
   /* ========================================================================
      ANIMATIONS
      ======================================================================== */
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes slideDown { from { opacity: 0; max-height: 0; transform: translateY(-8px); } to { opacity: 1; max-height: 300px; transform: translateY(0); } }
 
-  /* Auto-collapse visual transition cue */
+  /* Auto-collapse visual transition cue. This keyframe paints semantic colours, so it
+     lives here rather than in tokens/motion.css; useWindowMode holds its `isCollapsing`
+     flag for the matching --duration-500 so the border settles when the flag clears. */
   @keyframes collapsePulse {
     0% { border-bottom-color: var(--primary); background: color-mix(in oklch, var(--primary) 8%, var(--card)); }
     100% { border-bottom-color: var(--border); background: var(--card); }
   }
   .collapse-flash {
-    animation: collapsePulse 600ms ease-out forwards;
+    animation: var(--animate-collapse-flash);
   }
 }
+
+/* ============================================================================
+   FLOATING SURFACE LAYERING — z-index, elevation, scrim, enter/exit
+   ============================================================================
+
+   Unlayered on purpose. A `@layer components` rule loses to Tailwind's
+   `utilities` layer regardless of specificity — the documented collision that
+   made the old `.shimmer` declarations never apply — and every value below is
+   fighting a utility on the same element (`z-50`, `bg-black/80`, `bg-popover`,
+   `rounded-lg`, `p-4`, `shadow-md`, `data-open:animate-in`). Unlayered normal
+   declarations outrank every layer, so this is the only place the assignment
+   can live.
+
+   `components/ui/` is pristine-by-policy, so the four Radix surfaces are styled
+   through their `data-slot` hooks (verified against the primitive sources)
+   rather than by editing them. Every animation is a whole `--animate-*`
+   shorthand, so `prefers-reduced-motion` is handled by the `:root` reset at the
+   top of this file — no per-surface mirror is needed. */
+
+[data-slot="dialog-overlay"] {
+  z-index: var(--z-overlay);
+  background: var(--scrim);
+  animation: var(--animate-scrim-enter);
+}
+
+[data-slot="dialog-overlay"][data-state="closed"] {
+  animation: var(--animate-scrim-exit);
+}
+
+[data-slot="dialog-content"] {
+  z-index: var(--z-modal);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  padding: var(--spacing-6);
+}
+
+[data-slot="dropdown-menu-content"],
+[data-slot="popover-content"] {
+  z-index: var(--z-popover);
+  background: var(--popover);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: var(--animate-surface-enter);
+}
+
+[data-slot="dropdown-menu-content"][data-state="closed"],
+[data-slot="popover-content"][data-state="closed"] {
+  animation: var(--animate-surface-exit);
+}
+
+[data-slot="tooltip-content"] {
+  z-index: var(--z-tooltip);
+  background: var(--popover);
+  /* The primitive paints this plate inverted (`bg-foreground text-background`);
+     now that the plate is `--popover`, the label has to flip with it or the
+     tooltip ships as white on white. */
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-tooltip);
+}
+
+/* Menu rows are `focus:`-styled upstream, so the row under the pointer painted
+   nothing until it also held DOM focus. Radix marks the pointer row with
+   `data-highlighted`, and `min-h-7` (28px) is under the `--target-min` floor. */
+[data-slot="menu-item"],
+[data-slot="dropdown-menu-item"] {
+  min-height: var(--target-min);
+}
+
+[data-slot="menu-item"]:is(:hover, [data-highlighted="on"]),
+[data-slot="dropdown-menu-item"]:is(:hover, [data-highlighted="on"]) {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Keep the destructive row's own treatment — it is the one variant the primitive
+   already distinguishes (`data-variant` is always present on the element). */
+[data-slot="menu-item"][data-variant="destructive"]:is(:hover, [data-highlighted="on"]),
+[data-slot="dropdown-menu-item"][data-variant="destructive"]:is(:hover, [data-highlighted="on"]) {
+  background: var(--destructive-soft);
+  color: var(--destructive);
+}
+/* The upstream Tooltip arrow hardcodes `bg-foreground fill-foreground`, which
+   paints a dark nub on a light plate. It carries no data-slot, so it is reached
+   through its parent; unlayered so it beats those two utilities. */
+[data-slot="tooltip-content"] > svg {
+  background: var(--popover);
+  fill: var(--popover);
+  z-index: var(--z-tooltip);
+}
+
+/* ============================================================================
+   DENSITY, PRIMITIVE OVERRIDES, INLINE CODE — unlayered, so each rule beats the
+   upstream utility it is correcting. `components/ui/` is pristine-by-policy, so
+   where an upstream class string is wrong for us (`transition-all`) the fix is
+   applied here through `data-slot`, never in the primitive.
+   ============================================================================ */
+
+/* The upstream primitives all animate `transition-all`, which repaints on any
+   property change and is explicitly banned elsewhere in this system. Name the
+   properties the recipes actually change. */
+[data-slot="button"],
+[data-slot="badge"],
+[data-slot="tabs-trigger"],
+[data-slot="switch-root"],
+[data-slot="switch-thumb"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, outline-color;
+  transition-duration: var(--duration-150);
+  transition-timing-function: var(--easing-standard);
+}
+
+/* Compact density is one token reassignment on the element that carries
+   `data-window-mode`, not a per-class rule. Every consumer of
+   `--padding-block-section` and `--gap-block` inside that subtree tightens with
+   it, which is what a token system is for. */
+[data-window-mode="compact"] {
+  --padding-block-section: var(--spacing-2);
+  --gap-block: var(--spacing-2);
+}
+
+/* Inline code is a span of the surrounding 16px prose, not a separate rung. */
+.answer-content code:not(pre code) {
+  font-size: var(--text-code-inline);
+}
+
+/* Scrollbars. The platform default is a wide, unthemed bar that reads as a
+   Windows control sitting on top of an elevated surface — visible in the
+   shortcuts dialog, where it also overlaps the key-column. Thin, tinted and
+   transparent-track, using the same tokens as every other boundary. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--input) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--input);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: content-box;
+}
+
+/* The upstream dialog close affordance is `size="icon-sm"` (24px), below the
+   32px pointer floor this system now holds every icon control to. `ui/` is
+   pristine-by-policy, so the floor is enforced here rather than in the recipe. */
+[data-slot="dialog-content"] > [data-slot="button"] {
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+}
+
+/* The sortable header is a real button inside the <th> so it is reachable by
+   keyboard; it inherits the cell's type and alignment rather than restating them. */
+.data-table-sort {
+  display: inline-flex; align-items: center; gap: var(--spacing-1);
+  padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: inherit; cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-150) var(--easing-standard);
+}
+.data-table-sort:hover { color: var(--primary); }
+.data-table-sort:focus-visible { outline: var(--ring-width) solid var(--ring); outline-offset: 2px; }

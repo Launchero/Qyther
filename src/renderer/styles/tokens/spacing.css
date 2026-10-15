@@ -1,62 +1,86 @@
 /*
  * =============================================================================
- * SPACING SCALE
+ * SPACING SCALE — a strict 4pt grid
  * =============================================================================
- * 
+ *
  * PURPOSE: This file contains spacing tokens for the shadcn design system.
- * 
+ *
  * RULES:
  * 1. No arbitrary values in components (e.g., p-[17px], bg-[#ff0000])
  * 2. Use tokens: var(--spacing-4), var(--color-primary)
  * 3. Add new tokens here, not in components
- * 4. All colors in OKLCH format for perceptual consistency
- * 5. Document mockup specs when extracting (e.g., "Mockup line 78")
+ * 4. Every layout length is a multiple of 4px. The half-step rungs (0-5, 1-5,
+ *    2-5, 3-5) are **grid aliases**: they exist so an already-written class
+ *    string and every upstream `ui/` primitive lands on the grid instead of on
+ *    Tailwind's 6px/10px/2px arithmetic. `px-1.5` and `px-2` are the same 8px
+ *    here, on purpose — do not "fix" the duplication by giving them distinct
+ *    off-grid values again.
+ * 5. Exception: `--icon-size-xs` is 14px. A glyph is optical, not a layout box;
+ *    the surrounding box is still on the grid.
+ * 6. Document mockup specs when extracting (e.g., "Mockup line 78")
+ *
+ * Tailwind resolves `p-3`, `gap-4`, `mt-2` straight to these tokens (verified:
+ * the built CSS emits `.py-3{padding-block:var(--spacing-3)}`), so a change
+ * here moves the whole app — no class string has to be edited.
  */
 
 @theme {
-  /* Spacing scale (0-16) */
+  /* Spacing scale — 4px steps */
   --spacing-0: 0;
+  --spacing-0-5: 4px;     /* alias of 1 */
   --spacing-1: 0.25rem;   /* 4px */
-  --spacing-1-5: 6px;     /* micro spacing */
+  --spacing-1-5: 0.5rem;  /* 8px — alias of 2 */
   --spacing-2: 0.5rem;    /* 8px */
-  --spacing-2-5: 10px;    /* suggestion grid gap */
+  --spacing-2-5: 0.75rem; /* 12px — alias of 3 */
   --spacing-3: 0.75rem;   /* 12px */
-  --spacing-3-5: 0.625rem;/* 10px */
+  --spacing-3-5: 1rem;    /* 16px — alias of 4 */
   --spacing-4: 1rem;      /* 16px */
   --spacing-5: 1.25rem;   /* 20px */
   --spacing-6: 1.5rem;    /* 24px */
-  --spacing-7: 1.75rem;   /* 28px - fill gap */
+  --spacing-7: 1.75rem;   /* 28px */
   --spacing-8: 2rem;      /* 32px */
+  --spacing-9: 2.25rem;   /* 36px */
   --spacing-10: 2.5rem;   /* 40px */
+  --spacing-11: 2.75rem;  /* 44px — the standard control height */
   --spacing-12: 3rem;     /* 48px */
   --spacing-14: 3.5rem;   /* 56px */
   --spacing-16: 4rem;     /* 64px */
-  
+
   /* Container widths (from mockup specs) */
   --container-command-palette: 800px;    /* Mockup line 78 */
-  --container-input-height: 44px;         /* Mockup line 241 */
-  --container-compact-height: 100px;      /* Updated to fill viewport (was 80px) */
-  --container-expanded-height: 600px;     /* Mockup line 80 */
-  --container-custom-height: 480px;      /* custom mode */
-  --container-header-height: 100px;       /* CommandPaletteHeader fixed height */
-  
+  --container-input-height: 40px;        /* Mockup line 241 — the control height */
+  --container-header-height: 72px;       /* CommandPaletteHeader fixed height — MUST equal main's MODE_CONFIGS.compact.height (windowManager.ts), the compact card is one header tall */
+
+  /* Rhythm: one gap ladder, applied per level of grouping */
+  --gap-inline: var(--spacing-2);        /* between two things that are one unit */
+  --gap-block: var(--spacing-3);         /* between sibling blocks in a section */
+  --gap-section: var(--spacing-4);       /* between sections of a surface */
+  --padding-inline-control: var(--spacing-3);
+  --padding-block-row: var(--spacing-2);
+  --padding-block-section: var(--spacing-3);
+  --padding-card: var(--spacing-3);
+
   /* Section padding */
   --padding-section-sm: var(--spacing-3);
   --padding-section-md: var(--spacing-4);
   --padding-section-lg: var(--spacing-6);
-  --padding-section-xl: 18px;
-  
+  --padding-section-xl: var(--spacing-4);
+
   /* Shortcut key specific */
   --shortcut-key-min-width: 20px;
   --shortcut-key-width: 40px; /* Accommodates widest common key label like "Space" */
-  --shortcut-key-height: 28px;
 
-  /* Gap token for SearchBar (12px = gap-3) */
-  --spacing-gap-searchbar: 12px;
+  /* Target floors — the smallest box a pointer may have to hit */
+  --target-min: 32px;        /* icon-only control */
+  --target-row: 40px;        /* a row in a list — compact; still above the 32px floor and WCAG 2.5.8 */
+
+  /* Gap token for SearchBar — alias of --spacing-3, kept so the existing
+     reference cannot drop. Migrate the call site, then delete. */
+  --spacing-gap-searchbar: var(--spacing-3);
 
   /* Result item specific */
   --max-width-path: 300px;
-  --result-item-height: 44px; /* h-11 = 44px */
+  --result-item-height: 40px; /* = --target-row, kept as the row contract */
 
   /* Textarea specific */
   --min-height-textarea: 48px;
@@ -66,30 +90,25 @@
   --max-height-scroll-section: 300px;
 
   /* Switch component specific */
-  --switch-height-default: 16.6px;
+  --switch-height-default: 16px;
   --switch-width-default: 28px;
-  --switch-height-sm: 14px;
+  --switch-height-sm: 12px;
   --switch-width-sm: 24px;
 
   /* Icon sizes (for ask-mode components) */
-  --icon-size-xs: 14px;       /* mode icons */
+  --icon-size-xs: 14px;       /* mode icons — the one off-grid exception, see header */
   --icon-size-sm: 16px;
   --icon-size-md: 20px;
   --icon-size-lg: 24px;
   --icon-size-xl: 32px;       /* send buttons */
   --icon-size-2xl: 40px;      /* drag-and-drop icon */
   --icon-size-3xl: 80px;      /* welcome logo */
-  
-  /* Send button unified size */
-  --send-button-size: 32px;
 
-  /* Small text sizes */
-  --text-2xs: 10px;           /* expand indicators */
-  --text-xs-custom: 9px;      /* context badges */
-  --text-11px: 11px;          /* new chat button */
+  /* Send button unified size */
+  --send-button-size: var(--target-min);
 
   /* Ask mode Perplexity layout tokens */
-  --container-ask-command-bar-height: 100px;     /* Mockup line 100-101 - Updated from 52px */
+  --container-ask-command-bar-height: 72px;      /* Mockup line 100-101 */
   --textarea-ask-max-lines: calc(var(--text-base) * 1.5 * 3); /* 3 lines at 16px × 1.5 line-height */
   --chat-bubble-max-width-user: 80%;             /* Mockup line 192 */
   --chat-message-max-width: 88%;                 /* User message bubble max width */
@@ -99,4 +118,5 @@
   --recent-chats-max-width: 480px;               /* Mockup line 173 */
   --suggestion-grid-max-width: 520px;            /* Mockup line 162 */
   --model-selector-max-width: 120px;             /* Model selector inline max width */
+  --measure-readable: 44rem;                     /* 704px cap on a running text column */
 }

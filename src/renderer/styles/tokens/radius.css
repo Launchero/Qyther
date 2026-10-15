@@ -1,42 +1,79 @@
 /*
  * =============================================================================
- * BORDER RADIUS SCALE
+ * BORDER RADIUS SCALE — MINIMUM-RADIUS STANDARD
  * =============================================================================
- * 
- * PURPOSE: This file contains radius tokens for the shadcn design system.
- * 
- * Current base: 0.625rem (10px), defined in this file and semantic/theme.css line 70
+ *
+ * PURPOSE: A minimal, sleek scale with a hard ceiling at the base. Two tiers,
+ * and nothing between them:
+ *
+ *   SURFACE tier   8px  (`--radius`, `--radius-lg`)  — the palette card, dialogs,
+ *                      popovers, dropdowns, cards, toasts, banners. The largest
+ *                      corner in the app, and the only one allowed at the ceiling.
+ *   CONTROL tier   2–6px (`--radius-md` 6, `--radius-sm`/`--radius-chip` 4,
+ *                      `--radius-xs`/`--radius-micro` 2) — buttons, inputs, rows,
+ *                      menu items, chips, badges, keycaps, text highlights.
+ *
+ * WHY 8px IS THE CEILING AND NOT A LOWER VALUE: this window is frameless and
+ * transparent with `roundedCorners: true` (`src/main/windows.ts:83`), so Windows
+ * draws the window's own corner — 8px on Win11's DWM frame. The palette card
+ * fills that window, so the card corner and the OS window edge have to agree.
+ * Going below 8px on the outer surface makes the card visibly sharper than the
+ * window clipping it; going above 8px makes it rounder. 8px is the minimum that
+ * does not mismatch the OS.
+ *
+ * WHY THE RUNGS ABOVE `--radius-lg` ARE PINNED, NOT DELETED: `rounded-xl`,
+ * `rounded-2xl`, `rounded-3xl` and `rounded-4xl` exist in the vendored
+ * `components/ui/` primitives (upstream shadcn tracks them and `shadcn diff`
+ * will bring them back). A Tailwind v4 `@theme` block MERGES with the default
+ * theme, so an undeclared name does not vanish — it silently resolves to
+ * Tailwind's stock value (`--radius-2xl: 1rem`, i.e. 16px). Declaring them at
+ * the ceiling is what makes "no corner in this app exceeds 8px" a property of
+ * the token file rather than a review convention: an upstream `rounded-2xl`
+ * lands on 8px instead of 16px.
+ *
+ * `--radius-full` is NOT part of the ladder. It is for shapes that are genuinely
+ * circular or pill-by-nature — avatars, status dots, switch tracks and thumbs,
+ * scrollbar thumbs, meter tracks and fills, spinner rings. A rectangular chip,
+ * badge, tag or keycap is not one of those; those use `--radius-chip`/`--radius-sm`.
+ *
+ * The rungs are spelled out, not `calc()`-multiplied: multiplying produced 3.6px
+ * and 6.4px corners, which read as an accident rather than a decision. This file
+ * is the single source — Tailwind v4 maps the `--radius-*` namespace onto the
+ * `rounded-*` utilities, so reshaping the scale here moves every corner in the
+ * app, including the pristine `ui/` primitives, without editing a component.
+ * Never widen the ceiling back toward 12px+; that is the softer look this scale
+ * replaced.
+ *
+ * Current base: 0.5rem (8px), declared here once; `semantic/theme.css` no
+ * longer restates it.
  */
 
 @theme {
-  /* Base radius */
-  --radius: 0.625rem;  /* 10px - Mockup line 81 */
-  
-  /* Derived scale (from shadcn convention) */
-  --radius-xs: calc(var(--radius) * 0.3);   /* 3px */
-  --radius-sm: calc(var(--radius) * 0.6);   /* 6px - Mockup line 286: calc(var(--radius) - 2px) */
-  --radius-md: calc(var(--radius) * 0.8);   /* 8px */
-  --radius-lg: var(--radius);               /* 10px */
-  --radius-xl: calc(var(--radius) * 1.4);   /* 14px */
-  --radius-2xl: calc(var(--radius) * 1.8);  /* 18px */
-  --radius-3xl: calc(var(--radius) * 2.2);  /* 22px */
-  --radius-4xl: calc(var(--radius) * 2.6);  /* 26px */
-  
-  /* Special values */
+  /* Base radius — the ceiling. No corner in this app may exceed it. */
+  --radius: 0.5rem;   /* 8px — equals the Win11 DWM frame radius this
+                           frameless transparent window is clipped by */
+
+  /* Ladder: micro → control → surface. Stops at the base. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: var(--radius);              /* 8px — surface tier */
+
+  /* Pinned to the ceiling, see the header. Not a softer rung. */
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
+
+  /* Circles and pill-by-nature shapes only — never a chip or badge. */
   --radius-full: 9999px;
-  --radius-micro: calc(var(--radius) * 0.3);
-  --radius-arrow: 2px;  /* For tooltip arrow, small decorative elements */
-  
-  /* Component-specific (from mockups) */
-  --radius-shortcut-key: calc(var(--radius) - 2px);  /* Mockup line 286 */
-  --radius-command-palette: var(--radius);           /* Mockup line 81: 10px */
-  
-  /* Named aliases for convenience */
-  --radius-small: calc(var(--radius) * 0.6);
-  --radius-medium: calc(var(--radius) * 0.8);
-  --radius-large: var(--radius);
-  
-  /* Named radius calculations for consistency */
-  --radius-input: calc(var(--radius) + 2px);         /* 12px - search inputs */
-  --radius-chip: calc(var(--radius) - 2px);          /* 8px - compact chips */
+
+  /* Semantic aliases */
+  --radius-micro: 2px;                      /* legend swatches, indicator bars */
+  --radius-arrow: 2px;                      /* tooltip arrow, small decorative elements */
+  --radius-shortcut-key: 4px;               /* Mockup line 286 */
+  --radius-command-palette: var(--radius);  /* Mockup line 81 */
+  --radius-input: 6px;                      /* search inputs */
+  --radius-chip: 4px;                       /* chips, badges, tags, keycaps */
+  --radius-card: var(--radius);             /* panels and cards */
 }
