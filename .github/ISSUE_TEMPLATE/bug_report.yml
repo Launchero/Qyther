@@ -63,15 +63,16 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: hitl
+    id: cancel
     attributes:
-      label: Did a human-in-the-loop confirmation appear, and what did you choose
-      description: Relevant for desktop and document paths, where non-safe actions interrupt for approval. This changes how the problem must be read.
+      label: If the run stopped early, how
+      description: There is no approval gate any more — every tool runs without asking. What replaced it is turn cancellation: Stop in the palette aborts the turn, and the desktop agent's own abort slot is released from the chat pump. This changes how the problem must be read.
       options:
-        - No confirmation dialog appeared
-        - A confirmation appeared and I approved it
-        - A confirmation appeared and I denied it
-        - A confirmation appeared and the app hung or ignored my choice
+        - I did not stop it; it ended on its own
+        - I pressed Stop and it stopped
+        - I pressed Stop and it kept running
+        - I pressed Stop and the app became unresponsive
+        - The 120s stream timeout fired but the run kept going
         - Not applicable to this mode
     validations:
       required: true
@@ -80,7 +81,7 @@ body:
     attributes:
       label: Relevant log output
       description: |
-        Reproduce with logging switched on and paste the lines around the failure. Set `LOG_LEVEL=debug` for everything, or a per-subsystem switch to `true` for just one area. The switches that exist in `src/main/utils/logger.ts` are `LOG_APP` (app, tray, shortcuts, platform, preferences), `LOG_WINDOW`, `LOG_IPC`, `LOG_CHAT`, `LOG_BROWSER`, `LOG_MCP`, `LOG_LANGCHAIN`, `LOG_GRAPH`, `LOG_SEARCH` (Everything CLI and document loader), `LOG_DESKTOP`, `LOG_DB`. The renderer has its own level, `VITE_LOG_LEVEL`.
+        Reproduce with logging switched on and paste the lines around the failure. Set `LOG_LEVEL=debug` for everything, or a per-subsystem switch to `true` for just one area. The switches that exist in `src/main/utils/logger.ts` are `LOG_APP` (app, tray, shortcuts, platform, preferences), `LOG_WINDOW`, `LOG_IPC`, `LOG_CHAT`, `LOG_BROWSER`, `LOG_MCP`, `LOG_LANGCHAIN`, `LOG_GRAPH`, `LOG_PI` (the desktop agent, its tools and its provider), `LOG_SEARCH` (Everything CLI and document loader), `LOG_DESKTOP`, `LOG_DB`. The renderer has its own level, `VITE_LOG_LEVEL`.
 
         ```
         set LOG_LEVEL=debug && set LOG_DESKTOP=true && npm run dev
@@ -89,8 +90,8 @@ body:
         Redact paths and window titles before posting.
       render: text
       placeholder: |
-        [12:04:31] [DesktopAgent] HITL interrupt for close_window
-        [12:04:33] [DesktopAgent] verifier score 0.21 — hard reject
+        [12:04:31] [PiDesktop] Starting desktop automation: "close the notepad window"
+        [12:04:33] [Pi] Verification for "close_window": score=0.21 hardReject=true
     validations:
       required: true
   - type: input

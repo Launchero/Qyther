@@ -16,9 +16,9 @@ Check what applies. An unchecked box needs a sentence saying why it does not.
 - [ ] I updated the nearest owning `AGENTS.md` after editing (Purpose, Ownership, Local Contracts, Work Guidance or Verification as applicable), and any parent whose Child DOX Index changed. Stale or contradicted text was deleted, not annotated.
 - [ ] **IPC**: if I added, renamed or removed a channel, all four sites are in step: the channel string in `src/preload/preload.ts`, the `ipcMain.handle` in `src/main/ipc/`, the renderer call site, and `src/renderer/types/electron.d.ts`. Validation added in main, not only in preload.
 - [ ] **IPC**: I did **not** extend `src/preload/types.d.ts` or `src/renderer/types.d.ts` (stale duplicates).
-- [ ] **Desktop tool**: if I added a tool, all six edits are present: factory in `src/main/services/desktop/desktop-tools.ts`, member of `DesktopToolName` (`src/main/services/desktop/types.ts:74-106`), `DANGER_POLICY` entry (`src/main/services/desktop/desktop-agent.ts:62-95`), push into the `DesktopAgent.initialize()` array (`desktop-agent.ts:136-170`), system-prompt guidance line (`desktop-agent.ts:251-300`), and a branch in `inferStatusFromTool` (`desktop-agent.ts:746-761`). Missing the last one makes the UI report "capturing" forever.
-- [ ] **Desktop tool**: if I added an action to an existing tool, the per-action `file_operations`-style danger override was updated too.
-- [ ] **Graph node**: if I added a node, it is registered in `NODE_AGENT_MAP` and in **both** `responseNodes` whitelists in `src/main/ipc/chat-handlers.ts`, and its reducer choice in `src/main/services/langgraph/state.ts` is deliberate.
+- [ ] **Desktop tool**: if I added a tool, all four edits are present: the `AgentTool` factory with its inline TypeBox `parameters` schema in `src/main/services/pi/toolbox.ts`, the name in the frozen list in `src/main/services/pi/toolbox.test.ts` (the one mechanical guard), a real `details.status` returned by `execute`, and a system-prompt guidance line in `src/main/services/pi/prompt.ts`. There is no `DANGER_POLICY` row and no `inferStatusFromTool` branch any more. Missing `details.status` makes the UI report "capturing" forever.
+- [ ] **Desktop tool**: if the tool should run the pixel verifier, it sets `details.verifies: true` (`close_window` is the only one that does today).
+- [ ] **Graph node**: if I added a node, I added exactly one row to `ASK_GRAPH_NODES` in `src/main/services/langgraph/node-registry.ts` with its label and whether it emits; `NODE_AGENT_MAP` and `RESPONSE_NODE_SET` are derived from that table and `research-agent-registry.test.ts` fails if the builder and the table disagree. The reducer choice in `src/main/services/langgraph/state.ts` is deliberate.
 - [ ] **Logger**: if I introduced a `createLogger('<Subsystem>')` name, it has a `SUBSYSTEM_ENV_VARS` entry in `src/main/utils/logger.ts:57-84`. Without one, its `info` and `debug` lines are dropped in production and no env switch can enable them.
 - [ ] **Styling**: no new hardcoded pixel values or colors. I ran the three drift greps and pasted the output below; `oklch(` inside `src/renderer/components/` is still empty and `@theme inline` still returns exactly one hit.
 
@@ -52,7 +52,7 @@ Before and after, both themes if the change is theme-sensitive.
 - [ ] Where this fixes a bug, I added a test that imports the production module and fails without the fix.
 - [ ] Where a surface is untested and I could not add a test, the manual steps above are the only coverage — and I said so below.
 
-Do not write that the suite covers this. `npm run test` collects two files that import no production code, so a green run is not evidence.
+Do not write that the suite covers this. `npm run test` collects 38 files / 305 tests, and three of them (`handlers.test.ts`, `ocr.test.ts`, `client-contract.test.ts`) import no production code, so a green run is not evidence. Two further limits worth knowing before you claim coverage: `src/main/lifecycle.test.ts` covers the quit-time teardown *policy*, not the `will-quit` wiring itself (`main.ts` cannot be imported under vitest because it pulls `electron` and `koffi` at module scope), and `useWindowTween.test.tsx` is wall-clock sensitive and will flake on a loaded machine — a solo re-run is the honest read.
 
 ## Dependencies
 

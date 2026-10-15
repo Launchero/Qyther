@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-commercial%20EULA-6b7280" alt="License: commercial EULA"></a>
 </p>
 
-Qyther is a Windows command palette — press `Alt+Space` anywhere, type, act. It started as a launcher and grew into something more interesting: a local host for an agent that can search your files, browse the web, write office documents, and **move the mouse and press keys on your actual desktop**, with a human approval gate in front of every action that can break something.
+Qyther is a Windows command palette — press `Alt+Space` anywhere, type, act. It started as a launcher and grew into something more interesting: a local host for an agent that can search your files, browse the web, write office documents, and **move the mouse and press keys on your actual desktop**, with no approval gate in front of any of it — every desktop tool runs without asking, by deliberate product decision.
 
 This repository is the whole system: the Electron host, the LangGraph agent runtime, 32 native Windows automation tools, and the design system the UI is built from. It is a work in progress, and the [known gaps](#what-qyther-does-not-do) section is as long as the feature list on purpose.
 
@@ -64,7 +64,7 @@ flowchart LR
     P["Sandboxed preload (CJS)<br/>contextIsolation · no nodeIntegration"]
     R["React renderer<br/>19 · Tailwind v4 tokens"]
     R -- "window.electronAPI" --> P
-    P -- "IPC: 60 handlers, 10 push channels" --> M
+    P -- "IPC: 59 handlers, 9 push channels" --> M
   end
   H["Global Alt+Space<br/>low-level keyboard hook (FFI)"]
   M --- H
@@ -72,7 +72,7 @@ flowchart LR
   CH["Chromium<br/>driven only through Playwright MCP"]
   ES["es.exe<br/>Everything CLI"]
   LLM["Any OpenAI-compatible endpoint"]
-  WEB["DuckDuckGo HTML · Tavily fallback"]
+  WEB["Search chain: Exa > Parallel > SearXNG > Marginalia<br/>> DuckDuckGo > Tavily / Brave &middot; page fetch: md sibling > reader"]
   OS["Win32 · UIA · OCR"]
   DB["userData<br/>sql.js trajectories · preferences.json"]
   M -- "stdio JSON-RPC" --> MCP
@@ -92,7 +92,7 @@ title: "AskGraph: one classifier, three capability subgraphs"
 ---
 flowchart TB
   S(["start"]) --> C["classify<br/>heuristics first, LLM router only if needed"]
-  C -- "desktop" --> D["desktopSubgraph<br/>7 nodes · 32 tools"]
+  C -- "desktop" --> D["desktopAgent<br/>Pi agent · 32 tools · no graph"]
   C -- "document" --> DOC["documentSubgraph<br/>9 nodes · docx/pptx/xlsx"]
   C -- "everything else" --> B["browserSubgraph<br/>8 nodes · plan→execute→verify→recover"]
   B --> PP["postProcess"]
@@ -107,7 +107,7 @@ Four compiled graphs, 29 nodes total. Three diagrams with named edges and a sour
 
 **A verifier, not just a generator.** After the desktop agent acts, the system checks its own work: it re-reads the UIA element it claims to have clicked, compares a screenshot and pixel diff, and runs OCR as a third signal (weighted 0.4 window / 0.4 pixel / 0.2 OCR). Below 0.3 it hard-rejects and hands the failure to a recovery ladder — retry, alternative, replan, skip, abort — which aborts after three attempts. Most agent demos skip this layer. It is the reason this one is slow on some tasks and honest on others.
 
-**Human-in-the-loop is a type, not a policy suggestion.** Every desktop tool declares a danger level in a `Record<ToolName, DangerLevel>`, so the TypeScript compiler refuses a new tool that has no classification. 29 are safe, 2 are reviewable (`drag`, `execute_command`), 1 is dangerous (`close_window`). Anything not `safe` raises a LangGraph `interrupt()` and waits for a click in the UI. A denial is written back into the conversation as both a tool result and a human message instructing the model not to retry — because models do retry.
+**No approval gate — tools run without asking.** There is no danger-level table any more, and no level that pauses for approval: there are no levels at all. Every one of the 32 tools runs without asking, by deliberate product decision. The only surviving opt-in is a `details.verifies` flag on a tool's own result, and exactly one tool sets it — `close_window` — which runs the automatic pixel verifier and feeds a failing verdict back to the model.
 
 **The graph streams, the UI doesn't poll.** Tokens travel over `chat:stream-chunk`, agent attribution over `chat:agent-change`, reasoning steps over `chat:thinking-step`, with one checkpoint thread per turn. That coupling is also the codebase's sharpest edge: a new node missing its entry in two whitelists streams nothing at all, silently. It is documented in the contract file for exactly that reason.
 
@@ -120,7 +120,7 @@ Four compiled graphs, 29 nodes total. Three diagrams with named edges and a sour
 | **Files** | Instant local file search | Windows `es.exe` (Everything) index, auto-downloaded on first run; falls back to an unavailable-state message |
 | **Ask** | Streaming chat with citations, thinking steps, generative-UI cards | Tables, comparisons, charts, form previews rendered from structured model output |
 | **Browser** | Multi-step web research and automation | Plan → execute → verify → recover over Playwright MCP; on-disk `SKILL.md` prompt material; trajectory memory |
-| **Desktop** | Real GUI automation on Windows | 32 tools over Win32 FFI, UIA COM and OCR; per-tool danger policy with HITL interrupts |
+| **Desktop** | Real GUI automation on Windows | 32 tools over Win32 FFI, UIA COM and OCR; per-tool danger classification feeding the automatic pixel verifier; no approval prompt |
 | **Documents** | Writes `.docx`, `.pptx`, `.xlsx` | `docx` / `pptxgenjs` / `xlsx`; output sandboxed to `~/Documents` with sanitised names; written bytes are re-parsed to verify |
 | **MCP** | Client for external tool servers | Servers come from `mcp-config.json`; tools are routed to intents by name prefix |
 | **Memory** | Learns across runs | `sql.js` trajectory, step and failure tables under `userData`; flushed to disk on every write |
@@ -128,9 +128,9 @@ Four compiled graphs, 29 nodes total. Three diagrams with named edges and a sour
 Counts are re-derived from source, not copied from a document:
 
 ```bash
-grep -cE "^export function create[A-Za-z]+Tool" src/main/services/desktop/desktop-tools.ts   # 32 desktop tools
-grep -rc "\.addNode(" src/main/services/{langgraph/research-agent,browser/browser-subgraph,desktop/desktop-subgraph,document/document-subgraph}.ts   # 5 + 8 + 7 + 9 = 29 nodes
-grep -rhoE "ipcMain\.handle\(\s*['\"][^'\"]+" src/main | sed -E "s/.*\(\s*['\"]//" | sort -u | wc -l   # 60 IPC channels
+npx vitest run src/main/services/pi/toolbox.test.ts   # 32 desktop tools, frozen
+grep -rc "\.addNode(" src/main/services/{langgraph/research-agent,browser/browser-subgraph,document/document-subgraph}.ts   # 5 + 8 + 9 = 22 nodes / 3 graphs (there is no desktop subgraph)
+grep -rhoE "ipcMain\.handle\(\s*['\"][^'\"]+" src/main | sed -E "s/.*\(\s*['\"]//" | sort -u | wc -l   # 59 IPC channels
 ```
 
 ---
@@ -144,7 +144,7 @@ That is the good part. Here is what is not finished, because a security section 
 - **`command:execute` is guarded in the wrong layer.** Its blocklist lives in the preload script, which is renderer-reachable, so a direct `ipcRenderer.invoke` bypasses it; the main-process handler runs `promisify(exec)` with no second check.
 - **`file:revealInFolder` has no validation anywhere.**
 - **Validation is asymmetric by channel** — some check in main, some only in preload. There are no shared validators; each handler validates inline.
-- **`execute_command` runs arbitrary text through PowerShell.** Its only guard is the reviewable HITL gate, so approving it is approving a shell.
+- **`execute_command` runs arbitrary text through PowerShell.** It has no allowlist and there is no confirmation prompt, so invoking it is invoking a shell.
 - **The agent's reach is your reach.** Everything the desktop and browser agents do happens as your Windows user, with your file access. MCP servers are child processes you configure — the filesystem server's allowed directories are yours to keep narrow.
 
 If you find something beyond this list, see [SECURITY.md](SECURITY.md).
@@ -173,7 +173,7 @@ Environment, in `.env` (see [`.env.example`](.env.example)):
 |---|---|
 | `API_KEY` · `BASE_URL` · `MODEL` | Model credentials and endpoint. Read at module load, so they must be set before first import. |
 | `FAST_MODEL` | Small model for classification and rewriting. |
-| `TAVILY_API_KEY` | Optional search provider; DuckDuckGo HTML is the default. |
+| `TAVILY_API_KEY`, `BRAVE_API_KEY`, `JINA_API_KEY` | Optional web-search providers and the remote page reader. Search needs none of them: two keyless search APIs are tried first, and `JINA_API_KEY` only raises rate limits on the fallback reader. |
 | `LOG_LEVEL`, `LOG_DESKTOP`, `LOG_BROWSER`, … | Per-subsystem logging. A subsystem not registered in `SUBSYSTEM_ENV_VARS` inherits the global level, which is `error` in production. |
 
 Package an installer with `npm run build:win` (unpacked dir: `npm run build:win:dir`).
@@ -192,10 +192,11 @@ Navigation · arrows, `Home`/`End`, `PageUp`/`PageDown`, `Enter`, `1`–`9`, and
 
 ```
 src/main/          Electron host: boot, window, tray, keyboard hook, preferences, logging
-  ipc/             60 IPC handlers + the preload bridge (one contract, two trees)
+  ipc/             59 IPC handlers + the preload bridge (one contract, two trees)
   services/
     langgraph/     the AskGraph: nodes, state reducers, in-graph tools
-    desktop/       32 Windows automation tools, danger policy, verifiers, recovery
+    pi/            the desktop agent: one Pi Agent loop, 32 TypeBox tools, event bridge
+    desktop/       the native substrate Pi drives: Win32 FFI, UIA COM, OCR, capture, pixel verifier
     browser/       Playwright-MCP subgraph, skills, memory, session lifecycle
     document/      docx/pptx/xlsx generation and verification
     mcp/           MCP client and tool routing
@@ -222,7 +223,7 @@ npm run test         # vitest run
 npm run build        # electron-vite build
 ```
 
-Current state, measured rather than asserted: typecheck passes with 0 errors; lint reports 0 errors and 81 warnings; the test run is green with 65 tests across 2 files — **and neither file imports production code**, so treat that green as weak evidence. The desktop subtree, both agent loops, the graph, the streaming contract and the database layer have no automated coverage. [Contributions that add real tests](CONTRIBUTING.md) are the most useful thing you can do here.
+Current state, measured rather than asserted: typecheck passes with 0 errors; lint reports 0 errors and 44 warnings; the test run is green with 305 tests across 38 files, 35 of which import production code — but the IPC surface is still only partly covered (see CONTRIBUTING for the caveats). The 32 desktop tools, the Pi agent's cancellation path, the window singleton, the graph-node registry, the quit-time teardown and the database layer all have automated coverage now; the browser subtree, the token-stream pump and the desktop agent loop itself do not. [Contributions that add real tests](CONTRIBUTING.md) are the most useful thing you can do here.
 
 The UI captures are reproducible: start `npm run dev`, then `node scripts/capture-ui.mjs`.
 

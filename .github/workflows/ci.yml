@@ -10,9 +10,12 @@
 #
 # Failures are deliberately not masked: there is no `continue-on-error` and no
 # `|| true` anywhere in this file. A green run here means the gates actually
-# passed. Note also that `npm run test` collects only two test files, neither of
-# which imports production code, so a passing test step is weak evidence — see
-# CONTRIBUTING.md.
+# passed. `npm run test` collects 37 test files / 297 tests, and 34 of them
+# import production code — but nothing constructs the Pi desktop agent, runs a
+# real agent loop, or touches real Win32, and no test imports any
+# `services/browser` module. A passing test step is still weak evidence for the
+# runtime; the live gate is `npm run dev` plus `npm run harness:selftest` —
+# see CONTRIBUTING.md and the root AGENTS.md "Live Verification" section.
 
 name: CI checks
 

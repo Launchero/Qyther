@@ -16,9 +16,9 @@ body:
       label: The user-facing problem
       description: Describe what you cannot do today, and the cost of not being able to do it. Do this before proposing a solution; a good problem statement may be solved a better way.
       placeholder: |
-        When I ask the desktop agent to rename a batch of files, it must click through File
-        Explorer one file at a time, and every rename raises a confirmation. I give up and do
-        it by hand.
+        When I ask the desktop agent to rename a batch of files, it has to click through File
+        Explorer one file at a time, and the shell keeps throwing a confirmation at it. I give
+        up and do it by hand.
     validations:
       required: true
   - type: dropdown
@@ -55,11 +55,11 @@ body:
     id: surface
     attributes:
       label: Does this need new native or Win32 surface
-      description: Check all that apply. New Win32 reach means new coupled edits (`DesktopAdapter`, its implementation in `src/main/services/desktop/input-simulation.ts`, a tool, a danger-policy entry) and it is the highest-maintenance kind of change in this repository.
+      description: Check all that apply. New Win32 reach means new coupled edits (`DesktopAdapter`, its implementation in `src/main/services/desktop/input-simulation.ts`, and a tool in `src/main/services/pi/toolbox.ts` plus its frozen-list entry and system-prompt line) and it is the highest-maintenance kind of change in this repository.
       options:
         - label: It needs a new Win32, UIA or FFI call that no current tool exposes.
           required: false
-        - label: It needs a new LLM-callable desktop tool (that is six coupled edits, see src/main/services/desktop/AGENTS.md).
+        - label: It needs a new LLM-callable desktop tool (four coupled edits, see CONTRIBUTING.md and src/main/services/pi/AGENTS.md).
           required: false
         - label: It needs a new IPC channel (that is four hand-synced sites, see src/main/ipc/AGENTS.md).
           required: false
@@ -73,7 +73,7 @@ body:
     id: risk
     attributes:
       label: Risk and reversibility, if you can judge it
-      description: Does the request widen what the agent can do to the machine, or change what leaves the machine to a model endpoint? If so, say how it should be gated (safe, reviewable, dangerous) and whether it needs its own confirmation.
+      description: Does the request widen what the agent can do to the machine, or change what leaves the machine to a model endpoint? There is no danger-level table and no approval gate any more — every tool runs without asking — so say plainly what new capability this adds and how a user would notice it going wrong.
     validations:
       required: false
   - type: checkboxes

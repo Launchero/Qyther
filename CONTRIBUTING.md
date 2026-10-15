@@ -29,7 +29,7 @@ Qyther is Windows-only. Packaging targets are Windows NSIS x64 only; there is no
 1. Install Node. Node 22 or newer is recommended; the maintainer develops on Node 24. There is no `engines` field in `package.json` yet, so no version range is formally supported.
 2. `npm install`
 3. Rebuild the native dependencies: `npx electron-rebuild`. Three native modules must stay in the build externals list in `electron.vite.config.ts`: `koffi`, `libwin32` and `node-winautomation`.
-4. Copy `.env.example` to `.env` and fill in the required values: `API_KEY`, `BASE_URL` and `MODEL`. Optional: `FAST_MODEL` and `TAVILY_API_KEY`. These are the only names the code reads — there is no `OPENAI_API_KEY` support and no `LLM_*` support. `BASE_URL` can point at any OpenAI-compatible endpoint; the model layer is `@langchain/openai`.
+4. Copy `.env.example` to `.env` and fill in the required values: `API_KEY`, `BASE_URL` and `MODEL`. Optional: `FAST_MODEL`, and `TAVILY_API_KEY` / `BRAVE_API_KEY` / `JINA_API_KEY` for web search and the remote page reader. These are the only names the code reads — there is no `OPENAI_API_KEY` support and no `LLM_*` support. `BASE_URL` can point at any OpenAI-compatible endpoint; the model layer is `@langchain/openai`.
 5. Optional, for browser automation: `npm run install-playwright` (installs Chromium for the Playwright MCP server).
 6. File search needs the Everything CLI (`es.exe`). `src/main/utils/esDownloader.ts` will locate or download it on Windows.
 
@@ -64,22 +64,20 @@ A channel is only alive when all four exist:
 3. the call site in the renderer (`window.electronAPI.…`)
 4. the type at `src/renderer/types/electron.d.ts`
 
-Site 4 is not a second declaration: `electron.d.ts` imports `ElectronAPI` from `src/preload/preload.ts`, which is `export type ElectronAPI = typeof electronAPI` (`preload.ts:419`). You normally change nothing there. Never add a channel type to `src/preload/types.d.ts` or `src/renderer/types.d.ts` — both are stale hand-maintained duplicates and extending one is the most common way to desync the bridge.
+Site 4 is not a second declaration: `electron.d.ts` imports `ElectronAPI` from `src/preload/preload.ts`, which is `export type ElectronAPI = typeof electronAPI` (`preload.ts:416`). You normally change nothing there. Never add a channel type to `src/preload/types.d.ts` or `src/renderer/types.d.ts` — both are stale hand-maintained duplicates and extending one is the most common way to desync the bridge.
 
 Channel names follow `namespace:camelCaseVerb`. The existing namespaces are `app`, `window`, `command`, `url`, `file`, `apps`, `dialog`, `debug`, `chat`, `mcp`, `browser`, `api-config`. The two three-segment exceptions (`file:everything:status`, `desktop:screenshot:capture`) are existing debt; do not add new ones casually. Validate in main, not only in preload — main is the only boundary the sandbox actually guarantees. `src/main/ipc/AGENTS.md` has the per-channel validation table and the current drift list.
 
-### Adding one desktop tool is six coupled edits
+### Adding one desktop tool is four coupled edits
 
-The Windows automation registry has 32 tools. Adding a 33rd requires all six edits:
+The Windows automation registry has 32 tools, all TypeBox `AgentTool`s in `src/main/services/pi/toolbox.ts` (they were zod `tool()` factories in the now-deleted `desktop/desktop-tools.ts` until the Pi cutover). Adding a 33rd requires all four edits:
 
-1. `create<X>Tool` factory in `src/main/services/desktop/desktop-tools.ts`
-2. the tool name as a member of `DesktopToolName` (`src/main/services/desktop/types.ts:74-106`)
-3. a `DANGER_POLICY` entry (`src/main/services/desktop/desktop-agent.ts:62-95`) — this is the one step the compiler enforces, because the record is typed exhaustively
-4. push the factory call into the array built in `DesktopAgent.initialize()` (`desktop-agent.ts:136-170`); `bindTools` only sees that array
-5. a guidance line in the system prompt (`desktop-agent.ts:251-300`), or the model will not prefer the tool over a screenshot
-6. a branch in `inferStatusFromTool` (`desktop-agent.ts:746-761`) — miss this one and the UI reports "capturing" for that tool forever, with no error
+1. the `AgentTool` factory in `src/main/services/pi/toolbox.ts`, with its TypeBox `parameters` schema inline — that schema is the single source of truth for the `execute` signature, so never hand-duplicate a params type beside it
+2. the name added to the frozen list in `src/main/services/pi/toolbox.test.ts` — the suite fails on a mismatch, which is the one step the compiler-equivalent enforces
+3. a `details.status` on the result, chosen from `PiToolStatus`, so the renderer does not report "capturing" for that tool forever; plus `details.verifies: true` **only** if the tool should run the pixel verifier (`close_window` is the only one that does today)
+4. a guidance line in the system prompt (`src/main/services/pi/prompt.ts`), or the model will not prefer the tool over a screenshot
 
-Danger levels are `safe`, `reviewable` and `dangerous`; anything not in the map defaults to `reviewable`, and every level that is not `safe` raises a human-in-the-loop interrupt. `file_operations` overrides its own level per action (`desktop-agent.ts:421-430`) — if you add an action to that tool's enum, update the override in the same change or the new action silently becomes `safe`.
+There is **no** `DANGER_POLICY` row and **no** `inferStatusFromTool` branch any more — both died with `desktop-agent.ts`, and neither is replaced. Nothing pauses for approval: that gate was removed by decision, so every tool runs without asking. `details.verifies` is the only surviving opt-in, and it feeds one automatic pixel check.
 
 ## Styling law
 
@@ -110,12 +108,15 @@ The CI workflow enforces the second and third of these.
 
 Be careful reading the test situation correctly, because the honest answer is uncomfortable.
 
-`npm run test` runs `vitest run` with `include: ['src/**/*.test.{ts,tsx}']` (`vitest.config.ts:9`). That collects exactly two files:
+`npm run test` runs `vitest run` with `include: ['src/**/*.test.{ts,tsx}']` (`vitest.config.ts:8`). That collects 38 files / 305 tests (measured 2026-10-15). 35 of them import production code; three do not:
 
-- `src/main/ipc/handlers.test.ts`
-- `src/main/services/langgraph/research-agent.test.ts`
+- `src/main/ipc/handlers.test.ts` re-declares its own `validateUrl`/`validatePath`/`isCommandSafe`.
+- `src/main/services/desktop/ocr.test.ts` re-implements its subject against `pngjs`.
+- `src/main/services/mcp/client-contract.test.ts` imports only the MCP adapter library (it drives the repo's own stdio MCP server, so it is a dependency-behaviour contract, not coverage of this repo).
 
-Neither imports production code. Each re-declares its own local copies of the functions it exercises, so a green run proves very little about the shipped app. There are no renderer tests, no component tests, and no coverage of the agent graphs, the 32 desktop tools, the streaming contract, the HITL interrupt path, or the database layer.
+A green run therefore under-proves the handler surface. The 32 desktop tools (`pi/toolbox.test.ts`), the Pi event bridge (`pi/events.test.ts`), the Pi cancellation path (`pi/cancel.test.ts`), the window singleton, the graph-node registry and the quit-time teardown policy (`src/main/lifecycle.test.ts`) all do have real gates. Still uncovered: the `will-quit` wiring in `main.ts` itself (it imports `electron` and `koffi` at module scope, so it cannot be imported under vitest — which is why the teardown *policy* was split into an Electron-free module to be testable at all), the graph node bodies, the token-stream pump, the desktop agent loop itself, and the browser subtree. `npm run harness:selftest` is the only gate that exercises the shipped window.
+
+One test is known to flake under machine load: `useWindowTween.test.tsx` awaits real `setTimeout` and asserts a count of real jsdom rAF callbacks inside 100 ms, so a busy CPU can starve it. It has passed in isolation every time it has failed in a full run. Do not loosen its assertion to make it quiet — that bound is what distinguishes a working frame pump from a broken one.
 
 What this means for you:
 
