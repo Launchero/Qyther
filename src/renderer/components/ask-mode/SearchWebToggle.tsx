@@ -1,5 +1,6 @@
 import React from 'react';
 import { GlobeIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface SearchWebToggleProps {
@@ -10,15 +11,18 @@ interface SearchWebToggleProps {
 
 export function SearchWebToggle({ enabled, onToggle, className }: SearchWebToggleProps) {
   return (
-    <button
-      className={cn('search-web-toggle', enabled && 'active', className)}
+    <Button
+      type="button"
+      variant={enabled ? 'default' : 'outline'}
+      size="xs"
+      className={cn('search-web-toggle', className)}
       onClick={onToggle}
       aria-label={enabled ? 'Disable web search' : 'Enable web search'}
       aria-pressed={enabled}
       title="Search web for answers"
     >
-      <GlobeIcon weight="regular" />
+      <GlobeIcon weight="regular" aria-hidden="true" />
       Search web
-    </button>
+    </Button>
   );
 }

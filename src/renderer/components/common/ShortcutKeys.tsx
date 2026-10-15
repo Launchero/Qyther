@@ -16,8 +16,10 @@ export function ShortcutKey({ label, modifier = false, alt = false, className }:
     <kbd
       className={cn(
         'flex items-center justify-center',
-        'w-[var(--shortcut-key-width)] h-8',
-        'bg-background border border-border rounded-[var(--radius-xs)]',
+        'min-w-[var(--shortcut-key-width)] w-auto px-2 h-8 whitespace-nowrap',
+        // --radius-shortcut-key (radius.css:35) is this chip's own token; --radius-xs was a
+        // 4px stand-in for it.
+        'bg-background border border-border rounded-[var(--radius-shortcut-key)]',
         'text-xs font-mono font-medium',
         'text-muted-foreground',
         'shadow-[var(--shadow-shortcut-key)]',
@@ -56,7 +58,7 @@ export function ShortcutCombo({ keys, className }: ShortcutComboProps) {
               className={cn(
                 'flex items-center justify-center',
                 'min-w-[var(--shortcut-key-min-width)] h-8 px-2.5',
-                'bg-background border border-border rounded-[var(--radius-xs)]',
+                'bg-background border border-border rounded-[var(--radius-shortcut-key)]',
                 'text-xs font-mono font-medium',
                 'text-muted-foreground',
                 'shadow-[var(--shadow-shortcut-key)]'

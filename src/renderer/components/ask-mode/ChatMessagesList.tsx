@@ -1,12 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { PlusIcon } from '@phosphor-icons/react';
 import autoAnimate from '@formkit/auto-animate';
+import { Button } from '@/components/ui/button';
+import { motionDurationMs, motionEasing, prefersReducedMotion } from '../../utils/motion';
 import { ChatMessageBubble, ChatMessage } from '../ChatMessageBubble';
 import { ChatErrorBanner } from './ChatErrorBanner';
 import { ChatWelcomeState } from './ChatWelcomeState';
-import { DesktopConfirmationDialog } from './DesktopConfirmationDialog';
 import { AgentIndicator } from './AgentIndicator';
 import type { InlineChatSession } from './RecentChatsInline';
+
+/** Streaming keeps the transcript pinned only while it sits this near the bottom (CSS px). */
+const BOTTOM_STICK_PX = 120;
 
 interface ChatMessagesListProps {
   messages: ChatMessage[];
@@ -15,15 +19,12 @@ interface ChatMessagesListProps {
   browserModeEnabled: boolean;
   desktopModeEnabled?: boolean;
   activeAgent?: { label: string } | null;
-  desktopConfirmation?: { threadId: string; action: string; description: string; planActions: Array<{ type: string; description: string; success: boolean; result?: string }> } | null;
-  onConfirmDesktopAction?: (confirmed: boolean) => void;
   onSendExample: (query: string) => void;
   onEnableBrowserMode?: () => void;
   onCopy?: (content: string) => void;
   onExplain?: (content: string) => void;
   onShowCode?: (content: string) => void;
   onRegenerate?: () => void;
-  onRelatedQuestion?: (question: string) => void;
   recentSessions?: InlineChatSession[];
   onSelectSession?: (sessionId: string) => void;
   onNewChat?: () => void;
@@ -41,15 +42,12 @@ export function ChatMessagesList({
   browserModeEnabled,
   desktopModeEnabled: _desktopModeEnabled = false,
   activeAgent = null,
-  desktopConfirmation = null,
-  onConfirmDesktopAction = () => {},
   onSendExample,
   onEnableBrowserMode,
   onCopy,
   onExplain,
   onShowCode,
   onRegenerate,
-  onRelatedQuestion,
   recentSessions,
   onSelectSession,
   onNewChat,
@@ -61,18 +59,43 @@ export function ChatMessagesList({
 }: ChatMessagesListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const pinnedToBottomRef = useRef(true);
+
+  const handleAreaScroll = useCallback(() => {
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    pinnedToBottomRef.current =
+      area.scrollHeight - area.scrollTop - area.clientHeight < BOTTOM_STICK_PX;
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const last = messages[messages.length - 1];
+    // A question the user just asked is always worth scrolling to, even if they had
+    // been reading further up; a streamed answer is not.
+    if (last?.role === 'user') pinnedToBottomRef.current = true;
+    if (!pinnedToBottomRef.current) return;
+    // `smooth` only for a jump the user caused. A streamed answer re-commits every animation
+    // frame, and each commit would restart a ~300 ms scroll toward a bottom that has already
+    // moved again — the transcript swims and the browser fights itself. Tracking live output is
+    // an instant job; the same reduced-motion rule applies on top of that, not instead of it.
+    const instant = prefersReducedMotion() || last?.isStreaming === true;
+    messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'instant' : 'smooth' });
   }, [messages]);
 
   useEffect(() => {
-    if (messagesAreaRef.current) {
-      autoAnimate(messagesAreaRef.current, {
-        duration: 200,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-      });
-    }
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    // Duration and easing come from the same tokens the stylesheet composes from, so the
+    // transcript tweens on the design scale instead of on JS literals that can drift.
+    // The controller must be destroyed: this host is re-created on every Ask-mode entry and
+    // StrictMode mounts it twice, and a dropped controller leaves its MutationObserver,
+    // ResizeObserver and pending timers running against the same element.
+    const controller = autoAnimate(area, {
+      duration: motionDurationMs('--duration-200', 200),
+      easing: motionEasing('--easing-smooth', 'ease-in-out'),
+    });
+    // auto-animate 0.10 disables `prefers-reduced-motion` itself, so no media query here.
+    return () => controller.destroy?.();
   }, []);
 
   return (
@@ -94,22 +117,32 @@ export function ChatMessagesList({
           {/* Chat header with New Chat button - visible when in active conversation */}
           {messages.length > 0 && onNewChat && (
             <div className="messages-header">
-              <button
-                className="messages-new-chat-btn"
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                // The BEM rule paints the primary tint at rest; these utilities restore the
+                // mockup's fill-on-hover, which `ghost`'s muted hover would otherwise replace.
+                className="messages-new-chat-btn hover:bg-primary hover:text-primary-foreground"
                 onClick={onNewChat}
-                aria-label="Start new chat"
-                title="Start a new conversation"
+                aria-label="Start new chat (Ctrl+Shift+N)"
+                title="Start a new conversation (Ctrl+Shift+N)"
               >
-                <PlusIcon className="w-4 h-4" weight="bold" />
+                <PlusIcon className="w-4 h-4" weight="bold" aria-hidden="true" />
                 <span>New Chat</span>
-              </button>
+              </Button>
             </div>
           )}
+          {/* A polite live region fed every token floods a screen reader, so the
+              transcript goes silent while any turn streams and announces once
+              at completion. A new turn re-arms the announcement by flipping
+              back to polite. */}
           <div
             ref={messagesAreaRef}
             className="messages-area"
+            onScroll={handleAreaScroll}
             role="log"
-            aria-live="polite"
+            aria-live={messages.some((m) => m.isStreaming) ? 'off' : 'polite'}
             aria-relevant="additions"
             aria-label="Chat messages"
           >
@@ -121,21 +154,9 @@ export function ChatMessagesList({
                 onExplain={onExplain}
                 onShowCode={onShowCode}
                 onRegenerate={onRegenerate}
-                onRelatedQuestion={onRelatedQuestion}
                 onFormSubmit={onFormSubmit}
               />
             ))}
-            {/* Desktop Confirmation Dialog */}
-            {desktopConfirmation && (
-              <div className="desktop-confirmation-container mx-[var(--spacing-6)] my-[var(--spacing-2)]" role="alert" aria-live="assertive">
-                <DesktopConfirmationDialog
-                  action={desktopConfirmation.action}
-                  description={desktopConfirmation.description}
-                  onConfirm={() => onConfirmDesktopAction(true)}
-                  onDeny={() => onConfirmDesktopAction(false)}
-                />
-              </div>
-            )}
             {isLoading && activeAgent && (
               <AgentIndicator agent={activeAgent} isStreaming className="mx-[var(--spacing-6)] mb-[var(--spacing-2)] self-start" />
             )}
@@ -147,7 +168,7 @@ export function ChatMessagesList({
               </div>
             )}
             {error && (
-              <div className="answer self-start max-w-[100%]" role="alert" aria-live="assertive">
+              <div className="answer self-start max-w-full" role="alert" aria-live="assertive">
                 <ChatErrorBanner
                   error={error}
                   onRetry={onRetry}

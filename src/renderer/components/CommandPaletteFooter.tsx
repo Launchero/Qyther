@@ -42,7 +42,8 @@ export function CommandPaletteFooter({
         ref={footerRef}
         {...hoverHandlers}
         className={cn(
-          'flex items-center justify-between px-4 py-2.5',
+          // Row rhythm: --padding-block-section is the footer's rung, px-4 is the surface gutter.
+          'flex items-center justify-between px-4 py-[var(--padding-block-section)]',
           'bg-muted border-t border-border',
           'rounded-b-[var(--radius-command-palette)]',
           'min-h-[var(--container-input-height)]'
@@ -55,15 +56,17 @@ export function CommandPaletteFooter({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[var(--gap-inline)]">
           <Button
             variant="ghost"
-            size="icon"
-            className="h-7 w-7"
+            // The icon variant owns the box; --target-min (32px) is the floor, so the
+            // size never gets restated as an h-/w- override against the primitive here.
+            size="icon-lg"
             onClick={handleToggleShortcuts}
             title="Keyboard shortcuts"
+            aria-label="Keyboard shortcuts"
           >
-            <Question className="h-4 w-4" />
+            <Question className="h-4 w-4" aria-hidden="true" />
           </Button>
           <ThemeToggle />
         </div>

@@ -10,8 +10,8 @@ interface FooterTipsProps {
 
 export function FooterTips({ tip, isPaused, className }: FooterTipsProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <Lightbulb className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+    <div className={cn('flex items-center gap-[var(--gap-inline)]', className)}>
+      <Lightbulb className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
 
       <span
         className={cn(

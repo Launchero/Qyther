@@ -4,7 +4,8 @@ import { MCPServerCard } from './MCPServerCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { getOSDisplayNamesSync } from '@/utils/shortcuts';
+import { ShortcutKey } from '@/components/common/ShortcutKeys';
+import { logError } from '../utils/debugLogger';
 
 interface MCPServer {
   name: string;
@@ -18,20 +19,37 @@ export function MCPToolModal({ onClose }: { onClose: () => void }) {
   const { isLoading } = useMCP();
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
 
-  // Focus search input on mount
   useEffect(() => {
-    inputRef.current?.focus();
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
+  // No imperative focus effect here: Radix owns `open`'s initial focus and lands it on the
+  // first focusable child, which is the search Input below. The old mount effect raced that
+  // behaviour and is the reason the caret could not reach the dialog body.
+
   const loadServers = async () => {
-    const result = await window.electronAPI.mcp.getServers();
-    setServers(result);
+    try {
+      const result = await window.electronAPI.mcp.getServers();
+      if (isMountedRef.current) {
+        setServers(result);
+      }
+    } catch (error) {
+      logError('[MCPToolModal] mcp:getServers rejected:', error);
+    }
   };
 
   const handleToggleServer = async (serverName: string, enabled: boolean) => {
-    await window.electronAPI.mcp.toggleServer(serverName, enabled);
+    try {
+      await window.electronAPI.mcp.toggleServer(serverName, enabled);
+    } catch (error) {
+      logError(`[MCPToolModal] mcp:toggleServer rejected for "${serverName}":`, error);
+      return;
+    }
     await loadServers();
   };
 
@@ -46,14 +64,13 @@ export function MCPToolModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md max-h-[80vh]">
+      <DialogContent className="max-w-md max-h-[calc(100vh_-_var(--spacing-16))]">
         <DialogHeader>
           <DialogTitle>MCP Servers</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <Input
-            ref={inputRef}
             type="text"
             placeholder="Search servers..."
             value={searchQuery}
@@ -83,9 +100,10 @@ export function MCPToolModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-2">
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">{getOSDisplayNamesSync().modifierLabel}</kbd>
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">T</kbd>
+            <div className="flex items-center gap-[var(--gap-inline)]">
+              {/* The shared kbd primitive owns the chip shape and the OS modifier name. */}
+              <ShortcutKey modifier />
+              <ShortcutKey label="T" />
               <span>Close</span>
             </div>
             <Badge variant="outline" className="text-xs">

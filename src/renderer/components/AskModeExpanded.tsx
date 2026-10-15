@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
-import { useChatSession, type ChatSession } from '../hooks/useChatSession';
+import { useChatSession } from '../hooks/useChatSession';
 import { MCPToolModal } from './MCPToolModal';
 import { useMCPKeyboardShortcuts } from '../hooks/useMCPKeyboardShortcuts';
+import { Button } from '@/components/ui/button';
 import { ToastProvider } from '../contexts/ToastContext';
 import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
@@ -28,6 +29,7 @@ export interface AskModeExpandedProps {
   onAddFile?: (file: AttachedFile) => void;
   recentSearchResults?: Array<{ title: string; type: string }>;
   mcpCount?: number;
+  onExitAskMode?: () => void;
   registerInput?: (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
 }
 
@@ -45,6 +47,7 @@ export function AskModeExpanded({
   onAddFile,
   recentSearchResults = [],
   mcpCount = 0,
+  onExitAskMode,
   registerInput,
 }: AskModeExpandedProps) {
   const {
@@ -52,18 +55,19 @@ export function AskModeExpanded({
     isLoading,
     error,
     isReady,
+    isInitializing,
+    notReady,
+    initializeChat,
     sendMessage,
     submitForm,
     createNewSession,
     loadSession,
-    listSessions,
-    desktopConfirmation,
-    confirmDesktopAction,
+    sessions,
+    cancelTurn,
   } = useChatSession();
 
   const [showMCPModal, setShowMCPModal] = useState(false);
   const [welcomeState, setWelcomeState] = useState(true);
-  const [historyItems, setHistoryItems] = useState<ChatSession[]>([]);
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
@@ -77,6 +81,10 @@ export function AskModeExpanded({
 
   // Desktop automation state with useReducer
   const [desktopState, desktopDispatch] = useReducer(desktopReducer, initialDesktopState);
+
+  const handleStopTurn = useCallback(() => {
+    void cancelTurn();
+  }, [cancelTurn]);
 
   // Browser automation event listeners
   useEffect(() => {
@@ -102,7 +110,7 @@ export function AskModeExpanded({
   // Desktop automation event listeners
   useEffect(() => {
     // Note: desktop events come through the chat session stream, not separate IPC
-    // The progress is emitted by the DesktopAgent and forwarded via chat:thinking-step
+    // The progress is emitted by the Pi desktop agent and forwarded via chat:thinking-step
     // We handle desktop progress through the existing chat streaming mechanism
 
     return () => {
@@ -112,14 +120,19 @@ export function AskModeExpanded({
 
   // Poll browser session status
   useEffect(() => {
+    let inFlight = false;
     const pollStatus = async () => {
+      if (inFlight) return;
       if (browserState.enabled) {
+        inFlight = true;
         try {
           const status = await window.electronAPI.browser.getSessionStatus();
           dispatch({ type: 'SET_SESSION_URL', url: status.url || null });
           dispatch({ type: 'SET_SESSION_ACTIVE', active: status.active });
         } catch (error) {
           logError('[AskModeExpanded] Error polling status:', error);
+        } finally {
+          inFlight = false;
         }
       }
     };
@@ -156,33 +169,55 @@ export function AskModeExpanded({
         e.preventDefault();
         handleToggleDesktopMode();
       }
+      // Ctrl/Cmd+Shift+N: new chat session
+      if (metaOrCtrl && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        handleNewChat();
+      }
+      // Ctrl/Cmd+Shift+C: copy last AI message to clipboard
+      if (metaOrCtrl && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        const lastAiMessage = messages.filter(m => m.role === 'assistant').pop();
+        if (lastAiMessage) {
+          handleCopy(lastAiMessage.content);
+        }
+      }
+      // Ctrl/Cmd+Shift+R: regenerate response
+      if (metaOrCtrl && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        handleRegenerate();
+      }
+      // Ctrl/Cmd+Shift+S: stop the current response (works while typing)
+      if (metaOrCtrl && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        handleStopTurn();
+      }
+      // ArrowUp on empty ask input: edit last user message. Textarea-only so
+      // result-list navigation and modal inputs never populate the ask box.
+      if (e.key === 'ArrowUp' && !e.shiftKey && !metaOrCtrl && !e.altKey) {
+        if (e.target instanceof HTMLTextAreaElement && searchQuery.trim().length === 0) {
+          const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+          if (lastUserMessage) {
+            e.preventDefault();
+            onSearchChange(lastUserMessage.content);
+          }
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browserState.enabled, browserState.sessionActive, desktopState.enabled, desktopState.sessionActive]);
-
-  const loadHistory = useCallback(async () => {
-    try {
-      const sessions = await listSessions();
-      setHistoryItems(sessions.slice(0, 10));
-    } catch (err) {
-      logError('[AskModeExpanded] Failed to load history:', err);
-    }
-  }, [listSessions]);
-
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+  }, [browserState.enabled, browserState.sessionActive, desktopState.enabled, desktopState.sessionActive, handleStopTurn, messages, searchQuery]);
 
   const handleNewChat = useCallback(async () => {
     onClearAttachments?.();
     await createNewSession();
     setWelcomeState(true);
     setHasSentMessage(false);
-    loadHistory(); // Refresh list after creating a new session
-  }, [createNewSession, onClearAttachments, loadHistory]);
+    // No list refresh: main publishes the list whenever it can change, and a brand-new session has
+    // no messages yet, so it is not in the visible list until the first message lands.
+  }, [createNewSession, onClearAttachments]);
 
   // Keep a ref to the latest searchQuery so the registered callback always has current value
   const searchQueryRef = useRef(searchQuery);
@@ -237,8 +272,7 @@ export function AskModeExpanded({
   const handleSelectHistory = useCallback(async (sessionIdToLoad: string) => {
     await loadSession(sessionIdToLoad);
     setWelcomeState(false);
-    loadHistory(); // Refresh list after switching sessions
-  }, [loadSession, loadHistory]);
+  }, [loadSession]);
 
   const handleCopy = useCallback(async (content: string) => {
     try {
@@ -250,11 +284,11 @@ export function AskModeExpanded({
   }, []);
 
   const handleExplain = useCallback((content: string) => {
-    handleSendMessage(`Please explain this in simpler terms: ${content.slice(0, 200)}`);
+    handleSendMessage(`Please explain this in simpler terms: ${content}`);
   }, [handleSendMessage]);
 
   const handleShowCode = useCallback((content: string) => {
-    handleSendMessage(`Please show me code examples related to: ${content.slice(0, 200)}`);
+    handleSendMessage(`Please show me code examples related to: ${content}`);
   }, [handleSendMessage]);
 
   const handleRegenerate = useCallback(() => {
@@ -263,10 +297,6 @@ export function AskModeExpanded({
       handleSendMessage(lastUserMessage.content);
     }
   }, [messages, handleSendMessage]);
-
-  const handleRelatedQuestion = useCallback((question: string) => {
-    handleSendMessage(question);
-  }, [handleSendMessage]);
 
   const handleToggleBrowserMode = useCallback(async () => {
     const newEnabled = !browserState.enabled;
@@ -295,40 +325,12 @@ export function AskModeExpanded({
     }
   }, []);
 
-  const handlePauseBrowser = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_PAUSED', paused: true });
-      logInfo('[AskModeExpanded] Browser automation paused');
-    } catch (error) {
-      logError('[AskModeExpanded] Failed to pause browser:', error);
-    }
-  }, []);
-
-  const handleResumeBrowser = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_PAUSED', paused: false });
-      logInfo('[AskModeExpanded] Browser automation resumed');
-    } catch (error) {
-      logError('[AskModeExpanded] Failed to resume browser:', error);
-    }
-  }, []);
-
   // Desktop mode handlers
   const handleToggleDesktopMode = useCallback(async () => {
     const newEnabled = !desktopState.enabled;
     desktopDispatch({ type: 'TOGGLE_MODE', enabled: newEnabled });
     logInfo('[AskModeExpanded] Desktop mode toggled:', newEnabled ? 'enabled' : 'disabled');
   }, [desktopState.enabled]);
-
-  const handlePauseDesktop = useCallback(() => {
-    desktopDispatch({ type: 'SET_PAUSED', paused: true });
-    logInfo('[AskModeExpanded] Desktop automation paused');
-  }, []);
-
-  const handleResumeDesktop = useCallback(() => {
-    desktopDispatch({ type: 'SET_PAUSED', paused: false });
-    logInfo('[AskModeExpanded] Desktop automation resumed');
-  }, []);
 
   // Desktop elapsed time timer
   useEffect(() => {
@@ -342,6 +344,7 @@ export function AskModeExpanded({
 
   // MCP keyboard shortcuts
   useMCPKeyboardShortcuts({
+    onToggleMCP: () => setShowMCPModal((prev) => !prev),
     onOpenMCPModal: () => setShowMCPModal(true),
     closeModal: () => setShowMCPModal(false),
     isModalOpen: showMCPModal,
@@ -351,18 +354,59 @@ export function AskModeExpanded({
   // The UnifiedCommandBar handles sending via Enter key - no auto-send needed here
   // Auto-send during typing causes race conditions with isLoading state
 
-  // Map history to inline sessions
-  const recentSessions: InlineChatSession[] = historyItems.map(item => ({
+  // The list main pushed; capped where the UI wanted ten, not where the transport decided.
+  const recentSessions: InlineChatSession[] = sessions.slice(0, 10).map(item => ({
     id: item.id,
     title: item.title,
   }));
 
+  // The live agent pill reads the same folded truth the finished turns show:
+  // the agent label main attributed to the currently streaming message.
+  // No streaming message with an agent means no pill — never a placeholder.
+  const activeAgent = isLoading
+    ? messages.filter((m) => m.isStreaming && m.agent).map((m) => m.agent ?? null).pop() ?? null
+    : null;
+
+  if (isInitializing) {
+    return (
+      <div key="initializing" className="ask-mode-expanded">
+        <div className="view-enter chat-loading-state" role="status" aria-live="polite">
+          <div className="loading-spinner" aria-hidden="true" />
+          <p>Connecting to the model…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isReady) {
     return (
-      <div className="ask-mode-expanded">
-        <div className="chat-loading-state">
-          <div className="loading-spinner" />
-          <p>Initializing AI assistant...</p>
+      <div key="not-ready" className="ask-mode-expanded">
+        <div className="view-enter chat-not-ready" role="alert" tabIndex={-1} autoFocus>
+          <h2 className="chat-not-ready-title">Ask mode isn&apos;t connected</h2>
+          <p className="chat-not-ready-body">
+            {notReady?.reason ?? 'The model could not be reached.'}
+          </p>
+          {/* The variable list is the fix for a missing key only — a thrown init
+              failure has a different cause and must not be told it is configuration. */}
+          {notReady && !notReady.retryable && (
+            <ul className="chat-not-ready-list">
+              <li><code>API_KEY</code> — required</li>
+              <li><code>MODEL</code> — optional, defaults to the built-in model</li>
+              <li><code>BASE_URL</code> — optional, only for a non-default provider</li>
+            </ul>
+          )}
+          <div className="chat-not-ready-actions">
+            {notReady?.retryable && (
+              <Button size="sm" onClick={() => { void initializeChat(); }}>
+                Try again
+              </Button>
+            )}
+            {onExitAskMode && (
+              <Button size="sm" variant="outline" onClick={onExitAskMode}>
+                Back to Files
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -370,7 +414,7 @@ export function AskModeExpanded({
 
   return (
     <ToastProvider>
-      <div className="ask-mode-expanded flex flex-col flex-1 min-h-0 overflow-hidden" style={{ position: 'relative' }}>
+      <div key="ready" className="view-enter ask-mode-expanded flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Browser Session Status Indicator */}
         {browserState.sessionActive && browserState.progress && (
           <BrowserProgressPanel
@@ -383,13 +427,8 @@ export function AskModeExpanded({
             }
             metrics={{
               elapsedMs: browserState.elapsedMs,
-              estimatedTokens: Math.floor(browserState.elapsedMs / 100),
-              confidence: Math.max(70, 100 - Math.floor(browserState.elapsedMs / 1000)),
             }}
-            onPause={handlePauseBrowser}
-            onResume={handleResumeBrowser}
-            onStop={handleCloseBrowserSession}
-            isPaused={browserState.isPaused}
+            onStop={() => { void cancelTurn(); handleCloseBrowserSession(); }}
           />
         )}
 
@@ -405,13 +444,8 @@ export function AskModeExpanded({
             }
             metrics={{
               elapsedMs: desktopState.elapsedMs,
-              estimatedTokens: Math.floor(desktopState.elapsedMs / 100),
-              confidence: Math.max(70, 100 - Math.floor(desktopState.elapsedMs / 1000)),
             }}
-            onPause={handlePauseDesktop}
-            onResume={handleResumeDesktop}
-            onStop={() => desktopDispatch({ type: 'RESET' })}
-            isPaused={desktopState.isPaused}
+            onStop={() => { void cancelTurn(); desktopDispatch({ type: 'RESET' }); }}
           />
         )}
 
@@ -423,8 +457,7 @@ export function AskModeExpanded({
             welcomeState={welcomeState}
             browserModeEnabled={browserState.enabled}
             desktopModeEnabled={desktopState.enabled}
-            desktopConfirmation={desktopConfirmation}
-            onConfirmDesktopAction={confirmDesktopAction}
+            activeAgent={activeAgent}
             onSendExample={(query) => {
               handleSendMessage(query);
               setWelcomeState(false);
@@ -434,7 +467,6 @@ export function AskModeExpanded({
             onExplain={handleExplain}
             onShowCode={handleShowCode}
             onRegenerate={handleRegenerate}
-            onRelatedQuestion={handleRelatedQuestion}
             recentSessions={recentSessions}
             onSelectSession={handleSelectHistory}
             onNewChat={handleNewChat}
@@ -451,6 +483,7 @@ export function AskModeExpanded({
           value={searchQuery}
           onChange={onSearchChange}
           onSend={(message) => handleSendMessage(message)}
+          onStop={handleStopTurn}
           windowMode="expanded"
           hasSentMessage={hasSentMessage}
           isLoading={isLoading}

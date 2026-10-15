@@ -25,12 +25,12 @@ export function TaskMetricsDisplay({ metrics, defaultExpanded = false }: TaskMet
   return (
     <details className="task-metrics-display" open={expanded} onToggle={(e) => setExpanded((e.target as HTMLDetailsElement).open)}>
       <summary className="task-metrics-summary">
-        <ClockIcon className="task-metrics-icon" />
+        <ClockIcon className="task-metrics-icon" aria-hidden="true" />
         <span className="task-metrics-label">Task Details</span>
         <span className="task-metrics-preview">
           {formatTokenCount(metrics.tokensUsed)} tokens · {formatCost(metrics.estimatedCost)} · {durationSeconds}s
         </span>
-        <CaretDownIcon className="task-metrics-chevron" />
+        <CaretDownIcon className="task-metrics-chevron" aria-hidden="true" />
       </summary>
 
       <div className="task-metrics-content">
@@ -59,7 +59,7 @@ export function TaskMetricsDisplay({ metrics, defaultExpanded = false }: TaskMet
         {metrics.inputTokens !== undefined && metrics.outputTokens !== undefined && (
           <div className="token-breakdown-section">
             <div className="token-breakdown-header">
-              <SquaresFourIcon className="token-breakdown-icon" />
+              <SquaresFourIcon className="token-breakdown-icon" aria-hidden="true" />
               <span className="token-breakdown-label">Input {formatTokenCount(metrics.inputTokens)} · Output {formatTokenCount(metrics.outputTokens)}</span>
             </div>
 

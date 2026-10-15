@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { CaretDownIcon, PaperPlaneRightIcon, PaperclipIcon, XIcon, GlobeIcon } from '@phosphor-icons/react';
+import { PaperPlaneRightIcon, PaperclipIcon, XIcon, GlobeIcon, StopIcon } from '@phosphor-icons/react';
 import { SearchWebToggle } from './SearchWebToggle';
+import { Button } from '@/components/ui/button';
 import { ShortcutKey } from '@/components/common/ShortcutKeys';
 import { getAriaKeyshortcuts } from '@/utils/shortcuts';
 import type { AttachedFile } from '@/types/ask-types';
@@ -28,6 +29,7 @@ export interface UnifiedCommandBarProps {
   onAttachFile?: () => void;
   onAttachFolder?: () => void;
   onAddFile?: (file: AttachedFile) => void;
+  onStop?: () => void;
   registerInput?: (name: string, ref: React.RefObject<HTMLElement | null>) => () => void;
 }
 
@@ -48,6 +50,7 @@ export function UnifiedCommandBar({
   onAttachFile,
   onAttachFolder: _onAttachFolder,
   onAddFile,
+  onStop,
   registerInput,
 }: UnifiedCommandBarProps) {
   const [hasSent, setHasSent] = useState(hasSentMessage);
@@ -92,6 +95,11 @@ export function UnifiedCommandBar({
   }, [value, disabled, isLoading, onSend, onChange, resetHeight]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Browsers confirm IME composition with Enter; without this bail a CJK
+    // user sends a half-converted string. Mirrors useKeyboard's first branch.
+    if (e.nativeEvent?.isComposing) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -117,7 +125,7 @@ export function UnifiedCommandBar({
       {isDragOver && (
         <div className="drag-drop-overlay">
           <div className="drag-drop-zone">
-            <PaperclipIcon className="drag-drop-icon" weight="fill" />
+            <PaperclipIcon className="drag-drop-icon" weight="fill" aria-hidden="true" />
             <span className="drag-drop-title">Drop files to attach</span>
             <span className="drag-drop-subtitle">Files will be added as context for your query</span>
           </div>
@@ -129,19 +137,19 @@ export function UnifiedCommandBar({
           <div className="context-indicator-compact">
             {attachedFiles.length > 0 && (
               <span className="context-badge" title={`${attachedFiles.length} files attached`}>
-                <PaperclipIcon className="context-badge-icon" weight="fill" />
+                <PaperclipIcon className="context-badge-icon" weight="fill" aria-hidden="true" />
                 {attachedFiles.length}
               </span>
             )}
             {mcpCount > 0 && (
               <span className="context-badge" title={`${mcpCount} MCP servers`}>
-                <span className="mcp-status-dot" />
+                <span className="mcp-status-dot" aria-hidden="true" />
                 {mcpCount}
               </span>
             )}
             {webSearchEnabled && (
               <span className="context-badge" title="Web search enabled">
-                <GlobeIcon className="context-badge-icon" weight="fill" />
+                <GlobeIcon className="context-badge-icon" weight="fill" aria-hidden="true" />
               </span>
             )}
           </div>
@@ -160,6 +168,7 @@ export function UnifiedCommandBar({
               isSendActive && 'send-icon'
             )}
             weight={hasSent ? 'fill' : 'regular'}
+            aria-hidden="true"
           />
 
           <textarea
@@ -169,37 +178,54 @@ export function UnifiedCommandBar({
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
+            aria-label="Ask the AI assistant"
+            aria-keyshortcuts="Enter"
+            title="Send (Enter)"
             rows={1}
             disabled={disabled || isLoading}
           />
 
           {onAttachFile && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
               className={cn('attach-trigger-inline', isDragOver && 'drag-over-active')}
               onClick={onAttachFile}
               title="Attach file or folder"
-              type="button"
+              aria-label="Attach file or folder"
             >
-              <PaperclipIcon weight="regular" />
-            </button>
+              <PaperclipIcon weight="regular" aria-hidden="true" />
+            </Button>
           )}
 
-          {hasSent && (
-            <button className="model-select-inline visible" type="button">
-              <span>Qwen</span>
-              <CaretDownIcon weight="bold" />
-            </button>
+          {isLoading && onStop && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-lg"
+              className="send-button"
+              onClick={onStop}
+              title="Stop response (Ctrl+Shift+S)"
+              aria-label="Stop response"
+              aria-keyshortcuts="Control+Shift+S"
+            >
+              <StopIcon weight="bold" aria-hidden="true" />
+            </Button>
           )}
 
-          <button
+          <Button
+            type="button"
+            variant="default"
+            size="icon-lg"
             className={cn('send-button', isSendActive && 'active')}
             onClick={handleSend}
             disabled={!isSendActive || disabled || isLoading}
             title="Send"
-            type="button"
+            aria-label="Send message"
           >
-            <PaperPlaneRightIcon weight="bold" />
-          </button>
+            <PaperPlaneRightIcon weight="bold" aria-hidden="true" />
+          </Button>
         </div>
 
         {!hasSent && (
@@ -218,25 +244,33 @@ export function UnifiedCommandBar({
               <div key={index} className="context-chip-above" data-file-type={iconType}>
                 <FileIconForType iconType={iconType} />
                 <span className="context-chip-label" title={file.name}>{file.name}</span>
-                <XIcon
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
                   className="context-chip-remove"
-                  weight="bold"
                   onClick={() => onRemoveFile?.(index)}
-                />
+                  aria-label={`Remove ${file.name} from context`}
+                  title={`Remove ${file.name} from context`}
+                >
+                  <XIcon weight="bold" aria-hidden="true" />
+                </Button>
               </div>
             );
           })}
           {mcpCount > 0 && (
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               className="mcp-chip"
               onClick={onOpenMCPModal}
               aria-keyshortcuts={getAriaKeyshortcuts('Control', 'Shift', 'M')}
               title={`${mcpCount} MCP servers connected — click to manage`}
-              type="button"
             >
-              <span className="mcp-chip-dot" />
+              <span className="mcp-chip-dot" aria-hidden="true" />
               {mcpCount} MCP{mcpCount > 1 ? 's' : ''}
-            </button>
+            </Button>
           )}
           {onToggleWebSearch && (
             <SearchWebToggle

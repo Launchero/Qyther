@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DownloadSimpleIcon, CodeIcon, FileIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 
 export interface TableColumn {
   key: string;
@@ -102,29 +103,31 @@ export function DataTable({ data, title, onExport, onFilter, onSort }: DataTable
       <div className="data-table-controls">
         {onExport && (
           <div className="export-buttons">
-            <button onClick={() => handleExport('csv')} className="export-btn" title="Export as CSV">
-              <DownloadSimpleIcon />
+            <Button variant="outline" size="xs" onClick={() => handleExport('csv')} title="Export as CSV">
+              <DownloadSimpleIcon aria-hidden="true" />
               CSV
-            </button>
-            <button onClick={() => handleExport('json')} className="export-btn" title="Export as JSON">
-              <CodeIcon />
+            </Button>
+            <Button variant="outline" size="xs" onClick={() => handleExport('json')} title="Export as JSON">
+              <CodeIcon aria-hidden="true" />
               JSON
-            </button>
-            <button onClick={() => handleExport('md')} className="export-btn" title="Export as Markdown">
-              <FileIcon />
+            </Button>
+            <Button variant="outline" size="xs" onClick={() => handleExport('md')} title="Export as Markdown">
+              <FileIcon aria-hidden="true" />
               MD
-            </button>
+            </Button>
           </div>
         )}
         
         <div className="filter-input">
           <input
             type="text"
+            aria-label="Filter table rows"
             placeholder={`Filter ${filterColumn || 'all columns'}...`}
             value={filterValue}
             onChange={(e) => handleFilterChange(filterColumn || data.columns[0]?.key || '', e.target.value)}
           />
           <select
+            aria-label="Filter column"
             value={filterColumn || ''}
             onChange={(e) => setFilterColumn(e.target.value || null)}
             className="filter-column-select"
@@ -142,18 +145,28 @@ export function DataTable({ data, title, onExport, onFilter, onSort }: DataTable
           <thead>
             <tr>
               {data.columns.map(col => (
-                <th 
+                <th
                   key={col.key}
-                  onClick={() => handleSort(col.key)}
+                  scope="col"
                   className={`sortable ${sortColumn === col.key ? `sorted-${sortDirection}` : ''}`}
                   style={{ textAlign: col.align || 'left' }}
+                  aria-sort={sortColumn === col.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                 >
-                  {col.label}
-                  {sortColumn === col.key && (
-                    <span className="sort-indicator">
-                      {sortDirection === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
+                  {/* A click handler on <th> is unreachable by keyboard; the button
+                      carries the interaction and the th keeps the sort semantics. */}
+                  <button
+                    type="button"
+                    className="data-table-sort"
+                    onClick={() => handleSort(col.key)}
+                    aria-label={`Sort by ${col.label}`}
+                  >
+                    {col.label}
+                    {sortColumn === col.key && (
+                      <span className="sort-indicator" aria-hidden="true">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
                 </th>
               ))}
             </tr>

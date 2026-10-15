@@ -38,9 +38,9 @@ export function ConfidenceBadge({ confidence, verified, selfCorrected, qualitySc
       role="status"
       aria-label={`Response confidence: ${percentage}%`}
     >
-      {level === 'high' && <CheckCircle className="w-3 h-3" weight="fill" />}
-      {level === 'medium' && <Info className="w-3 h-3" />}
-      {level === 'low' && <Warning className="w-3 h-3" />}
+      {level === 'high' && <CheckCircle className="w-3 h-3" weight="fill" aria-hidden="true" />}
+      {level === 'medium' && <Info className="w-3 h-3" aria-hidden="true" />}
+      {level === 'low' && <Warning className="w-3 h-3" aria-hidden="true" />}
       <span>
         {label} ({percentage}%)
       </span>

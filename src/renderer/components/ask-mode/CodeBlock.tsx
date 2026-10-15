@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface CodeBlockProps {
   language: string;
@@ -26,12 +27,20 @@ const languageDotColors: Record<string, string> = {
 
 export function CodeBlock({ language, code, onCopy, onApply, className }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
     setCopied(true);
     onCopy?.();
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const dotClass = languageDotColors[language.toLowerCase()] || '';
@@ -44,21 +53,30 @@ export function CodeBlock({ language, code, onCopy, onApply, className }: CodeBl
           {language || 'code'}
         </div>
         <div className="code-block-actions">
-          <button
-            className="code-action-btn"
+          {/* `secondary`/`default` carry their own background AND foreground, which a code
+              plate needs: the header is `--color-code-header` in both themes, so a variant
+              that inherited text colour would land near-black on a dark plate in light mode. */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="xs"
             onClick={handleCopy}
             aria-label="Copy code"
+            title="Copy code to clipboard"
           >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
+            {copied ? <span role="status" aria-live="polite">Copied!</span> : 'Copy'}
+          </Button>
           {onApply && (
-            <button
-              className="code-action-btn primary"
+            <Button
+              type="button"
+              variant="default"
+              size="xs"
               onClick={onApply}
               aria-label="Apply code"
+              title="Apply this code"
             >
               Apply
-            </button>
+            </Button>
           )}
         </div>
       </div>

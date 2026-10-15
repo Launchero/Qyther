@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Form data shapes are dynamic */
 ﻿import React, { useState } from 'react';
 import { LinkIcon, CheckIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 
 export interface FormField {
   name: string;
@@ -41,6 +42,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       case 'textarea':
         return (
           <textarea
+            id={field.name}
             value={String(value)}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className="form-field-input"
@@ -52,6 +54,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       case 'select':
         return (
           <select
+            id={field.name}
             value={String(value)}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className="form-field-input"
@@ -67,6 +70,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       case 'checkbox':
         return (
           <input
+            id={field.name}
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => handleChange(field.name, e.target.checked)}
@@ -77,6 +81,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       default:
         return (
           <input
+            id={field.name}
             type={field.type}
             value={String(value)}
             onChange={(e) => handleChange(field.name, field.type === 'number' ? Number(e.target.value) : e.target.value)}
@@ -93,7 +98,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       
       {targetUrl && (
         <div className="form-target-url">
-          <LinkIcon />
+          <LinkIcon aria-hidden="true" />
           <span>{targetUrl}</span>
         </div>
       )}
@@ -101,7 +106,7 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       <div className="form-fields">
         {formData.map(field => (
           <div key={field.name} className="form-field-group">
-            <label className="form-field-label">
+            <label className="form-field-label" htmlFor={field.name}>
               {field.label}
               {field.required && <span className="required">*</span>}
             </label>
@@ -112,15 +117,15 @@ export function FormPreview({ formData, targetUrl, title, onConfirm, onEdit, onC
       
       <div className="form-actions">
         {onCancel && (
-          <button onClick={onCancel} className="form-btn-cancel">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
         {onConfirm && (
-          <button onClick={handleSubmit} className="form-btn-confirm">
-            <CheckIcon />
+          <Button type="button" size="sm" onClick={handleSubmit}>
+            <CheckIcon aria-hidden="true" />
             Submit Form
-          </button>
+          </Button>
         )}
       </div>
     </div>

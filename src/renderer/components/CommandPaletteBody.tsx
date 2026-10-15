@@ -32,6 +32,7 @@ interface CommandPaletteBodyProps {
   onAskAboutFile?: (result: SearchResult) => void;
   onQuickAction?: (action: string) => void;
   mcpCount?: number;
+  onExitAskMode?: () => void;
   registerInput?: RegisterInputFn;
 }
 
@@ -60,12 +61,13 @@ function CommandPaletteBodyImpl({
   onQuickAction,
   onAskAboutFile,
   mcpCount = 0,
+  onExitAskMode,
   registerInput,
 }: CommandPaletteBodyProps) {
   // Show chat interface in expanded Ask mode
   if (searchMode === 'ai' && windowMode === 'expanded') {
     return (
-      <div ref={bodyRef} className="flex-1 min-h-0 flex flex-col overflow-hidden bg-card">
+      <div key="ask" ref={bodyRef} className="view-enter flex-1 min-h-0 flex flex-col overflow-hidden bg-card">
         <AskModeExpanded
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
@@ -77,6 +79,7 @@ function CommandPaletteBodyImpl({
           onClearAttachments={onClearAttachments}
           onAddFile={onAddFile}
           mcpCount={mcpCount}
+          onExitAskMode={onExitAskMode}
           recentSearchResults={results.filter(r => r.type === 'file').slice(0, 3).map(r => ({ title: r.title, type: r.type }))}
           registerInput={registerInput}
         />
@@ -87,7 +90,7 @@ function CommandPaletteBodyImpl({
   // Show empty state with quick actions when no query (file mode)
   if (!searchQuery.trim() && searchMode !== 'ai') {
     return (
-      <div ref={bodyRef} className="flex-1 min-h-0 overflow-hidden flex flex-col bg-card">
+      <div key="empty" ref={bodyRef} className="view-enter flex-1 min-h-0 overflow-hidden flex flex-col bg-card">
         <SearchEmptyState
           recentFiles={recentFiles}
           onOpenFile={(path) => {
@@ -113,8 +116,9 @@ function CommandPaletteBodyImpl({
 
   return (
     <div
+      key="results"
       ref={bodyRef}
-      className="flex-1 min-h-0 overflow-hidden flex flex-col bg-card"
+      className="view-enter flex-1 min-h-0 overflow-hidden flex flex-col bg-card"
     >
       <ResultsList
         results={results}

@@ -21,11 +21,11 @@ interface ModeConfig {
 const modeConfigs: Record<SearchMode, ModeConfig> = {
   file: {
     label: 'Files',
-    icon: <Folder weight="fill" className="h-4 w-4" />,
+    icon: <Folder weight="fill" className="h-4 w-4" aria-hidden="true" />,
   },
   ai: {
     label: 'Ask',
-    icon: <Sparkle weight="fill" className="h-4 w-4" />,
+    icon: <Sparkle weight="fill" className="h-4 w-4" aria-hidden="true" />,
   },
 };
 
@@ -49,14 +49,16 @@ export function ModeTabs({
           e.stopPropagation();
           onToggle();
         }}
-        aria-keyshortcuts={getAriaKeyshortcuts('Control', 'Tab')}
+        aria-keyshortcuts={getAriaKeyshortcuts('Shift', 'Tab')}
         aria-label={`Switch mode. Currently: ${currentModeConfig.label}. Press Shift+Tab to cycle.`}
         className={cn(
           "flex items-center justify-center",
-          "h-10 px-3",
-          "gap-2",
-          "rounded-lg",
-          "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+          // Match the 40px control height the search input uses (--container-input-height /
+          // --target-row), so the tab and the input agree inside the same header row.
+          "h-[var(--target-row)] px-3",
+          "gap-[var(--gap-inline)]",
+          "rounded-md",
+          "transition-[background-color,border-color,box-shadow] duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
           "focus:outline-none focus:ring-2 focus:ring-ring",
           "border border-border bg-background hover:bg-accent hover:border-ring"
         )}
@@ -76,13 +78,15 @@ export function ModeTabs({
     <Tabs
       value={currentMode}
       onValueChange={(value) => handleModeChange(value as SearchMode)}
-      className="h-10"
+      className="h-[var(--target-row)]"
     >
       <TabsList className={cn(
-        "h-full gap-1 p-1",
+        // The primitive sizes the list through `group-data-horizontal/tabs:h-8`, so the caller
+        // has to override that same variant key for the 44px row contract to survive.
+        "h-full gap-1 p-1 group-data-horizontal/tabs:h-[var(--target-row)]",
         "bg-muted border border-border",
-        "rounded-lg",
-        "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]"
+        "rounded-md",
+        "transition-[background-color,border-color] duration-[var(--duration-150)] ease-[var(--easing-smooth)]"
       )}>
         {(Object.keys(modeConfigs) as SearchMode[]).map((mode) => {
           const config = modeConfigs[mode];
@@ -91,9 +95,9 @@ export function ModeTabs({
               key={mode}
               value={mode}
               className={cn(
-                "gap-2 px-4 h-full rounded-md",
+                "gap-[var(--gap-inline)] px-4 h-full rounded-md",
                 "text-sm font-medium",
-                "transition-all duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+                "transition-[background-color,color] duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
                 "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
                 "data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground",
                 "data-[state=inactive]:hover:bg-accent data-[state=inactive]:hover:text-foreground"

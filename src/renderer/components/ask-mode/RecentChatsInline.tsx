@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChatTeardropTextIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export interface InlineChatSession {
@@ -26,29 +27,35 @@ export function RecentChatsInline({
     <div className={cn('recent-chats', className)}>
       <div className="recent-chats-header">
         <span className="recent-chats-title">Recent Chats</span>
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
           className="new-chat-btn"
           onClick={onNewChat}
           aria-label="Start new chat"
+          title="Start a new conversation"
         >
           + New Chat
-        </button>
+        </Button>
       </div>
       {recentSessions.length > 0 && (
         <div className="recent-chats-list" role="list">
           {recentSessions.map((session) => (
-            <button
+            <Button
               key={session.id}
-              className="recent-chat-item"
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="recent-chat-item justify-start"
               onClick={() => onSelectSession(session.id)}
               role="listitem"
               aria-label={`Open chat: ${session.title}`}
+              title={`Open chat: ${session.title}`}
             >
-              <ChatTeardropTextIcon className="recent-chat-icon" weight="regular" />
-              <span className="recent-chat-text" title={session.title}>
-                {session.title}
-              </span>
-            </button>
+              <ChatTeardropTextIcon className="recent-chat-icon" weight="regular" aria-hidden="true" />
+              <span className="recent-chat-text">{session.title}</span>
+            </Button>
           ))}
         </div>
       )}

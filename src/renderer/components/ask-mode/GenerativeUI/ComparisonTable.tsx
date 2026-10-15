@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Comparison payload shapes are dynamic */
 ﻿import React, { useMemo, useCallback } from 'react';
 import { DownloadSimpleIcon, CodeIcon, FileIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 
 export interface ComparisonItem {
   name: string;
@@ -123,18 +124,18 @@ export function ComparisonTable({ items, criteria, title, onExport }: Comparison
       {onExport && (
         <div className="comparison-controls">
           <div className="export-buttons">
-            <button onClick={() => handleExport('csv')} className="export-btn" title="Export as CSV">
-              <DownloadSimpleIcon weight="bold" />
+            <Button variant="outline" size="xs" onClick={() => handleExport('csv')} title="Export as CSV">
+              <DownloadSimpleIcon weight="bold" aria-hidden="true" />
               CSV
-            </button>
-            <button onClick={() => handleExport('json')} className="export-btn" title="Export as JSON">
-              <CodeIcon weight="bold" />
+            </Button>
+            <Button variant="outline" size="xs" onClick={() => handleExport('json')} title="Export as JSON">
+              <CodeIcon weight="bold" aria-hidden="true" />
               JSON
-            </button>
-            <button onClick={() => handleExport('md')} className="export-btn" title="Export as Markdown">
-              <FileIcon weight="bold" />
+            </Button>
+            <Button variant="outline" size="xs" onClick={() => handleExport('md')} title="Export as Markdown">
+              <FileIcon weight="bold" aria-hidden="true" />
               MD
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -66,7 +66,7 @@ export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onE
                 </li>
               ))
             ) : (
-              <li>No data available</li>
+              <li role="status">No data available</li>
             )}
           </ul>
         </div>

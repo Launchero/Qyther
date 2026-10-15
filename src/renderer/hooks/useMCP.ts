@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { logError } from '../utils/debugLogger';
 
 interface MCPStatus {
@@ -21,11 +21,21 @@ export function useMCP() {
   });
   const [tools, setTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadStatus = useCallback(async () => {
     try {
       const result = await window.electronAPI.mcp.getStatus();
-      setStatus(result);
+      if (isMountedRef.current) {
+        setStatus(result);
+      }
     } catch (error) {
       logError('[useMCP] Failed to load MCP status:', error);
     }
@@ -33,13 +43,19 @@ export function useMCP() {
 
   const loadTools = useCallback(async () => {
     try {
-      setIsLoading(true);
+      if (isMountedRef.current) {
+        setIsLoading(true);
+      }
       const result = await window.electronAPI.mcp.getTools();
-      setTools(result);
+      if (isMountedRef.current) {
+        setTools(result);
+      }
     } catch (error) {
       logError('[useMCP] Failed to load MCP tools:', error);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

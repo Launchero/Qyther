@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchMode } from '../types/commandPalette';
 import { logInfo, logError } from '../utils/debugLogger';
+import { motionDurationMs } from '../utils/motion';
 
 export type WindowMode = 'compact' | 'expanded' | 'custom';
 
@@ -11,160 +12,129 @@ interface UseWindowModeOptions {
 
 const AUTO_EXPAND_CHAR_THRESHOLD = 2;
 const AUTO_EXPAND_DEBOUNCE_MS = 150;
+/** The token `.collapse-flash` animates on (`--animate-collapse-flash` composes `--duration-500`).
+ *  Read per flash rather than frozen at import, so the flag is gone the moment the class is — and
+ *  under reduced motion, where the scale is zeroed, the flag does not hold for 500ms of nothing. */
+const COLLAPSE_FLASH_DURATION = '--duration-500';
 
 /**
- * Hook for managing window mode state
- * Uses IPC events instead of polling for mode change detection
+ * The renderer's mirror of the window mode — a read-only projection of main.
+ *
+ * **Main owns the value.** It is written in exactly one place (`adopt`), fed by the mount snapshot
+ * and by `window:modeChanged` pushes. This hook also *requests* modes (auto-expand on typing, AI
+ * mode), but a request never writes state: the previous shape set `windowMode` optimistically
+ * before the IPC round-tripped, so the palette laid out for a height main had not agreed to and
+ * two owners existed for one fact — with main's echo then discarded by `mode !== windowMode`,
+ * because the renderer had already guessed it. Requesting without adopting is what makes main's
+ * answer the thing the UI actually renders.
+ *
+ * Nothing here re-fetches on visibility either. That resync used to overwrite the mode every time
+ * the window came up, clobbering a change that was still in flight; main pushes `modeChanged`
+ * whether or not the window is visible, so the push is the sync.
  */
 export function useWindowMode(options: UseWindowModeOptions = {}) {
   const { searchQuery = '', searchMode } = options;
 
   const [windowMode, setWindowMode] = useState<WindowMode>('compact');
-  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const [isCollapsing, setIsCollapsing] = useState(false);
+  /** Policy, not state: an expansion main announced is not auto-collapsed by an empty query. */
+  const [announcedExpanded, setAnnouncedExpanded] = useState(false);
+  // Mirrors for the effects that must not re-subscribe when the value changes.
+  const modeRef = useRef<WindowMode>('compact');
+  /**
+   * The last mode this hook asked main for, so main's echo of it is not mistaken for the user
+   * taking over. Dropping the optimistic write means every auto-expand now arrives as a push, and a
+   * push is exactly what marks an expansion "manual" — without this the palette would expand on two
+   * keystrokes and then never collapse again, because its own request would have muted the policy
+   * forever. (The old code got this right by accident: it wrote state first, so `mode !== windowMode`
+   * discarded the echo before the manual flag was set.)
+   */
+  const requestedRef = useRef<WindowMode | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previousModeRef = useRef<WindowMode>('compact');
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Load current window mode on mount
   useEffect(() => {
-    async function loadWindowMode() {
-      try {
-        const mode = await window.electronAPI.window.getMode();
-        logInfo('[useWindowMode] Initial window mode:', mode);
-        setWindowMode(mode);
-      } catch (error) {
-        logError('[useWindowMode] Failed to load window mode:', error);
-      }
-    }
-    
-    loadWindowMode();
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
   }, []);
-  
-  // Listen for mode changes from main process via IPC event (replaces polling)
+
+  const adopt = useCallback((mode: WindowMode) => {
+    if (mode === modeRef.current) return;
+    if (mode === 'compact' && modeRef.current === 'expanded') {
+      setIsCollapsing(true);
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = setTimeout(
+        () => setIsCollapsing(false),
+        motionDurationMs(COLLAPSE_FLASH_DURATION, 500),
+      );
+    }
+    const selfRequested = requestedRef.current === mode;
+    requestedRef.current = null;
+    modeRef.current = mode;
+    setWindowMode(mode);
+    // A mode main moved on its own (Alt+Shift+M, a tray action) survives the query; one the policy
+    // asked for does not.
+    if (!selfRequested) setAnnouncedExpanded(mode === 'expanded');
+  }, []);
+
+  // Snapshot on mount, then the pushes are the only other writer.
+  useEffect(() => {
+    window.electronAPI.window
+      .getMode()
+      .then((mode) => {
+        logInfo('[useWindowMode] Initial window mode:', mode);
+        // The state starts at 'compact', so adopting 'compact' would be a no-op and the ref would
+        // never learn the restored mode. Seed the ref from the answer, not from the guard.
+        modeRef.current = mode;
+        setWindowMode(mode);
+        setAnnouncedExpanded(mode === 'expanded');
+      })
+      .catch((error) => logError('[useWindowMode] Failed to load window mode:', error));
+  }, []);
+
   useEffect(() => {
     const handleModeChanged = (event: Event) => {
-      const mode = (event as CustomEvent<WindowMode>).detail;
-      if (mode !== windowMode) {
-        // Trigger collapse flash when transitioning to compact from expanded
-        if (mode === 'compact' && previousModeRef.current === 'expanded') {
-          setIsCollapsing(true);
-          setTimeout(() => setIsCollapsing(false), 600);
-        }
-        previousModeRef.current = mode;
-        logInfo(`[useWindowMode] IPC mode change: ${windowMode} -> ${mode}`);
-        // When mode is changed from main process (manual toggle), treat it as manual
-        if (mode === 'expanded') {
-          setIsManuallyExpanded(true);
-        } else if (mode === 'compact') {
-          setIsManuallyExpanded(false);
-        }
-        setWindowMode(mode);
-      }
+      adopt((event as CustomEvent<WindowMode>).detail);
     };
-    
     window.addEventListener('electron-window-mode-changed', handleModeChanged);
     return () => {
       window.removeEventListener('electron-window-mode-changed', handleModeChanged);
     };
-  }, [windowMode]);
-  
-  // Sync state when window becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        try {
-          const mode = await window.electronAPI.window.getMode();
-          if (mode === 'compact') {
-            setIsManuallyExpanded(false);
-          } else if (mode === 'expanded') {
-            setIsManuallyExpanded(true);
-          }
-          setWindowMode(mode);
-          logInfo(`[useWindowMode] Window shown - restored mode: ${mode}`);
-        } catch (error) {
-          logError('[useWindowMode] Failed to load window mode on visibility change:', error);
-        }
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
+  }, [adopt]);
 
-  // Clear manual expansion flag when search mode changes to allow fresh auto-expand/collapse logic
+  // A view swap re-arms the auto-expand policy from scratch.
   useEffect(() => {
-    setIsManuallyExpanded(false);
+    setAnnouncedExpanded(false);
   }, [searchMode]);
-  
-  // Auto-expand/collapse logic with debounce and character threshold
+
+  // Auto-expand/collapse policy: it asks main, it never decides.
   useEffect(() => {
     const queryLength = searchQuery.trim().length;
-    
-    // If user manually expanded, keep expanded regardless of query
-    if (isManuallyExpanded) {
-      if (windowMode !== 'expanded') {
-        logInfo(`[useWindowMode] Manually expanded: forcing expanded`);
-        setWindowMode('expanded');
-        window.electronAPI.window.setMode('expanded').catch((e) => logError('[useWindowMode] Failed to set expanded mode:', e));
-      }
+
+    if (announcedExpanded) {
+      // An expansion main announced survives the query, so there is nothing to request: the value
+      // is already 'expanded', because the only writer of that flag is the same path that adopted
+      // the mode.
       return;
     }
-    
-    // In AI mode, always expand immediately
-    // In other modes, require minimum character threshold before expanding
-    const isAskMode = searchMode === 'ai';
-    const hasQuery = queryLength >= AUTO_EXPAND_CHAR_THRESHOLD;
-    const targetMode = isAskMode || hasQuery ? 'expanded' : 'compact';
 
-    // Debounce the mode change to prevent rapid toggling during typing
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
+    const targetMode = searchMode === 'ai' || queryLength >= AUTO_EXPAND_CHAR_THRESHOLD ? 'expanded' : 'compact';
+    if (modeRef.current === targetMode) return;
 
-    if (windowMode !== targetMode) {
-      const willCollapse = targetMode === 'compact';
-      debounceTimerRef.current = setTimeout(() => {
-        logInfo(`[useWindowMode] Search query: "${searchQuery}", searchMode: ${searchMode}, targetMode: ${targetMode}`);
-        // Flash collapse indicator so users understand what happened
-        if (willCollapse && previousModeRef.current === 'expanded') {
-          setIsCollapsing(true);
-          setTimeout(() => setIsCollapsing(false), 600);
-        }
-        previousModeRef.current = targetMode;
-        setWindowMode(targetMode);
-        window.electronAPI.window.setMode(targetMode).catch((e) => logError('[useWindowMode] Failed to set mode:', e));
-      }, AUTO_EXPAND_DEBOUNCE_MS);
-    }
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      requestedRef.current = targetMode;
+      logInfo(`[useWindowMode] requesting ${targetMode} (query "${searchQuery}", mode ${searchMode})`);
+      window.electronAPI.window
+        .setMode(targetMode)
+        .catch((e) => logError('[useWindowMode] Failed to request mode:', e));
+    }, AUTO_EXPAND_DEBOUNCE_MS);
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [searchQuery, searchMode, isManuallyExpanded, windowMode]);
+  }, [searchQuery, searchMode, announcedExpanded]);
 
-  const setMode = useCallback(async (mode: WindowMode) => {
-    setWindowMode(mode);
-    await window.electronAPI.window.setMode(mode);
-  }, []);
-
-  const toggleMode = useCallback(async () => {
-    const newMode = windowMode === 'expanded' ? 'compact' : 'expanded';
-    await setMode(newMode);
-  }, [windowMode, setMode]);
-
-  const setExpandedManually = useCallback((expanded: boolean) => {
-    setIsManuallyExpanded(expanded);
-  }, []);
-
-  return {
-    windowMode,
-    isManuallyExpanded,
-    isCollapsing,
-    setIsManuallyExpanded: setExpandedManually,
-    setWindowMode: setMode,
-    toggleMode,
-  };
+  return { windowMode, isCollapsing };
 }

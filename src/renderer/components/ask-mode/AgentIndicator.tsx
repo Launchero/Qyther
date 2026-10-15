@@ -32,7 +32,7 @@ export const AgentIndicator = React.memo(({ agent, isStreaming = false, classNam
       aria-label={`${agent.label} agent active`}
     >
       <span className={cn('agent-indicator__dot', isStreaming && 'agent-indicator__dot--pulse')} />
-      <Icon className="w-[var(--icon-size-xs)] h-[var(--icon-size-xs)]" weight="fill" />
+      <Icon className="w-[var(--icon-size-xs)] h-[var(--icon-size-xs)]" weight="fill" aria-hidden="true" />
       <span className="agent-indicator__label">{agent.label}</span>
     </div>
   );

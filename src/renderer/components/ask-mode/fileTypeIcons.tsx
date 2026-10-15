@@ -29,18 +29,18 @@ export function getFileIconType(name: string): string {
 export function FileIconForType({ iconType }: { iconType: string }) {
   switch (iconType) {
     case 'code':
-      return <FileText className="chip-icon" weight="regular" />;
+      return <FileText className="chip-icon" weight="regular" aria-hidden="true" />;
     case 'image':
-      return <Image className="chip-icon" weight="regular" />;
+      return <Image className="chip-icon" weight="regular" aria-hidden="true" />;
     case 'pdf':
-      return <FilePdf className="chip-icon" weight="regular" />;
+      return <FilePdf className="chip-icon" weight="regular" aria-hidden="true" />;
     case 'spreadsheet':
-      return <FileCsv className="chip-icon" weight="regular" />;
+      return <FileCsv className="chip-icon" weight="regular" aria-hidden="true" />;
     case 'presentation':
-      return <Presentation className="chip-icon" weight="regular" />;
+      return <Presentation className="chip-icon" weight="regular" aria-hidden="true" />;
     case 'ebook':
-      return <BookOpen className="chip-icon" weight="regular" />;
+      return <BookOpen className="chip-icon" weight="regular" aria-hidden="true" />;
     default:
-      return <PaperclipIcon className="chip-icon" weight="regular" />;
+      return <PaperclipIcon className="chip-icon" weight="regular" aria-hidden="true" />;
   }
 }

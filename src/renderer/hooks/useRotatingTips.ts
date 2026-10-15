@@ -7,21 +7,24 @@ export interface Tip {
   modes: SearchMode[];
 }
 
+// Every tip below maps to a binding the code actually implements — hooks/useKeyboard.ts,
+// components/ask-mode/UnifiedCommandBar.tsx, components/AskModeExpanded.tsx, App.tsx (theme)
+// and src/main/shortcuts.ts (OS-level). Keys that have no handler are not advertised here
+// and must not be added to the shortcuts dialog either.
 const TIPS: Tip[] = [
   // General tips (all modes)
   { id: 'tab-cycle', text: 'Press Shift+Tab to cycle between File and AI modes', modes: [] },
   { id: 'arrows-navigate', text: 'Use arrow keys to navigate through results', modes: [] },
-  { id: 'esc-close', text: 'Press Esc to close this window', modes: [] },
-  { id: 'global-shortcut', text: 'Press Ctrl+Alt+Space from anywhere to open this launcher', modes: [] },
+  { id: 'help', text: 'Press Ctrl+/ to open the full keyboard shortcut list', modes: [] },
+  { id: 'esc-close', text: 'Press Esc to close a dialog, clear the search, or hide this window', modes: [] },
+  { id: 'global-shortcut', text: 'Press Alt+Space from anywhere to open this launcher', modes: [] },
   { id: 'mode-toggle', text: 'Click the mode tabs to switch between File and AI', modes: [] },
   // File mode tips
-  { id: 'open-panel', text: 'Press right arrow to open a file in the side panel', modes: ['file'] },
-  { id: 'terminal', text: 'Press Ctrl+Shift to open the selected file in terminal', modes: ['file'] },
-  { id: 'alt-enter-ask', text: 'Press Alt+Enter to ask AI about the selected file', modes: ['file'] },
+  { id: 'ask-about', text: 'Press Ctrl+Shift+Enter to ask AI about the selected file', modes: ['file'] },
   // AI mode tips
-  { id: 'shift-enter', text: 'Press Shift+Enter for a new line in AI chat', modes: ['ai'] },
-  { id: 'browser-mode', text: 'Press Ctrl+B to enable browser automation in AI mode', modes: ['ai'] },
   { id: 'send-message', text: 'Press Enter to send your message', modes: ['ai'] },
+  { id: 'shift-enter', text: 'Press Shift+Enter for a new line in AI chat', modes: ['ai'] },
+  { id: 'browser-mode', text: 'Press Ctrl+Shift+B to enable browser automation in AI mode', modes: ['ai'] },
 ];
 
 const ROTATION_INTERVAL_MS = 4000;

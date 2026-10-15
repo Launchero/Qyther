@@ -37,6 +37,8 @@ export function useContextAttachments() {
       if (result && result.path && !result.cancelled) {
         const fileName = result.path.split(/[\\/]/).pop() || 'file';
         addFile({ name: fileName, path: result.path, type: 'file' });
+      } else if (result?.error) {
+        logError('[useContextAttachments] File picker failed:', result.error);
       }
     } catch (error) {
       logError('[useContextAttachments] File picker error:', error);
@@ -50,6 +52,8 @@ export function useContextAttachments() {
       if (result && result.path && !result.cancelled) {
         const folderName = result.path.split(/[\\/]/).pop() || 'folder';
         addFile({ name: folderName, path: result.path, type: 'file' });
+      } else if (result?.error) {
+        logError('[useContextAttachments] Folder picker failed:', result.error);
       }
     } catch (error) {
       logError('[useContextAttachments] Folder picker error:', error);

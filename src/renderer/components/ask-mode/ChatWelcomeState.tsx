@@ -1,6 +1,7 @@
 import React from 'react';
-import { FileIcon, FolderIcon, GlobeIcon, BugIcon, WrenchIcon } from '@phosphor-icons/react';
+import { FileIcon, FolderIcon, BugIcon, WrenchIcon } from '@phosphor-icons/react';
 import { RecentChatsInline, InlineChatSession } from './RecentChatsInline';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface SuggestionCard {
@@ -24,28 +25,21 @@ interface ChatWelcomeStateProps {
 
 const suggestionCards: SuggestionCard[] = [
   {
-    icon: <FolderIcon weight="regular" />,
+    icon: <FolderIcon weight="regular" aria-hidden="true" />,
     title: 'Find code or files',
     description: 'Search your workspace and get context-aware answers.',
     exampleQuery: 'Where is the authentication middleware defined?',
     requiresBrowser: false,
   },
   {
-    icon: <GlobeIcon weight="regular" />,
-    title: 'Search the web',
-    description: 'Get answers from the web with cited sources.',
-    exampleQuery: 'What are the latest React 19 features?',
-    requiresBrowser: false,
-  },
-  {
-    icon: <BugIcon weight="regular" />,
+    icon: <BugIcon weight="regular" aria-hidden="true" />,
     title: 'Debug an error',
     description: 'Paste an error and get a root cause analysis.',
     exampleQuery: 'Why am I getting "Cannot read properties of undefined"?',
     requiresBrowser: false,
   },
   {
-    icon: <WrenchIcon weight="regular" />,
+    icon: <WrenchIcon weight="regular" aria-hidden="true" />,
     title: 'Use tools & APIs',
     description: 'Run MCP tools, fetch data, or call external services.',
     exampleQuery: 'Fetch the latest npm package versions for my dependencies',
@@ -91,25 +85,23 @@ export function ChatWelcomeState({
       {recentSearchResults && recentSearchResults.length > 0 && (
         <div className="mb-6">
           <div className="px-1 pb-3">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-[var(--tracking-label)]">
               From Your Search
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
             {recentSearchResults.slice(0, 3).map((r) => (
-              <button
+              <Button
                 key={r.title}
+                type="button"
+                variant="secondary"
+                size="xs"
+                // `.recent-search-chip` carries the stagger — keep it on the element.
+                className="recent-search-chip"
                 onClick={() => onSendExample(`Tell me about ${r.title}`)}
-                className={cn(
-                  "px-3 py-1.5 text-xs rounded-md",
-                  "bg-accent hover:bg-accent/80 text-foreground",
-                  "border border-border/50",
-                  "transition-colors duration-150",
-                  "recent-search-chip"
-                )}
               >
                 {r.title}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -136,19 +128,22 @@ export function ChatWelcomeState({
 
       {!browserModeEnabled && onEnableBrowserMode && (
         <div className="browser-automation-intro">
-          <FileIcon className="browser-automation-icon" />
+          <FileIcon className="browser-automation-icon" aria-hidden="true" />
           <div className="browser-automation-content">
             <h4 className="browser-automation-title">Browser Automation Available</h4>
             <p className="browser-automation-description">
               I can navigate websites, fill forms, extract data, and take screenshots.
             </p>
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               className="browser-automation-cta"
               onClick={onEnableBrowserMode}
               aria-label="Enable browser automation mode"
             >
               Enable Browser Mode
-            </button>
+            </Button>
           </div>
         </div>
       )}

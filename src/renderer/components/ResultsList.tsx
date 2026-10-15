@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ResultItem } from './ResultItem';
 import { cn } from '@/lib/utils';
+import { prefersReducedMotion } from '@/utils/motion';
 import { logDebug } from '../utils/debugLogger';
 
 export interface SearchResult {
@@ -39,6 +40,36 @@ export interface ResultsListProps {
 interface SectionGroup {
   title: string;
   results: SearchResult[];
+}
+
+/**
+ * Maps `file:search`'s error string to the pair the empty state shows. Extracted to module
+ * scope so the render body stays a single branch instead of a five-deep `if` ladder.
+ */
+function describeFileSearchError(error: string): { message: string; hint: string } {
+  if (error.includes('Everything')) {
+    return { message: 'No results found', hint: 'Everything app is not running. Start it to enable file search.' };
+  }
+  if (error.includes('es.exe') || error.includes('not found')) {
+    return { message: 'No results found', hint: 'es.exe is missing. Restart the app to download it.' };
+  }
+  if (error.includes('Windows')) {
+    return { message: 'No results found', hint: 'File search is only available on Windows' };
+  }
+  if (error.includes('timed out')) {
+    return { message: 'Search timed out', hint: 'Try a more specific query' };
+  }
+  return { message: 'No results found', hint: 'File search unavailable' };
+}
+
+/** The one placeholder shape the list renders for "nothing to show", loading-error or not. */
+function PlaceholderState({ message, hint, hintIsError = false }: { message: string; hint: string; hintIsError?: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <p className="text-muted-foreground text-sm">{message}</p>
+      <p className={cn('text-xs mt-1', hintIsError ? 'text-destructive' : 'text-muted-foreground')}>{hint}</p>
+    </div>
+  );
 }
 
 function groupResultsBySection(results: SearchResult[]): SectionGroup[] {
@@ -110,7 +141,9 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
     if (selectedRef.current) {
       rafId = requestAnimationFrame(() => {
         selectedRef.current?.scrollIntoView({
-          behavior: 'instant',
+          // The reduced-motion signal comes from the same token layer CSS does: a keyboard
+          // sweep through the list scrolls smoothly until the OS asks for none.
+          behavior: prefersReducedMotion() ? 'instant' : 'smooth',
           block: 'nearest',
         });
       });
@@ -126,45 +159,24 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
   if (results.length === 0) {
     if (isFileSearchLoading) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary mb-3" />
-          <p className="text-muted-foreground text-sm">Searching files...</p>
+        // Skeleton rows, not a spinner: the placeholder holds the shape of the list that is
+        // about to arrive, so the swap does not move the surface. `.skeleton-row` + `.shimmer`
+        // are styled in styles/globals.css — nothing here may restyle them.
+        <div className="py-[var(--padding-block-section)]" role="status" aria-live="polite">
+          <p className="px-4 text-xs text-muted-foreground">Searching files…</p>
+          <div className="skeleton-row shimmer" />
+          <div className="skeleton-row shimmer" />
+          <div className="skeleton-row shimmer" />
         </div>
       );
     }
 
     if (fileSearchError) {
-      let errorMessage = 'No results found';
-      let errorHint = 'File search unavailable';
-
-      if (fileSearchError.includes('Everything')) {
-        errorMessage = 'No results found';
-        errorHint = 'Everything app is not running. Start it to enable file search.';
-      } else if (fileSearchError.includes('es.exe') || fileSearchError.includes('not found')) {
-        errorMessage = 'No results found';
-        errorHint = 'es.exe is missing. Restart the app to download it.';
-      } else if (fileSearchError.includes('Windows')) {
-        errorMessage = 'No results found';
-        errorHint = 'File search is only available on Windows';
-      } else if (fileSearchError.includes('timed out')) {
-        errorMessage = 'Search timed out';
-        errorHint = 'Try a more specific query';
-      }
-
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-muted-foreground text-sm">{errorMessage}</p>
-          <p className="text-xs text-destructive/80 mt-1">{errorHint}</p>
-        </div>
-      );
+      const { message, hint } = describeFileSearchError(fileSearchError);
+      return <PlaceholderState message={message} hint={hint} hintIsError />;
     }
 
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-muted-foreground text-sm">No results found</p>
-        <p className="text-xs text-muted-foreground mt-1">Try a different search term</p>
-      </div>
-    );
+    return <PlaceholderState message="No results found" hint="Try a different search term" />;
   }
 
   if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SEARCH === 'true') {
@@ -182,6 +194,12 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
 
   return (
     <ScrollArea className="flex-1 w-full">
+      {/* Screen reader announcement for results count */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {results.length === 0 
+          ? 'No results found' 
+          : `${results.length} result${results.length === 1 ? '' : 's'} found`}
+      </div>
       <div 
         ref={containerRef}
         className="flex flex-col"
@@ -194,14 +212,14 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
             {/* Section Header */}
             <div className={cn(
               "flex items-center justify-between",
-              "px-4 py-3 pb-2"
+              "px-4 pt-[var(--padding-block-section)] pb-[var(--padding-block-row)]"
             )}>
-              <span className="text-[var(--text-xs)] font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-[var(--tracking-label)]">
                 {section.title}
               </span>
               <span className={cn(
-                "text-[var(--text-xs)] font-medium",
-                "px-1.5 py-0.5 rounded-[var(--radius-sm)]",
+                "text-xs font-medium",
+                "px-[var(--gap-inline)] py-[var(--spacing-1)] rounded-sm",
                 "bg-muted text-muted-foreground"
               )}>
                 {section.results.length}
@@ -248,16 +266,16 @@ export const ResultsList = React.memo(function ResultsList({ results, selectedIn
 
         {/* Inline loading indicator (non-blocking) */}
         {isFileSearchLoading && (
-          <div className="flex items-center gap-3 px-4 py-2 text-muted-foreground">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-primary" />
-            <span className="text-xs">Searching files...</span>
+          <div className="py-[var(--padding-block-row)]" role="status" aria-live="polite">
+            <p className="sr-only">Searching files…</p>
+            <div className="skeleton-row shimmer" />
           </div>
         )}
 
         {/* Inline error indicator (non-blocking) */}
         {fileSearchError && results.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2">
-            <span className="text-xs text-destructive/80">File search unavailable</span>
+          <div className="flex items-center gap-[var(--gap-inline)] px-4 py-[var(--padding-block-row)]">
+            <span className="text-xs text-destructive">File search unavailable</span>
           </div>
         )}
       </div>

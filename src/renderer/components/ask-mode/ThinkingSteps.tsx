@@ -11,14 +11,13 @@ interface ThinkingStepsProps {
 const LOADING_MESSAGES: Record<string, string> = {
   classify: 'Understanding your question...',
   classifyIntent: 'Understanding your question...',
-  webSearch: 'Searching the web...',
+  externalSearch: 'Searching the web...',
+  webFetch: 'Reading source pages...',
   synthesizeWithSelfCheck: 'Composing answer...',
   synthesize: 'Composing answer...',
   quickVerify: 'Quick verification...',
   fastPath: 'Responding...',
   internalKnowledge: 'Checking knowledge...',
-  externalSearchFanOut: 'Searching multiple sources...',
-  fallbackSearch: 'Trying different approach...',
   replan: 'Looking deeper...',
   generalChat: 'Generating response...',
   tool_execution: 'Running tool...',
@@ -28,16 +27,16 @@ const LOADING_MESSAGES: Record<string, string> = {
 };
 
 const PHASE_ORDER = [
-  'classify', 'classifyIntent', 'webSearch', 'externalSearchFanOut',
+  'classify', 'classifyIntent', 'externalSearch', 'webFetch',
   'generalChat', 'internalKnowledge', 'synthesizeWithSelfCheck', 'synthesize',
-  'quickVerify', 'validate', 'replan', 'fallbackSearch', 'fastPath', 'tool_execution',
+  'quickVerify', 'validate', 'replan', 'fastPath', 'tool_execution',
 ];
 
 const PHASE_LABELS: Record<string, string> = {
   classify: 'Classified intent',
   classifyIntent: 'Classified intent',
-  webSearch: 'Searched web',
-  externalSearchFanOut: 'Multi-source search',
+  externalSearch: 'Searched web',
+  webFetch: 'Read source pages',
   generalChat: 'Generated response',
   internalKnowledge: 'Checked knowledge',
   synthesizeWithSelfCheck: 'Synthesized answer',
@@ -45,7 +44,6 @@ const PHASE_LABELS: Record<string, string> = {
   quickVerify: 'Verified quality',
   validate: 'Reviewed',
   replan: 'Refined search',
-  fallbackSearch: 'Re-searched',
   fastPath: 'Fast response',
   chartNode: 'Created visualization',
   comparisonNode: 'Built comparison',
@@ -60,7 +58,7 @@ function getStepBadge(step: ThinkingStep): { label: string; className: string } 
   if (step.type === 'tool_start' || step.step === 'tool_execution') {
     return { label: 'tool', className: 'step-badge tool' };
   }
-  if (step.step === 'webSearch' || step.step === 'externalSearchFanOut' || step.step === 'fallbackSearch') {
+  if (step.step === 'externalSearch' || step.step === 'webFetch') {
     return { label: 'web', className: 'step-badge web' };
   }
   if ((step.data as { name?: string } | undefined)?.name === 'web_search') {
@@ -133,12 +131,12 @@ function aggregateSteps(steps: ThinkingStep[]): ThinkingStep[] {
 
 function StepIcon({ status }: { status: string }) {
   if (status === 'completed') {
-    return <CheckCircle className="w-3 h-3 text-[var(--color-green-500)]" weight="fill" />;
+    return <CheckCircle className="w-3 h-3 text-success" weight="fill" aria-hidden="true" />;
   }
   if (status === 'in_progress') {
-    return <Spinner className="w-3 h-3 text-primary animate-spin" />;
+    return <Spinner className="w-3 h-3 text-primary animate-spin" aria-hidden="true" />;
   }
-  return <Circle className="w-3 h-3 text-muted-foreground opacity-30" weight="light" />;
+  return <Circle className="w-3 h-3 text-muted-foreground opacity-30" weight="light" aria-hidden="true" />;
 }
 
 function StepItem({ step, isLast }: { step: ThinkingStep; isLast: boolean }) {
@@ -146,6 +144,27 @@ function StepItem({ step, isLast }: { step: ThinkingStep; isLast: boolean }) {
   const displayName = PHASE_LABELS[step.step] || step.step;
   const hasDetail = !!step.detail && step.detail.length > 0;
   const badge = getStepBadge(step);
+  const headerClassName = `thinking-step-header ${hasDetail ? 'expandable' : ''}`;
+  const headerChildren = (
+    <>
+      <span className="thinking-step-text">
+        {displayName}
+        {badge && <span className={badge.className}>{badge.label}</span>}
+        {hasDetail && (
+          <span className="thinking-step-detail-badge">{step.detail}</span>
+        )}
+      </span>
+      {hasDetail && (
+        <span className="thinking-step-toggle">
+          {isExpanded ? (
+            <CaretDown className="w-3 h-3" aria-hidden="true" />
+          ) : (
+            <CaretRight className="w-3 h-3" aria-hidden="true" />
+          )}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <div className="thinking-step" aria-label={displayName}>
@@ -154,29 +173,18 @@ function StepItem({ step, isLast }: { step: ThinkingStep; isLast: boolean }) {
         {!isLast && <div className="thinking-step-line" />}
       </div>
       <div className="thinking-step-content">
-        <button
-          className={`thinking-step-header ${hasDetail ? 'expandable' : ''}`}
-          onClick={() => hasDetail && setIsExpanded(!isExpanded)}
-          aria-expanded={isExpanded}
-          type="button"
-        >
-          <span className="thinking-step-text">
-            {displayName}
-            {badge && <span className={badge.className}>{badge.label}</span>}
-            {hasDetail && (
-              <span className="thinking-step-detail-badge">{step.detail}</span>
-            )}
-          </span>
-          {hasDetail && (
-            <span className="thinking-step-toggle">
-              {isExpanded ? (
-                <CaretDown className="w-3 h-3" />
-              ) : (
-                <CaretRight className="w-3 h-3" />
-              )}
-            </span>
-          )}
-        </button>
+        {hasDetail ? (
+          <button
+            className={headerClassName}
+            onClick={() => setIsExpanded(!isExpanded)}
+            aria-expanded={isExpanded}
+            type="button"
+          >
+            {headerChildren}
+          </button>
+        ) : (
+          <span className={headerClassName}>{headerChildren}</span>
+        )}
       </div>
     </div>
   );
@@ -224,7 +232,7 @@ export function ThinkingSteps({ steps, isComplete, durationMs }: ThinkingStepsPr
         aria-label="AI is thinking"
       >
         <div className="thinking-steps-header">
-          <Spinner className="w-3 h-3 animate-spin text-muted-foreground" />
+          <Spinner className="w-3 h-3 animate-spin text-muted-foreground" aria-hidden="true" />
           <span className="thinking-steps-label">
             {loadingMessage || `Thinking... ${completedCount}/${totalCount}`}
           </span>
@@ -241,9 +249,9 @@ export function ThinkingSteps({ steps, isComplete, durationMs }: ThinkingStepsPr
       aria-label="Thinking process"
     >
       <summary className="thinking-summary-header">
-        <Robot className="w-3 h-3" />
+        <Robot className="w-3 h-3" aria-hidden="true" />
         <span>Thought for {duration}</span>
-        <CaretRight className={`w-3 h-3 thinking-summary-chevron ${isExpanded ? 'expanded' : ''}`} />
+        <CaretRight className={`w-3 h-3 thinking-summary-chevron ${isExpanded ? 'expanded' : ''}`} aria-hidden="true" />
       </summary>
       <div className="thinking-summary-body">
         <ExpandedThinkingSteps steps={aggregatedSteps} />

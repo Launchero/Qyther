@@ -25,13 +25,10 @@ export interface ResultItemProps {
   onAskAbout?: () => void;
 }
 
-function highlightMatches(text: string, query: string, isSelected?: boolean) {
-  if (!query || query.trim().length === 0) return text;
-
-  const escapedQuery = query.trim();
+/** Every case-insensitive occurrence range of `query` inside `text`. */
+function collectMatchRanges(text: string, query: string): Array<{ start: number; end: number }> {
   const lowerText = text.toLowerCase();
-  const lowerQuery = escapedQuery.toLowerCase();
-
+  const lowerQuery = query.toLowerCase();
   const matches: Array<{ start: number; end: number }> = [];
   let searchStart = 0;
 
@@ -39,13 +36,18 @@ function highlightMatches(text: string, query: string, isSelected?: boolean) {
     const matchIndex = lowerText.indexOf(lowerQuery, searchStart);
     if (matchIndex === -1) break;
 
-    matches.push({
-      start: matchIndex,
-      end: matchIndex + escapedQuery.length
-    });
-    searchStart = matchIndex + escapedQuery.length;
+    matches.push({ start: matchIndex, end: matchIndex + query.length });
+    searchStart = matchIndex + query.length;
   }
 
+  return matches;
+}
+
+function highlightMatches(text: string, query: string, isSelected?: boolean) {
+  if (!query || query.trim().length === 0) return text;
+
+  const trimmedQuery = query.trim();
+  const matches = collectMatchRanges(text, trimmedQuery);
   if (matches.length === 0) return text;
 
   const parts: (string | React.JSX.Element)[] = [];
@@ -60,7 +62,7 @@ function highlightMatches(text: string, query: string, isSelected?: boolean) {
       <mark
         key={index}
         className={cn(
-          "px-0.5 rounded font-semibold",
+          "px-0.5 rounded-xs font-semibold",
           isSelected
             ? "bg-primary-foreground/30 text-primary-foreground"
             : "bg-primary/20 text-primary"
@@ -117,148 +119,140 @@ function getFileTypeColor(fileType: string, isFolder?: boolean): string {
   }
 }
 
+// Extension -> kind label maps, hoisted to module scope: they are static data, and building
+// nine object literals plus their merge on every rendered row was pure waste.
+const DOCUMENT_TYPES: Record<string, string> = {
+  pdf: 'PDF Document',
+  doc: 'Word Document',
+  docx: 'Word Document',
+  txt: 'Text File',
+  rtf: 'Rich Text',
+  odt: 'OpenDocument',
+};
+
+const SPREADSHEET_TYPES: Record<string, string> = {
+  xls: 'Excel Sheet',
+  xlsx: 'Excel Sheet',
+  csv: 'CSV File',
+  ods: 'OpenDocument Sheet',
+};
+
+const PRESENTATION_TYPES: Record<string, string> = {
+  ppt: 'PowerPoint',
+  pptx: 'PowerPoint',
+  odp: 'OpenDocument',
+};
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: 'PNG Image',
+  jpg: 'JPEG Image',
+  jpeg: 'JPEG Image',
+  gif: 'GIF Image',
+  svg: 'SVG Image',
+  webp: 'WebP Image',
+  bmp: 'Bitmap Image',
+  ico: 'Icon File',
+};
+
+const VIDEO_TYPES: Record<string, string> = {
+  mp4: 'MP4 Video',
+  mov: 'QuickTime',
+  avi: 'AVI Video',
+  mkv: 'Matroska Video',
+  webm: 'WebM Video',
+};
+
+const AUDIO_TYPES: Record<string, string> = {
+  mp3: 'MP3 Audio',
+  wav: 'WAV Audio',
+  flac: 'FLAC Audio',
+  aac: 'AAC Audio',
+  ogg: 'OGG Audio',
+  m4a: 'M4A Audio',
+};
+
+const ARCHIVE_TYPES: Record<string, string> = {
+  zip: 'ZIP Archive',
+  rar: 'RAR Archive',
+  '7z': '7Z Archive',
+  tar: 'TAR Archive',
+  gz: 'GZIP Archive',
+  bz2: 'BZIP2 Archive',
+};
+
+const CODE_TYPES: Record<string, string> = {
+  tsx: 'TypeScript React',
+  ts: 'TypeScript',
+  jsx: 'JavaScript React',
+  js: 'JavaScript',
+  json: 'JSON',
+  html: 'HTML',
+  htm: 'HTML',
+  css: 'CSS',
+  scss: 'SCSS',
+  sass: 'Sass',
+  less: 'LESS',
+  py: 'Python',
+  rb: 'Ruby',
+  go: 'Go',
+  rs: 'Rust',
+  java: 'Java',
+  kt: 'Kotlin',
+  swift: 'Swift',
+  cpp: 'C++',
+  c: 'C',
+  h: 'C Header',
+  hpp: 'C++ Header',
+  cs: 'C#',
+  php: 'PHP',
+  sql: 'SQL',
+  sh: 'Shell Script',
+  bash: 'Bash Script',
+  zsh: 'Zsh Script',
+  ps1: 'PowerShell',
+  yaml: 'YAML',
+  yml: 'YAML',
+  xml: 'XML',
+  md: 'Markdown',
+  markdown: 'Markdown',
+  dockerfile: 'Dockerfile',
+  env: 'Environment File',
+  gitignore: 'Git Ignore',
+  config: 'Configuration',
+  ini: 'INI File',
+  toml: 'TOML File',
+};
+
+const EXECUTABLE_TYPES: Record<string, string> = {
+  exe: 'Windows Executable',
+  msi: 'Windows Installer',
+  dmg: 'macOS Disk Image',
+  pkg: 'macOS Package',
+  deb: 'Debian Package',
+  rpm: 'RPM Package',
+  appimage: 'AppImage',
+  snap: 'Snap Package',
+  flatpak: 'Flatpak',
+};
+
+const KIND_BY_EXTENSION: Record<string, string> = {
+  ...DOCUMENT_TYPES,
+  ...SPREADSHEET_TYPES,
+  ...PRESENTATION_TYPES,
+  ...IMAGE_TYPES,
+  ...VIDEO_TYPES,
+  ...AUDIO_TYPES,
+  ...ARCHIVE_TYPES,
+  ...CODE_TYPES,
+  ...EXECUTABLE_TYPES,
+};
+
 /**
  * Maps file extensions to human-readable kind labels
  * Follows consistent naming: "<Format> <Type>" for documents, "<Language>" for code
  */
 function getKindFromFileType(fileType: string, resultType?: string): string {
-  // Document formats
-  const documentTypes: Record<string, string> = {
-    pdf: 'PDF Document',
-    doc: 'Word Document',
-    docx: 'Word Document',
-    txt: 'Text File',
-    rtf: 'Rich Text',
-    odt: 'OpenDocument',
-  };
-
-  // Shorter alternatives:
-  const spreadsheetTypes: Record<string, string> = {
-    xls: 'Excel Sheet',
-    xlsx: 'Excel Sheet',
-    csv: 'CSV File',
-    ods: 'OpenDocument Sheet',
-  };
-
-  // Presentation formats
-  const presentationTypes: Record<string, string> = {
-    ppt: 'PowerPoint',
-    pptx: 'PowerPoint',
-    odp: 'OpenDocument',
-  };
-
-  // Image formats
-  const imageTypes: Record<string, string> = {
-    png: 'PNG Image',
-    jpg: 'JPEG Image',
-    jpeg: 'JPEG Image',
-    gif: 'GIF Image',
-    svg: 'SVG Image',
-    webp: 'WebP Image',
-    bmp: 'Bitmap Image',
-    ico: 'Icon File',
-  };
-
-  // Video formats
-  const videoTypes: Record<string, string> = {
-    mp4: 'MP4 Video',
-    mov: 'QuickTime',
-    avi: 'AVI Video',
-    mkv: 'Matroska Video',
-    webm: 'WebM Video',
-  };
-
-  // Audio formats
-  const audioTypes: Record<string, string> = {
-    mp3: 'MP3 Audio',
-    wav: 'WAV Audio',
-    flac: 'FLAC Audio',
-    aac: 'AAC Audio',
-    ogg: 'OGG Audio',
-    m4a: 'M4A Audio',
-  };
-
-  // Archive formats
-  const archiveTypes: Record<string, string> = {
-    zip: 'ZIP Archive',
-    rar: 'RAR Archive',
-    '7z': '7Z Archive',
-    tar: 'TAR Archive',
-    gz: 'GZIP Archive',
-    bz2: 'BZIP2 Archive',
-  };
-
-  // Code formats
-  const codeTypes: Record<string, string> = {
-    tsx: 'TypeScript React',
-    ts: 'TypeScript',
-    jsx: 'JavaScript React',
-    js: 'JavaScript',
-    json: 'JSON',
-    html: 'HTML',
-    htm: 'HTML',
-    css: 'CSS',
-    scss: 'SCSS',
-    sass: 'Sass',
-    less: 'LESS',
-    py: 'Python',
-    rb: 'Ruby',
-    go: 'Go',
-    rs: 'Rust',
-    java: 'Java',
-    kt: 'Kotlin',
-    swift: 'Swift',
-    cpp: 'C++',
-    c: 'C',
-    h: 'C Header',
-    hpp: 'C++ Header',
-    cs: 'C#',
-    php: 'PHP',
-    sql: 'SQL',
-    sh: 'Shell Script',
-    bash: 'Bash Script',
-    zsh: 'Zsh Script',
-    ps1: 'PowerShell',
-    yaml: 'YAML',
-    yml: 'YAML',
-    xml: 'XML',
-    md: 'Markdown',
-    markdown: 'Markdown',
-    dockerfile: 'Dockerfile',
-    env: 'Environment File',
-    gitignore: 'Git Ignore',
-    config: 'Configuration',
-    ini: 'INI File',
-    toml: 'TOML File',
-  };
-
-  // Executable formats
-  const executableTypes: Record<string, string> = {
-    exe: 'Windows Executable',
-    msi: 'Windows Installer',
-    dmg: 'macOS Disk Image',
-    pkg: 'macOS Package',
-    deb: 'Debian Package',
-    rpm: 'RPM Package',
-    appimage: 'AppImage',
-    snap: 'Snap Package',
-    flatpak: 'Flatpak',
-  };
-
-  // Combine all type maps
-  const allTypes = {
-    ...documentTypes,
-    ...spreadsheetTypes,
-    ...presentationTypes,
-    ...imageTypes,
-    ...videoTypes,
-    ...audioTypes,
-    ...archiveTypes,
-    ...codeTypes,
-    ...executableTypes,
-  };
-
-  const kind = allTypes[fileType.toLowerCase()];
+  const kind = KIND_BY_EXTENSION[fileType.toLowerCase()];
   if (kind) return kind;
 
   // Fallbacks for unknown types
@@ -314,9 +308,13 @@ export const ResultItem = memo(function ResultItem({
       onKeyDown={handleKeyDown}
       role="option"
       aria-selected={isSelected}
+      data-selected={isSelected || undefined}
       tabIndex={isSelected ? 0 : -1}
       className={cn(
-        "grid grid-cols-[28px_1fr_auto] gap-3 px-4 py-2 cursor-pointer group",
+        // One row of the 4pt rhythm: --padding-block-row, a --spacing-7 icon track, a title/path
+        // track that may shrink to nothing (min-width 0 truncation), a meta track that shrinks
+        // before it, and a zero-width executing track that only opens when the spinner mounts.
+        "grid grid-cols-[var(--spacing-7)_minmax(0,1fr)_minmax(0,auto)_auto] gap-3 px-4 py-[var(--padding-block-row)] cursor-pointer group",
         "relative",
         isSelected 
           ? "bg-primary text-primary-foreground" 
@@ -334,13 +332,13 @@ export const ResultItem = memo(function ResultItem({
       {/* Icon */}
       <div className={cn(
         "flex-shrink-0 w-7 h-7 flex items-center justify-center",
-        "transition-colors duration-100",
+        "transition-colors duration-[var(--duration-100)]",
         isSelected ? "text-primary-foreground" : getFileTypeColor(fileType, isFolder)
       )}>
         {icon ? (
-          <span className="text-lg">{icon}</span>
+          <span className="text-lg" aria-hidden="true">{icon}</span>
         ) : (
-          getFileTypeIcon(fileType, isFolder)
+          <span aria-hidden="true">{getFileTypeIcon(fileType, isFolder)}</span>
         )}
       </div>
 
@@ -364,7 +362,7 @@ export const ResultItem = memo(function ResultItem({
             ref={pathRef}
             className={cn(
               "font-mono truncate text-xs",
-              isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
+              isSelected ? "text-primary-foreground" : "text-muted-foreground"
             )}
             title={path}
           >
@@ -374,12 +372,12 @@ export const ResultItem = memo(function ResultItem({
       </div>
 
       {/* Meta section - Kind + Shortcut */}
-      <div className="flex items-center gap-1.5 self-center min-w-0">
-        {/* Kind label */}
+      <div className="flex items-center gap-[var(--gap-inline)] self-center min-w-0">
+        {/* Kind label — truncates against the meta track (minmax(0,auto)), no invented cap */}
         <span
           className={cn(
-            "text-xs whitespace-nowrap truncate max-w-[140px]",
-            isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
+            "text-xs min-w-0 truncate",
+            isSelected ? "text-primary-foreground" : "text-muted-foreground"
           )}
           title={kind}
         >
@@ -395,17 +393,24 @@ export const ResultItem = memo(function ResultItem({
                   e.stopPropagation();
                   onAskAbout();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                  }
+                }}
+                aria-label={`Ask about ${title}`}
                 className={cn(
-                  "opacity-0 group-hover:opacity-100 transition-opacity",
-                  "text-xs flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)]",
-                  "cursor-pointer",
+                  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                  "transition-[opacity,background-color] duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
+                  "text-xs flex items-center gap-1 px-[var(--gap-inline)] py-[var(--spacing-1)] rounded-sm",
+                  "cursor-pointer flex-shrink-0",
                   isSelected
                     ? "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30"
                     : "bg-primary/10 text-primary hover:bg-primary/20"
                 )}
                 type="button"
               >
-                <Sparkle weight="fill" className="h-3 w-3" />
+                <Sparkle weight="fill" className="h-3 w-3" aria-hidden="true" />
                 <span className="font-medium">Ask</span>
               </button>
             </TooltipTrigger>
@@ -417,7 +422,7 @@ export const ResultItem = memo(function ResultItem({
 
         {/* Shortcut badge */}
         <span className={cn(
-          "text-xs font-mono px-1.5 py-0.5 rounded-[var(--radius-sm)]",
+          "text-xs font-mono px-[var(--gap-inline)] py-[var(--spacing-1)] rounded-sm flex-shrink-0",
           isSelected
             ? "bg-primary-foreground/20 text-primary-foreground"
             : "bg-muted text-muted-foreground"
@@ -428,11 +433,16 @@ export const ResultItem = memo(function ResultItem({
 
       {/* Executing indicator */}
       {isExecuting && (
-        <div className="flex-shrink-0">
-          <CircleDashed weight="fill" className={cn(
-            "h-5 w-5 animate-spin",
-            isSelected ? "text-primary-foreground" : "text-[var(--color-green-500)]"
-          )} />
+        <div className="flex-shrink-0 self-center">
+          <CircleDashed
+            weight="fill"
+            aria-hidden="true"
+            className={cn(
+              "h-5 w-5 animate-spin",
+              isSelected ? "text-primary-foreground" : "text-success"
+            )}
+          />
+          <span className="sr-only">Opening…</span>
         </div>
       )}
     </div>

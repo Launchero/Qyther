@@ -87,8 +87,15 @@ const SKELETON_VARIANTS: Record<string, React.FC> = {
 export function GenerativeUISkeleton({ estimatedType, title }: GenerativeUISkeletonProps) {
   const SkeletonContent = SKELETON_VARIANTS[estimatedType || 'table'] || DefaultSkeleton;
 
+  // A real loading state, not just grey boxes: the row divs carry no text, so the label is
+  // what a screen reader gets while the payload is still streaming.
   return (
-    <div className="generative-ui-container generative-ui-skeleton">
+    <div
+      className="generative-ui-container generative-ui-skeleton"
+      role="status"
+      aria-live="polite"
+      aria-label={`Generating ${title || estimatedType || 'structured result'}…`}
+    >
       {title && <div className="skeleton-header shimmer" />}
       <SkeletonContent />
       <div className="skeleton-footer shimmer" />

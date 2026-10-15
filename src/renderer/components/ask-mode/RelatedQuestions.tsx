@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRightIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface RelatedQuestionsProps {
@@ -16,16 +17,21 @@ export function RelatedQuestions({ questions, onSelect, className }: RelatedQues
       <div className="related-title">Related</div>
       <div className="related-list" role="list">
         {questions.map((question) => (
-          <button
+          <Button
             key={question}
-            className="related-question-item related-item"
+            type="button"
+            variant="ghost"
+            size="xs"
+            // `.related-question-item` is the CSS stagger hook — it must stay on the element.
+            className="related-question-item related-item justify-start"
             onClick={() => onSelect(question)}
             role="listitem"
             aria-label={`Ask: ${question}`}
+            title={`Ask: ${question}`}
           >
-            <ArrowRightIcon weight="regular" />
+            <ArrowRightIcon weight="regular" aria-hidden="true" />
             {question}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

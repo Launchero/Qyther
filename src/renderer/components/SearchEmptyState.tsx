@@ -3,9 +3,6 @@ import { cn } from '@/lib/utils';
 import type { RecentFile } from '@/hooks/useRecentFiles';
 import {
   FolderOpen,
-  ClockCounterClockwise,
-  TerminalWindow,
-  GitBranch,
   File,
 } from '@phosphor-icons/react';
 
@@ -27,51 +24,30 @@ const quickActions: QuickActionConfig[] = [
   {
     id: 'find-in-folder',
     label: 'Find in Folder',
-    icon: <FolderOpen weight="fill" className="h-5 w-5" />,
+    icon: <FolderOpen weight="fill" className="h-5 w-5" aria-hidden="true" />,
     iconBg: 'bg-primary/10',
     iconColor: 'text-primary',
   },
-  {
-    id: 'recent-files',
-    label: 'Recent Files',
-    icon: <ClockCounterClockwise weight="fill" className="h-5 w-5" />,
-    iconBg: 'bg-[var(--color-yellow-500)]/10',
-    iconColor: 'text-[var(--color-yellow-500)]',
-  },
-  {
-    id: 'open-terminal',
-    label: 'Open Terminal',
-    icon: <TerminalWindow weight="fill" className="h-5 w-5" />,
-    iconBg: 'bg-[var(--color-green-500)]/10',
-    iconColor: 'text-[var(--color-green-500)]',
-  },
-  {
-    id: 'git-status',
-    label: 'Git Status',
-    icon: <GitBranch weight="fill" className="h-5 w-5" />,
-    iconBg: 'bg-destructive/10',
-    iconColor: 'text-destructive',
-  },
 ];
 
+// File-type colour comes from the semantic --file-* pair (light + .dark halves), never from a
+// raw primitive: the old --color-yellow-500 does not clear 4.5:1 on a light card.
 function getFileIcon(fileName: string): React.ReactNode {
   const ext = fileName.split('.').pop()?.toLowerCase();
+  const glyph = (color: string) => <File weight="fill" className={cn('h-4 w-4', color)} aria-hidden="true" />;
   switch (ext) {
     case 'tsx':
     case 'ts':
-      return <File weight="fill" className="h-4 w-4 text-primary" />;
+      return glyph('text-[var(--color-file-typescript)]');
     case 'js':
     case 'jsx':
-      return <File weight="fill" className="h-4 w-4 text-[var(--color-yellow-500)]" />;
     case 'json':
-      return <File weight="fill" className="h-4 w-4 text-[var(--color-yellow-500)]" />;
+      return glyph('text-[var(--color-file-javascript)]');
     case 'css':
     case 'scss':
-      return <File weight="fill" className="h-4 w-4 text-primary" />;
-    case 'md':
-      return <File weight="fill" className="h-4 w-4 text-muted-foreground" />;
+      return glyph('text-primary');
     default:
-      return <File weight="fill" className="h-4 w-4 text-muted-foreground" />;
+      return glyph('text-muted-foreground');
   }
 }
 
@@ -81,26 +57,31 @@ export function SearchEmptyState({
   onQuickAction,
 }: SearchEmptyStateProps) {
   return (
-    <div className="flex flex-col overflow-y-auto">
-      <div className="px-4 pt-6 pb-4">
+    <div className="flex flex-col overflow-y-auto flex-1 min-h-0">
+      {/* `my-auto` rather than a fixed top padding: it centres the landing content
+          while there is spare height and collapses to zero once the list grows, so
+          a short history never leaves a pooled void under the last row. */}
+      <div className="my-auto px-4 pt-6 pb-4">
         {/* Quick Actions */}
         <div className="mb-6">
           <div className="px-1 pb-3">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-[var(--tracking-label)]">
               Quick Actions
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          {/* One action in a two-column grid leaves the right column empty, which
+              reads as a missing tile rather than a deliberate single action. */}
+          <div className={cn('grid gap-2', quickActions.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
             {quickActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
                 onClick={() => onQuickAction(action.id)}
                 className={cn(
-                  'flex flex-col items-center gap-2 p-3 rounded-md',
+                  'flex flex-col items-center gap-[var(--gap-inline)] p-3 rounded-md',
                   'border border-transparent',
                   'hover:bg-accent hover:border-border',
-                  'transition-all duration-150 ease-in-out',
+                  'transition-[background-color,border-color] duration-[var(--duration-150)] ease-[var(--easing-smooth)]',
                 )}
               >
                 <div
@@ -124,10 +105,10 @@ export function SearchEmptyState({
         {recentFiles.length > 0 && (
           <div>
             <div className="flex items-center justify-between px-1 pb-3">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-[var(--tracking-label)]">
                 Recently Opened
               </span>
-              <span className="text-xs px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground font-medium">
+              <span className="text-xs px-[var(--gap-inline)] py-[var(--spacing-1)] rounded-sm bg-muted text-muted-foreground font-medium">
                 {recentFiles.length}
               </span>
             </div>
@@ -138,9 +119,10 @@ export function SearchEmptyState({
                   type="button"
                   onClick={() => onOpenFile(file.path)}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-sm',
+                    // Row rhythm matches ResultItem: --padding-block-row, gap-3, text-left.
+                    'flex items-center gap-3 px-3 py-[var(--padding-block-row)] rounded-sm',
                     'hover:bg-accent',
-                    'transition-colors duration-150 ease-in-out',
+                    'transition-colors duration-[var(--duration-150)] ease-[var(--easing-smooth)]',
                     'text-left w-full',
                   )}
                 >

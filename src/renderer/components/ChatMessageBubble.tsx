@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- LLM/component payload shapes are dynamic */
-﻿import React, { useRef, useEffect } from 'react';
+import React, { useMemo, type ElementType, type ReactNode } from 'react';
 import { ChatMessageActions } from './ask-mode/ChatMessageActions';
 import { GenerativeUI, GenerativeUIType } from './ask-mode/GenerativeUI';
-import { GenerativeUISkeleton } from './ask-mode/GenerativeUI/GenerativeUISkeleton';
-import { GenerativeUIProgress } from './ask-mode/GenerativeUI/GenerativeUIProgress';
 import { SourcesPanel } from './ask-mode/SourcesPanel';
 import { TaskMetricsDisplay } from './ask-mode/Transparency/TaskMetrics';
 import { CodeBlock } from './ask-mode/CodeBlock';
 import { CitationBracket } from './ask-mode/CitationBracket';
-import { RelatedQuestions } from './ask-mode/RelatedQuestions';
 import { ThinkingSteps } from './ask-mode/ThinkingSteps';
 import { ConfidenceBadge } from './ask-mode/ConfidenceBadge';
 import { formatTime } from '../utils/formatTime';
+import { splitAtSettledBlock } from '../utils/markdownBlocks';
+import { safeExternalUrl } from '../utils/externalUrl';
 import { cn } from '@/lib/utils';
 import type { TaskMetrics } from '../utils/costCalculator';
 import { CheckCircle } from '@phosphor-icons/react';
@@ -75,19 +74,117 @@ interface ChatMessageBubbleProps {
   onExplain?: (content: string) => void;
   onShowCode?: (content: string) => void;
   onRegenerate?: () => void;
-  onRelatedQuestion?: (question: string) => void;
   onFormSubmit?: (formTitle: string, formData: Record<string, unknown>) => void;
+}
+
+/**
+ * Markdown level → element and type rung. Every level now lands on its own rung of the
+ * measured scale (20 / 18 / 16 / 14px) instead of `##` and `###` both rendering `text-sm`
+ * and `#` rendering body size. The DOM tag stays one below the markdown level because the
+ * palette owns the page's `h1`; a chat answer must not re-declare one.
+ */
+const HEADING_RUNGS: Record<number, { Tag: ElementType; className: string }> = {
+  1: { Tag: 'h2', className: 'text-xl font-semibold mt-3 mb-1' },
+  2: { Tag: 'h3', className: 'text-lg font-semibold mt-3 mb-1' },
+  3: { Tag: 'h4', className: 'text-base font-semibold mt-3 mb-1' },
+  4: { Tag: 'h5', className: 'text-sm font-semibold mt-3 mb-1' },
+};
+
+const HEADING_MATCH = /^(#{1,4})[ \t]+(.*)$/;
+const BULLET_MATCH = /^[-*]\s+(.+)/;
+const ORDERED_MATCH = /^\d+\.\s+(.+)/;
+const FENCE_MATCH = /^```(\w*)/;
+
+type MarkdownBlock =
+  | { kind: 'code'; language: string; code: string }
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'list'; ordered: boolean; items: string[] }
+  | { kind: 'paragraph'; text: string };
+
+/**
+ * Line scanner, kept pure and above the component so the renderer below is only a mapping.
+ * Deliberately conservative: an unterminated fence renders as code, never as prose.
+ */
+function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  let inCodeBlock = false;
+  let codeContent = '';
+  let codeLanguage = '';
+
+  const flushList = () => {
+    if (list) {
+      blocks.push({ kind: 'list', ordered: list.ordered, items: list.items });
+      list = null;
+    }
+  };
+
+  for (const line of content.split('\n')) {
+    const fence = line.match(FENCE_MATCH);
+    if (fence) {
+      if (inCodeBlock) {
+        blocks.push({ kind: 'code', language: codeLanguage || 'text', code: codeContent.trim() });
+        codeContent = '';
+        codeLanguage = '';
+        inCodeBlock = false;
+      } else {
+        flushList();
+        inCodeBlock = true;
+        codeLanguage = fence[1] || '';
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeContent += line + '\n';
+      continue;
+    }
+
+    const heading = line.match(HEADING_MATCH);
+    if (heading) {
+      flushList();
+      blocks.push({ kind: 'heading', level: heading[1].length, text: heading[2] });
+      continue;
+    }
+
+    const ordered = line.match(ORDERED_MATCH);
+    const bullet = line.match(BULLET_MATCH);
+    if (ordered || bullet) {
+      const wantsOrdered = !!ordered;
+      if (list && list.ordered !== wantsOrdered) flushList();
+      if (!list) list = { ordered: wantsOrdered, items: [] };
+      list.items.push((ordered ?? bullet)![1]);
+      continue;
+    }
+
+    if (line.trim() === '') {
+      flushList();
+      continue;
+    }
+
+    flushList();
+    blocks.push({ kind: 'paragraph', text: line });
+  }
+
+  flushList();
+  if (inCodeBlock) {
+    blocks.push({ kind: 'code', language: codeLanguage || 'text', code: codeContent.trim() });
+  }
+  return blocks;
 }
 
 function renderInlineMarkdownWithCitations(
   text: string,
   sources?: Array<{ url: string }>,
   onCitationClick?: (url: string) => void
-): React.ReactNode {
+): ReactNode {
   const parts = text.split(/(`[^`]+`|\[\d+\])/g);
   return parts.map((part, i) => {
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} className="bg-muted px-1 rounded text-xs">{part.slice(1, -1)}</code>;
+      // No class here on purpose: `.answer-content code:not(pre code)` and
+      // `.message-user-bubble code` already own the mono face, the plate and the padding,
+      // and a `text-xs` on the element would restate a size under the prose that owns it.
+      return <code key={i}>{part.slice(1, -1)}</code>;
     }
     const citationMatch = part.match(/^\[(\d+)\]$/);
     if (citationMatch) {
@@ -97,7 +194,10 @@ function renderInlineMarkdownWithCitations(
         <CitationBracket
           key={i}
           number={citationNumber}
-          onClick={() => onCitationClick?.(source?.url || '')}
+          onClick={() => {
+            const href = safeExternalUrl(source?.url);
+            if (href) onCitationClick?.(href);
+          }}
         />
       );
     }
@@ -111,276 +211,229 @@ function renderInlineMarkdownWithCitations(
   });
 }
 
-function SimpleMarkdown({
-  content,
-  sources,
-  onCitationClick,
-}: {
+interface MarkdownProps {
   content: string;
   sources?: Array<{ url: string }>;
   onCitationClick?: (url: string) => void;
-}) {
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeContent = '';
-  let codeLanguage = '';
-  let listItems: string[] = [];
-  let listType: 'ul' | 'ol' | null = null;
+}
 
-  const flushList = () => {
-    if (listItems.length > 0) {
-      const ListTag = listType || 'ul';
-      elements.push(
-        <ListTag key={`list-${elements.length}`} className="my-2 ml-4 space-y-1">
-          {listItems.map((item, i) => (
-            <li key={i}>{renderInlineMarkdownWithCitations(item, sources, onCitationClick)}</li>
+function renderMarkdownBlock(
+  block: MarkdownBlock,
+  key: number,
+  inline: (text: string) => ReactNode
+): ReactNode {
+  switch (block.kind) {
+    case 'code':
+      return <CodeBlock key={key} language={block.language} code={block.code} />;
+
+    case 'heading': {
+      const rung = HEADING_RUNGS[block.level] ?? HEADING_RUNGS[4];
+      return <rung.Tag key={key} className={rung.className}>{inline(block.text)}</rung.Tag>;
+    }
+
+    case 'list': {
+      const ListTag = block.ordered ? 'ol' : 'ul';
+      return (
+        <ListTag key={key} className="my-2 ml-4 space-y-1">
+          {block.items.map((item, i) => (
+            <li key={i}>{inline(item)}</li>
           ))}
         </ListTag>
       );
-      listItems = [];
-      listType = null;
-    }
-  };
-
-  const renderInline = (text: string): React.ReactNode => {
-    return renderInlineMarkdownWithCitations(text, sources, onCitationClick);
-  };
-
-  lines.forEach((line) => {
-    const codeBlockMatch = line.match(/^```(\w*)/);
-    if (codeBlockMatch) {
-      if (inCodeBlock) {
-        elements.push(
-          <CodeBlock
-            key={`code-${elements.length}`}
-            language={codeLanguage || 'text'}
-            code={codeContent.trim()}
-          />
-        );
-        codeContent = '';
-        codeLanguage = '';
-        inCodeBlock = false;
-      } else {
-        flushList();
-        inCodeBlock = true;
-        codeLanguage = codeBlockMatch[1] || '';
-      }
-      return;
     }
 
-    if (inCodeBlock) {
-      codeContent += line + '\n';
-      return;
-    }
-
-    if (line.startsWith('### ')) {
-      flushList();
-      elements.push(<h4 key={elements.length} className="text-sm font-semibold mt-3 mb-1">{renderInline(line.slice(4))}</h4>);
-      return;
-    }
-
-    if (line.startsWith('## ')) {
-      flushList();
-      elements.push(<h3 key={elements.length} className="text-sm font-semibold mt-3 mb-1">{renderInline(line.slice(3))}</h3>);
-      return;
-    }
-
-    if (line.startsWith('# ')) {
-      flushList();
-      elements.push(<h2 key={elements.length} className="text-base font-semibold mt-3 mb-1">{renderInline(line.slice(2))}</h2>);
-      return;
-    }
-
-    const bulletMatch = line.match(/^[-*]\s+(.+)/);
-    const numberMatch = line.match(/^\d+\.\s+(.+)/);
-
-    if (bulletMatch) {
-      if (listType !== 'ul') {
-        flushList();
-        listType = 'ul';
-      }
-      listItems.push(bulletMatch[1]);
-      return;
-    }
-
-    if (numberMatch) {
-      if (listType !== 'ol') {
-        flushList();
-        listType = 'ol';
-      }
-      listItems.push(numberMatch[1]);
-      return;
-    }
-
-    if (line.trim() === '') {
-      flushList();
-      return;
-    }
-
-    flushList();
-    elements.push(
-      <p key={elements.length} className="my-2">{renderInline(line)}</p>
-    );
-  });
-
-  flushList();
-  return <>{elements}</>;
+    default:
+      return <p key={key} className="my-2">{inline(block.text)}</p>;
+  }
 }
 
-export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExplain, onShowCode, onRegenerate, onRelatedQuestion, onFormSubmit }: ChatMessageBubbleProps) => {
-  const messageRef = useRef<HTMLDivElement>(null);
+function SimpleMarkdown({ content, sources, onCitationClick }: MarkdownProps) {
+  const inline = (text: string) => renderInlineMarkdownWithCitations(text, sources, onCitationClick);
+  return <>{parseMarkdownBlocks(content).map((block, i) => renderMarkdownBlock(block, i, inline))}</>;
+}
 
-  useEffect(() => {
-    if (messageRef.current) {
-      messageRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, []);
+/**
+ * The half of a streamed answer that cannot change again. Memoized on its text, so once a block
+ * settles its element array is reused and React skips the subtree instead of reconciling every
+ * paragraph of a growing answer once per frame.
+ */
+const SettledMarkdown = React.memo(SimpleMarkdown);
 
+/** Prefer full `uiPayloads`; fall back to the legacy single payload shape. */
+function resolvePayloads(message: ChatMessage): UIPayload[] {
+  if (message.uiPayloads && message.uiPayloads.length > 0) return message.uiPayloads;
+  if (message.hasStructuredData && message.structuredData) {
+    return [{
+      type: message.dataType || ('list' as GenerativeUIType),
+      title: message.structuredData.title || '',
+      data: message.structuredData,
+      node: 'legacy',
+    }];
+  }
+  return [];
+}
+
+function GenerativePayloads({ message, onFormSubmit }: Pick<ChatMessageBubbleProps, 'message' | 'onFormSubmit'>) {
+  // Structured payloads arrive once, in the terminal chunk — there is no
+  // progressive generation to skeletonise (main has no sender for the
+  // ui-payload progress pushes, so a skeleton here would never resolve).
+  if (message.isStreaming) return null;
+
+  return resolvePayloads(message).map((payload, idx) => (
+    <GenerativeUI
+      key={`${payload.type}-${idx}`}
+      resultType={payload.type}
+      data={payload.data}
+      title={payload.title}
+      onExport={(format) => {
+        logInfo(`[ChatMessageBubble] Exported ${payload.type} as ${format}`);
+      }}
+      onConfirm={(formData) => {
+        const formTitle = (payload.data as Record<string, unknown>)?.title || (payload.data as Record<string, unknown>)?.targetUrl || payload.title || 'Configuration';
+        onFormSubmit?.(formTitle as string, formData as Record<string, unknown>);
+      }}
+      onEdit={() => {
+        // FormPreview manages local state; edits are handled internally.
+      }}
+      onCancel={() => {
+        logInfo('[ChatMessageBubble] Form cancelled');
+      }}
+    />
+  ));
+}
+
+/** Post-answer signals — each appears only once the turn settles, so each fades in. */
+function AnswerSignals({ message }: Pick<ChatMessageBubbleProps, 'message'>) {
+  return (
+    <>
+      {message.selfCorrected && !message.isStreaming && (
+        <div className="quality-badge animate-fade-in">
+          <CheckCircle className="w-3 h-3" weight="fill" aria-hidden="true" />
+          <span>Reviewed and improved</span>
+          {message.iterationsUsed && message.iterationsUsed > 1 && (
+            <span className="quality-badge-iterations">({message.iterationsUsed} iterations)</span>
+          )}
+        </div>
+      )}
+
+      {message.agent && !message.isStreaming && <AgentIndicator agent={message.agent} />}
+
+      {message.confidence !== undefined && message.confidence > 0 && !message.isStreaming && (
+        <ConfidenceBadge
+          className="animate-fade-in"
+          confidence={message.confidence}
+          verified={message.verified}
+          selfCorrected={message.selfCorrected}
+          qualityScore={message.qualityScore}
+          iterationsUsed={message.iterationsUsed}
+        />
+      )}
+    </>
+  );
+}
+
+function AnswerSecondary({ message }: Pick<ChatMessageBubbleProps, 'message'>) {
+  if (!message.sources?.length && !message.metrics) return null;
+
+  return (
+    <div className="answer-secondary">
+      {!!message.sources?.length && <SourcesPanel sources={message.sources} />}
+      {message.metrics && (
+        <div className="answer-metrics">
+          <TaskMetricsDisplay metrics={message.metrics} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssistantAnswer({
+  message,
+  onCopy,
+  onExplain,
+  onShowCode,
+  onRegenerate,
+  onFormSubmit,
+}: ChatMessageBubbleProps) {
+  // Split at the last blank line whose parser state is provably clean (see `markdownBlocks.ts`),
+  // so only the block still being streamed re-parses. A whole final answer parses in one piece
+  // either way; this is about the frames in between.
+  const { settled, tail } = useMemo(() => splitAtSettledBlock(message.content), [message.content]);
+
+  return (
+    <div>
+      {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+        <ThinkingSteps
+          steps={message.thinkingSteps}
+          isComplete={!message.isStreaming}
+          durationMs={message.metrics?.durationMs}
+        />
+      )}
+
+      <div className="answer-content">
+        {settled && <SettledMarkdown content={settled} />}
+        <SimpleMarkdown content={tail} />
+
+        {message.isStreaming && <span className="streaming-cursor">▊</span>}
+
+        <GenerativePayloads message={message} onFormSubmit={onFormSubmit} />
+        <AnswerSignals message={message} />
+      </div>
+
+      <AnswerSecondary message={message} />
+
+      {!message.isStreaming && (
+        <div className="answer-actions">
+          <ChatMessageActions
+            onCopy={onCopy ? () => onCopy(message.content) : undefined}
+            onExplain={onExplain ? () => onExplain(message.content) : undefined}
+            onShowCode={onShowCode ? () => onShowCode(message.content) : undefined}
+            onRegenerate={onRegenerate}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExplain, onShowCode, onRegenerate, onFormSubmit }: ChatMessageBubbleProps) => {
+  // No scroll-on-mount here on purpose. `ChatMessagesList` owns tracking the bottom of the
+  // transcript, and a bubble that scrolls itself into view on mount yanked the viewport once per
+  // message while a history was loading — the second, ungated `scrollIntoView` the transition
+  // audit asked to remove rather than gate.
+
+  // No `tabIndex` here either. Every bubble used to be focusable, which put a stop on every turn
+  // of the transcript in a palette the user drives with the keyboard; `role="article"` is kept on
+  // the assistant turn only, because that is the content with headings, sources and metrics.
   const isUser = message.role === 'user';
-
-  // Determine which payloads to render — prefer full uiPayloads, fall back to legacy single payload
-  const payloadsToRender = message.uiPayloads && message.uiPayloads.length > 0
-    ? message.uiPayloads
-    : message.hasStructuredData && message.structuredData
-      ? [{ type: message.dataType || 'list' as GenerativeUIType, title: message.structuredData.title || '', data: message.structuredData, node: 'legacy' }]
-      : [];
 
   return (
     <div
-      ref={messageRef}
       className={cn(
-        "flex gap-3 max-w-[var(--chat-message-max-width)]",
-        isUser ? "self-end flex-row-reverse" : "self-start",
+        'flex gap-3 max-w-[var(--chat-message-max-width)]',
+        isUser ? 'self-end flex-row-reverse' : 'self-start',
         className
       )}
-      tabIndex={0}
-      role="article"
-      aria-label={`${message.role} message`}
+      role={isUser ? undefined : 'article'}
+      aria-label={isUser ? undefined : 'Assistant response'}
     >
       <div className={cn(
-        "flex-1",
-        isUser ? "message-user" : "answer"
+        'min-w-0 flex-1',
+        isUser ? 'message-user' : 'answer max-w-[var(--measure-readable)]'
       )}>
         {isUser ? (
           <div className="message-user-bubble">
             <SimpleMarkdown content={message.content} />
           </div>
         ) : (
-          <div className="answer">
-            {/* Thinking block FIRST, collapsed by default (Claude-style) */}
-            {message.thinkingSteps && message.thinkingSteps.length > 0 && (
-              <ThinkingSteps
-                steps={message.thinkingSteps}
-                isComplete={!message.isStreaming}
-                durationMs={message.metrics?.durationMs}
-              />
-            )}
-
-            {/* Answer content — primary */}
-            <div className="answer-content">
-              <SimpleMarkdown content={message.content} />
-
-              {message.isStreaming && (
-                <span className="streaming-cursor">▊</span>
-              )}
-
-              {message.isStreaming && message.uiPayloadPending && (
-                <>
-                  <GenerativeUISkeleton
-                    estimatedType={message.uiPayloadType || 'table'}
-                  />
-                  {message.uiGenerationProgress !== undefined && message.uiGenerationProgress > 0 && (
-                    <GenerativeUIProgress
-                      progress={message.uiGenerationProgress}
-                      message={message.uiProgressMessage || 'Generating structured data...'}
-                    />
-                  )}
-                </>
-              )}
-
-              {!message.isStreaming && payloadsToRender.length > 0 && payloadsToRender.map((payload, idx) => (
-                <GenerativeUI
-                  key={`${payload.type}-${idx}`}
-                  resultType={payload.type}
-                  data={payload.data}
-                  title={payload.title}
-                  onExport={(format) => {
-                    logInfo(`[ChatMessageBubble] Exported ${payload.type} as ${format}`);
-                  }}
-                  onConfirm={(formData) => {
-                    const formTitle = (payload.data as Record<string, unknown>)?.title || (payload.data as Record<string, unknown>)?.targetUrl || payload.title || 'Configuration';
-                    onFormSubmit?.(formTitle as string, formData as Record<string, unknown>);
-                  }}
-                  onEdit={() => {
-                    // FormPreview manages local state; edits are handled internally.
-                  }}
-                  onCancel={() => {
-                    logInfo('[ChatMessageBubble] Form cancelled');
-                  }}
-                />
-              ))}
-
-              {/* Quality badge for self-corrected responses */}
-              {message.selfCorrected && !message.isStreaming && (
-                <div className="quality-badge">
-                  <CheckCircle className="w-3 h-3" weight="fill" />
-                  <span>Reviewed and improved</span>
-                  {message.iterationsUsed && message.iterationsUsed > 1 && (
-                    <span className="quality-badge-iterations">({message.iterationsUsed} iterations)</span>
-                  )}
-                </div>
-              )}
-
-              {/* Agent indicator for multi-agent routing */}
-              {message.agent && !message.isStreaming && (
-                <AgentIndicator agent={message.agent} />
-              )}
-
-              {/* Confidence badge for confidence-based routing */}
-              {message.confidence !== undefined && message.confidence > 0 && !message.isStreaming && (
-                <ConfidenceBadge
-                  confidence={message.confidence}
-                  verified={message.verified}
-                  selfCorrected={message.selfCorrected}
-                  qualityScore={message.qualityScore}
-                  iterationsUsed={message.iterationsUsed}
-                />
-              )}
-            </div>
-
-            {/* Secondary content — collapsible, below the answer */}
-            <div className="answer-secondary">
-              {message.sources && message.sources.length > 0 && (
-                <SourcesPanel sources={message.sources} />
-              )}
-
-              {message.metrics && (
-                <div className="answer-metrics">
-                  <TaskMetricsDisplay metrics={message.metrics} />
-                </div>
-              )}
-            </div>
-
-            {/* Actions — only after streaming completes */}
-            {!message.isStreaming && (
-              <div className="answer-actions">
-                <ChatMessageActions
-                  onCopy={onCopy ? () => onCopy(message.content) : undefined}
-                  onExplain={onExplain ? () => onExplain(message.content) : undefined}
-                  onShowCode={onShowCode ? () => onShowCode(message.content) : undefined}
-                  onRegenerate={onRegenerate}
-                />
-
-                {message.relatedQuestions && message.relatedQuestions.length > 0 && (
-                  <RelatedQuestions
-                    questions={message.relatedQuestions}
-                    onSelect={(q) => onRelatedQuestion?.(q)}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+          <AssistantAnswer
+            message={message}
+            onCopy={onCopy}
+            onExplain={onExplain}
+            onShowCode={onShowCode}
+            onRegenerate={onRegenerate}
+            onFormSubmit={onFormSubmit}
+          />
         )}
       </div>
 
@@ -401,6 +454,14 @@ export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExp
     prevProps.message.thinkingSteps?.length === nextProps.message.thinkingSteps?.length &&
     prevProps.message.confidence === nextProps.message.confidence &&
     prevProps.message.verified === nextProps.message.verified &&
+    prevProps.message.selfCorrected === nextProps.message.selfCorrected &&
+    prevProps.message.qualityScore === nextProps.message.qualityScore &&
+    prevProps.message.iterationsUsed === nextProps.message.iterationsUsed &&
+    prevProps.message.metrics?.tokensUsed === nextProps.message.metrics?.tokensUsed &&
+    prevProps.message.metrics?.estimatedCost === nextProps.message.metrics?.estimatedCost &&
+    prevProps.message.metrics?.durationMs === nextProps.message.metrics?.durationMs &&
+    prevProps.message.metrics?.inputTokens === nextProps.message.metrics?.inputTokens &&
+    prevProps.message.metrics?.outputTokens === nextProps.message.metrics?.outputTokens &&
     prevProps.message.uiPayloadPending === nextProps.message.uiPayloadPending &&
     prevProps.message.uiGenerationProgress === nextProps.message.uiGenerationProgress &&
     prevProps.message.uiProgressMessage === nextProps.message.uiProgressMessage &&

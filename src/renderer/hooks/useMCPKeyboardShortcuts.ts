@@ -17,28 +17,22 @@ export function useMCPKeyboardShortcuts({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const modifierKey = usesMetaKey() ? e.metaKey : e.ctrlKey;
-      
-      // Cmd/Ctrl+Shift+M - Toggle MCP
-      if (modifierKey && e.shiftKey && e.key === 'm') {
+
+      // Cmd/Ctrl+Shift+M - Toggle MCP (Shift yields 'M', so compare case-insensitively)
+      if (modifierKey && e.shiftKey && e.key.toLowerCase() === 'm') {
         e.preventDefault();
         onToggleMCP?.();
       }
-      
-      // Cmd/Ctrl+T - Open MCP Modal (or close if already open)
-      if (modifierKey && e.key === 't') {
+
+      // Cmd/Ctrl+T - Open MCP Modal (or close if already open).
+      // Case-insensitive; require !shiftKey so Ctrl+Shift+T does not trigger.
+      if (modifierKey && !e.shiftKey && e.key.toLowerCase() === 't') {
         e.preventDefault();
         if (isModalOpen && closeModal) {
           closeModal();
         } else {
           onOpenMCPModal?.();
         }
-      }
-      
-      // Escape - Close modal (consume event to prevent global handler from firing)
-      if (e.key === 'Escape' && isModalOpen && closeModal) {
-        e.preventDefault();
-        e.stopPropagation();
-        closeModal();
       }
     };
 

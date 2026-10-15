@@ -27,9 +27,17 @@ const CHART_COLORS = [
   'var(--color-chart-5)',
 ];
 
+/**
+ * Tick and legend labels are text, so they sit on the 12px floor. A Recharts prop is invisible
+ * to the token-drift grep — that is exactly why the size lives in one named constant here rather
+ * than in six `fontSize: 11` literals that no gate can see.
+ */
+const AXIS_TICK_STYLE = { fontSize: 12, fill: 'var(--muted-foreground)' };
+const LEGEND_STYLE = { fontSize: 12, color: 'var(--muted-foreground)' };
+
 function EmptyChart() {
   return (
-    <div className="chart-empty">
+    <div className="chart-empty" role="status">
       <p>No data available for visualization</p>
     </div>
   );
@@ -49,7 +57,7 @@ function SingleValueCard({ item, title }: { item: ChartDataPoint; title?: string
 
 function ErrorFallback({ chartType, dataCount }: { chartType: string; dataCount: number }) {
   return (
-    <div className="generative-ui-fallback">
+    <div className="generative-ui-fallback" role="alert" aria-live="assertive">
       <p>Failed to render chart visualization</p>
       <pre>{JSON.stringify({ chartType, dataCount }, null, 2)}</pre>
     </div>
@@ -61,8 +69,8 @@ function BarChartView({ data, xKey, yKey }: { data: ChartDataPoint[]; xKey: stri
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+        <XAxis dataKey={xKey} tick={AXIS_TICK_STYLE} />
+        <YAxis tick={AXIS_TICK_STYLE} />
         <Tooltip
           contentStyle={{
             background: 'var(--card)',
@@ -83,8 +91,8 @@ function LineChartView({ data, xKey, yKey }: { data: ChartDataPoint[]; xKey: str
     <ResponsiveContainer width="100%" height={280}>
       <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+        <XAxis dataKey={xKey} tick={AXIS_TICK_STYLE} />
+        <YAxis tick={AXIS_TICK_STYLE} />
         <Tooltip
           contentStyle={{
             background: 'var(--card)',
@@ -118,8 +126,8 @@ function AreaChartView({ data, xKey, yKey }: { data: ChartDataPoint[]; xKey: str
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+        <XAxis dataKey={xKey} tick={AXIS_TICK_STYLE} />
+        <YAxis tick={AXIS_TICK_STYLE} />
         <Tooltip
           contentStyle={{
             background: 'var(--card)',
@@ -169,7 +177,7 @@ function PieChartView({ data }: { data: ChartDataPoint[] }) {
           }}
         />
         <Legend
-          wrapperStyle={{ fontSize: 11, color: 'var(--muted-foreground)' }}
+          wrapperStyle={LEGEND_STYLE}
         />
       </PieChart>
     </ResponsiveContainer>

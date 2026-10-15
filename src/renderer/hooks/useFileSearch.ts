@@ -87,6 +87,30 @@ if (typeof import.meta !== 'undefined' && 'hot' in import.meta) {
 }
 
 /**
+ * Abortable backoff sleep. IPC calls cannot be cancelled, so the retry loop waits
+ * on this instead of a bare setTimeout: it resolves false as soon as the hook tears
+ * down, letting the caller bail out before starting another IPC round trip.
+ * Resolves true when the full delay elapses while still mounted.
+ */
+function sleepWhileMounted(delayMs: number, isAlive: () => boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + delayMs;
+    const tick = (): void => {
+      if (!isAlive()) {
+        resolve(false);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        resolve(true);
+        return;
+      }
+      setTimeout(tick, Math.min(25, deadline - Date.now()));
+    };
+    setTimeout(tick, Math.min(25, delayMs));
+  });
+}
+
+/**
  * Hook for file search with debouncing and caching
  */
 export function useFileSearch(query: string, options: UseFileSearchOptions) {
@@ -136,6 +160,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     let lastError: Error | null = null;
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (!isMountedRef.current) break;
       try {
         // Pass options to use enhanced backend features
         return await window.electronAPI.file.search(searchQuery, {
@@ -157,14 +182,18 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
           throw lastError; // Non-retryable error
         }
         
-        // Retry with exponential backoff
+        // Retry with exponential backoff on an abortable sleep: an unmount
+        // mid-backoff resolves false so the loop bails before firing more IPC.
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 100; // 100ms, 200ms, 400ms
           logInfo(`[useFileSearch] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          const settled = await sleepWhileMounted(delay, () => isMountedRef.current);
+          if (!settled) break;
         }
       }
     }
+
+    if (!isMountedRef.current) return [];
     
     throw lastError;
   }, [options.maxResults, options.excludeHidden, options.excludeSystem, options.includeMetadata]);

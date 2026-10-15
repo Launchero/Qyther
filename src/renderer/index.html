@@ -10,15 +10,16 @@
     <link rel="icon" type="image/png" href="../../build/icons/icon-256.png" sizes="256x256">
     <link rel="icon" type="image/x-icon" href="../../build/icons/icon.ico">
     
-    <!-- JetBrains Mono Font -->
+    <!-- JetBrains Mono is the only webfont the renderer asks for: `--font-mono`
+         (`styles/tokens/typography.css:34`) leads with it for code, paths and key
+         labels, and every other face in the app is a system stack. Body text is
+         `--font-body`, a system sans, so no Poppins request exists any more.
+         style-src needs fonts.googleapis.com (the css2 stylesheet) and font-src needs
+         fonts.gstatic.com (the .woff2 it points at); neither is a fetch, so neither
+         belongs in connect-src. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Poppins Font for logo -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <title>Qyther</title>
   </head>

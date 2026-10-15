@@ -7,7 +7,8 @@ import { type SearchResult } from './ResultsList';
 import type { AttachedFile } from '../types/ask-types';
 import type { RecentFile } from '@/hooks/useRecentFiles';
 import { useFocusManager } from '../hooks/useFocusManager';
-import { logComponentSizes, logInfo } from '../utils/debugLogger';
+import { useWindowReveal } from '../hooks/useWindowReveal';
+import { logInfo } from '../utils/debugLogger';
 import { cn } from '@/lib/utils';
 
 export interface CommandPaletteProps {
@@ -77,10 +78,16 @@ export function CommandPalette({
   const footerRef = React.useRef<HTMLDivElement>(null);
   const [localShowShortcuts, setLocalShowShortcuts] = useState(false);
 
+  // Owns show/mode focus routing for whichever input the active mode mounts
+  // (Files -> #search-input, Ask -> the UnifiedCommandBar textarea), including the
+  // electron-window-shown / electron-window-will-hide listeners.
   const { registerInput } = useFocusManager({
     searchMode,
     windowMode: currentMode,
   });
+
+  // Fade + grow the card on first paint and on every Alt+Space summon. Dismiss stays instant.
+  useWindowReveal(containerRef);
   const showShortcuts = parentShowShortcuts !== undefined ? parentShowShortcuts : localShowShortcuts;
   const toggleShortcuts = onToggleShortcuts ?? (() => setLocalShowShortcuts(prev => !prev));
 
@@ -95,70 +102,14 @@ export function CommandPalette({
   const isCompact = currentMode === 'compact';
   const showResults = !isCompact;
   const showFooter = !isCompact;
-  
-  // Debug: Log mode changes and measure sizes to main process terminal
-  React.useEffect(() => {
-    const logData: Record<string, string> = {};
-    
-    // Debug: Log the actual CSS token value being used
-    const compactHeightToken = getComputedStyle(document.documentElement)
-      .getPropertyValue('--container-compact-height').trim();
-    logData.compactHeightToken = compactHeightToken || 'NOT FOUND';
-    
-    // Get actual viewport size from DOM
-    logData.viewportSize = `${window.innerWidth} x ${window.innerHeight}px`;
-    logData.visualViewport = window.visualViewport ? 
-      `${window.visualViewport.width.toFixed(1)} x ${window.visualViewport.height.toFixed(1)}px` : 'N/A';
-    
-    // Measure entire command palette container
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      logData.commandPalette = `${rect.width.toFixed(1)} x ${rect.height.toFixed(1)}px`;
-    }
-    
-    // Measure header
-    if (headerRef.current) {
-      const rect = headerRef.current.getBoundingClientRect();
-      logData.header = `${rect.width.toFixed(1)} x ${rect.height.toFixed(1)}px`;
-    } else {
-      logData.header = 'NOT MOUNTED';
-    }
-    
-    // Measure body
-    if (showResults && bodyRef.current) {
-      const rect = bodyRef.current.getBoundingClientRect();
-      logData.body = `${rect.width.toFixed(1)} x ${rect.height.toFixed(1)}px`;
-    } else {
-      logData.body = 'HIDDEN';
-    }
-    
-    // Measure footer
-    if (showFooter && footerRef.current) {
-      const rect = footerRef.current.getBoundingClientRect();
-      logData.footer = `${rect.width.toFixed(1)} x ${rect.height.toFixed(1)}px`;
-    } else {
-      logData.footer = 'HIDDEN';
-    }
-    
-    // Get actual Electron window size from main process
-    window.electronAPI?.window?.getMode().then((mode) => {
-      const modeConfigs: Record<string, { width: number; height: number }> = {
-        compact: { width: 800, height: 100 },  // Updated from 80px to 100px
-        expanded: { width: 800, height: 600 },
-        custom: { width: 800, height: 480 },
-      };
-      const config = modeConfigs[mode] || modeConfigs.expanded;
-      logData.electronWindow = `${config.width} x ${config.height}px (mode: ${mode})`;
-      
-      // Send to main process terminal
-      logComponentSizes(logData);
-    }).catch(() => {
-      // Fallback if getMode fails
-      logData.electronWindow = 'UNKNOWN';
-      logComponentSizes(logData);
-    });
-  }, [currentMode, showResults, showFooter]);
-  
+
+  // No size-measuring debug effect lives here any more. It ran on every
+  // [currentMode, showResults, showFooter] change and, per run, forced layout with four
+  // `getBoundingClientRect()` reads plus a `getComputedStyle()`, issued a `window:getMode` IPC,
+  // and re-declared `MODE_CONFIGS`' pixels a fifth time (compact 800x72 / expanded 800x600 /
+  // custom 800x480) purely to log them. Nothing consumed the log: `debug:log` only reaches
+  // `log.debug` in main. Forced layout on a mode transition is exactly the cost the `h-full`
+  // contract above exists to avoid paying.
   const handleModeChange = (mode: SearchMode) => {
     setSearchMode(mode);
     logInfo('[CommandPalette] Mode changed to:', mode);
@@ -175,8 +126,10 @@ export function CommandPalette({
       ref={containerRef}
       className={cn(
         // Mockup lines 77-89: Compact command palette container
-        // Width: from spacing.css --container-command-palette
+        // Width: from spacing.css --container-command-palette, capped by the live window so a
+        // narrow/custom width never clips the card against App's overflow-hidden.
         "w-[var(--container-command-palette)]",
+        "max-w-full",
         "flex flex-col overflow-hidden",
         // Mockup line 87: 1px border - using semantic token
         "border border-border bg-transparent text-card-foreground",
@@ -184,12 +137,11 @@ export function CommandPalette({
         "shadow-[var(--shadow-command-palette)]",
         // Radius: from radius.css --radius-command-palette (Mockup line 81: 10px)
         "rounded-[var(--radius-command-palette)]",
-        // Motion: only transition height on mode changes, not every property
-        "transition-[height] duration-[var(--duration-150)] ease-[var(--easing-smooth)]",
-        // Heights: compact mode is fixed, expanded mode fills available window space
-        currentMode === 'compact' 
-          ? "h-[var(--container-compact-height)] min-h-[var(--container-compact-height)] max-h-[var(--container-compact-height)]" 
-          : "h-full min-h-[var(--container-expanded-height)]"
+        // Height is the OS window's to animate, never the card's. Measured before the change: a
+        // `transition-[height]` plus a 600px min-height made the card 298px taller than the window
+        // mid-expand (footer clipped off-screen) and, collapsing to a fixed 100px, left a 444px
+        // transparent slab over the desktop that was still always-on-top and swallowed clicks.
+        "h-full",
       )}
       style={{ 
         position: 'relative'
@@ -219,6 +171,7 @@ export function CommandPalette({
         bodyRef={bodyRef}
         searchMode={searchMode}
         windowMode={currentMode}
+        onExitAskMode={() => setSearchMode('file')}
         onRegisterSendMessage={handleAskModeSendRegister}
         attachedFiles={attachedFiles}
         onRemoveFile={onRemoveFile}

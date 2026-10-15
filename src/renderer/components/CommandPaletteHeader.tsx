@@ -39,24 +39,30 @@ export function CommandPaletteHeader({
 
   return (
     <div
+      // Keyed so the header remounts with the view it belongs to: the body swaps on the same
+      // signal, and a header that pops while the body fades reads as two separate events.
+      key={isAskMode ? 'ask' : 'files'}
       ref={headerRef}
       className={cn(
         "w-full",
         "flex-shrink-0",
         "bg-card text-card-foreground",
-        // In file mode, use fixed 100px header.
+        // In file mode, use the fixed 72px header (must equal main's compact window height).
         "h-[var(--container-header-height)]",
-        // Border: compact file mode has no border, everything else has bottom border
-        windowMode === 'compact' && !isAskMode
+        // The view this header belongs to just mounted.
+        "view-enter",
+        // Border: compact file mode has none, and Ask mode's own header row draws the
+        // single rule — the wrapper must not add a second one a pixel below it.
+        windowMode === 'compact' || isAskMode
           ? "border-0"
           : "border-b border-border",
         // Visual transition cue: brief highlight when auto-collapsing
         isCollapsing && "collapse-flash",
-        "transition-colors duration-200"
+        "transition-colors duration-[var(--duration-200)]"
       )}
     >
       {isAskMode ? (
-        <div className="ask-mode-header-minimal">
+        <div className="ask-mode-header-minimal h-full">
           <ModeTabs
             currentMode={searchMode}
             onModeChange={onSearchModeChange}
