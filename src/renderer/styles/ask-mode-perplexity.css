@@ -174,43 +174,9 @@
   }
 
   /* Model Selector Inline (Mockup lines 332-356) */
-  .model-select-inline {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-1);
-    padding: var(--spacing-1) var(--spacing-2);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--radius-chip);
-    cursor: pointer;
-    transition: opacity var(--duration-150) var(--easing-smooth),
-                max-width var(--duration-150) var(--easing-smooth),
-                background-color var(--duration-150) var(--easing-smooth),
-                border-color var(--duration-150) var(--easing-smooth);
-    flex-shrink: 0;
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    color: var(--muted-foreground);
-    opacity: 0;
-    max-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
 
-  .model-select-inline.visible {
-    opacity: 1;
-    max-width: var(--model-selector-max-width);
-  }
 
-  .model-select-inline:hover {
-    background: var(--muted);
-    border-color: var(--border);
-  }
 
-  .model-select-inline svg {
-    width: var(--spacing-2);
-    height: var(--spacing-2);
-  }
 
   /* Send Button */
   .send-button {
@@ -820,11 +786,6 @@
   /* ========================================================================
      RELATED QUESTIONS (Mockup lines 283-293)
      ======================================================================== */
-  .related-questions {
-    margin-top: var(--spacing-4);
-    padding-top: var(--spacing-3);
-    border-top: 1px solid var(--border);
-  }
 
   .related-title {
     font-size: var(--text-xs);
@@ -1587,38 +1548,9 @@
   }
 
   /* Search Web Toggle */
-  .search-web-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-1);
-    padding: var(--spacing-1) var(--spacing-2);
-    background: var(--secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-chip);
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    color: var(--muted-foreground);
-    cursor: pointer;
-    transition: background-color var(--duration-150) var(--easing-smooth),
-                border-color var(--duration-150) var(--easing-smooth),
-                color var(--duration-150) var(--easing-smooth);
-  }
 
-  .search-web-toggle:hover {
-    border-color: var(--ring);
-    color: var(--foreground);
-  }
 
-  .search-web-toggle.active {
-    background: var(--primary);
-    color: var(--primary-foreground);
-    border-color: var(--primary);
-  }
 
-  .search-web-toggle svg {
-    width: var(--spacing-3);
-    height: var(--spacing-3);
-  }
 
   /* Input Wrapper */
   .input-wrapper {
@@ -2513,41 +2445,6 @@
   }
 
   /* ========================================================================
-     CONFIDENCE BADGE
-     ======================================================================== */
-
-  .confidence-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-1);
-    padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-chip);
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    line-height: 1.4;
-    white-space: nowrap;
-  }
-
-  .confidence-badge svg {
-    flex-shrink: 0;
-  }
-
-  .confidence-badge--high {
-    background: var(--success-soft);
-    color: var(--success);
-  }
-
-  .confidence-badge--medium {
-    background: var(--warning-soft);
-    color: var(--warning);
-  }
-
-  .confidence-badge--low {
-    background: var(--destructive-soft);
-    color: var(--destructive);
-  }
-
-  /* ========================================================================
      DEBUG TRACE PANEL
      ======================================================================== */
 
@@ -2931,15 +2828,7 @@
   }
 
   /* Related questions stagger (CSS-only, no JS needed) */
-  .related-question-item {
-    animation: var(--animate-slide-up-fade);
-  }
 
-  .related-question-item:nth-child(1) { animation-delay: var(--stagger-50); }
-  .related-question-item:nth-child(2) { animation-delay: var(--stagger-100); }
-  .related-question-item:nth-child(3) { animation-delay: var(--stagger-150); }
-  .related-question-item:nth-child(4) { animation-delay: var(--stagger-200); }
-  .related-question-item:nth-child(n+5) { animation-delay: var(--stagger-200); }
 
   /* ========================================================================
      ASK MODE EXPANDED SHELL - loading and not-ready surfaces

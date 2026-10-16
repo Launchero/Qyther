@@ -6,16 +6,16 @@
  * deleted at the cutover, so nothing here has a zod counterpart left to drift from.
  *
  * Three LangChain-era indirections are gone because `AgentTool` makes them unnecessary:
- *  - `inferStatusFromTool` (a tool-name string map) â†’ each tool reports `details.status`.
- *  - `DANGER_POLICY` (32 rows, consulted by name) â†’ `details.verifies` on the one tool
+ *  - `inferStatusFromTool` (a tool-name string map) → each tool reports `details.status`.
+ *  - `DANGER_POLICY` (32 rows, consulted by name) → `details.verifies` on the one tool
  *    that runs the pixel verifier. A tool cannot forget its own flag, so the
  *    exhaustiveness check that guarded the map is no longer needed.
  *  - the `_type: 'screenshot_result'` marker, which `desktop-agent.ts` string-matched to
- *    build a multimodal ToolMessage â†’ `screenshot` returns a real `ImageContent` block.
+ *    build a multimodal ToolMessage → `screenshot` returns a real `ImageContent` block.
  *
  * Contract preserved from `desktop-tools.ts`: **tools never throw.** Every failure is
  * returned as readable text so the model can recover, which is also what
- * `AgentToolResult.isError` is for â€” failures set it rather than relying on a throw.
+ * `AgentToolResult.isError` is for — failures set it rather than relying on a throw.
  */
 import { Type, StringEnum } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult, AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
@@ -32,7 +32,7 @@ const log = createLogger("Pi");
  *
  * `AgentTool`'s `execute` is declared as a property, so under `strictFunctionTypes` its
  * `params: Static<TSchema>` (= `unknown`) is checked contravariantly and *no* concrete
- * `AgentTool[]` annotation accepts a tool that destructures its schema-derived params â€”
+ * `AgentTool[]` annotation accepts a tool that destructures its schema-derived params —
  * including `Agent.state.tools`. Re-declaring `execute` with **method** syntax (bivariant
  * parameters) and widening `params` to `any` is the escape. Each tool still declares its
  * real `parameters` schema inline, which stays the single source of truth for its
@@ -132,7 +132,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 /** True once the run has been cancelled; poll loops check this between iterations. */
 const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
 
-// â”€â”€ Pointer + keyboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Pointer + keyboard ───────────────────────────────────────────────────────
 
 export function screenshotTool(adapter: DesktopAdapter): PiTool {
   return {
@@ -368,7 +368,7 @@ export function holdKeyTool(): PiTool {
   };
 }
 
-// â”€â”€ Screen reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Screen reads ─────────────────────────────────────────────────────────────
 
 export function getScreenTextTool(adapter: DesktopAdapter): PiTool {
   return {
@@ -454,7 +454,7 @@ export function waitTool(): PiTool {
   };
 }
 
-// â”€â”€ Windows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Windows ──────────────────────────────────────────────────────────────────
 
 function handleParam() {
   return Type.String({ description: 'Numeric handle from get_window_list (e.g. "1", "2", "3")' });
@@ -574,12 +574,12 @@ export function restoreWindowTool(adapter: DesktopAdapter): PiTool {
   );
 }
 
-/** The one tool that runs the pixel verifier â€” `details.verifies` replaces `DANGER_POLICY`. */
+/** The one tool that runs the pixel verifier — `details.verifies` replaces `DANGER_POLICY`. */
 export function closeWindowTool(adapter: DesktopAdapter): PiTool {
   return windowTool(
     "close_window",
     "Close window",
-    'Close a window gracefully by its handle via WM_CLOSE. Use get_window_list to find window handles (e.g. "1", "2", "3"). Use with caution â€” this may close applications with unsaved work.',
+    'Close a window gracefully by its handle via WM_CLOSE. Use get_window_list to find window handles (e.g. "1", "2", "3"). Use with caution — this may close applications with unsaved work.',
     async (handle) =>
       (await adapter.closeWindow(handle))
         ? "Window closed successfully. Sent WM_CLOSE to the window."
@@ -588,7 +588,7 @@ export function closeWindowTool(adapter: DesktopAdapter): PiTool {
   );
 }
 
-// â”€â”€ UI Automation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── UI Automation ────────────────────────────────────────────────────────────
 
 export function getElementInfoTool(a11y: AccessibilityTreeAdapter): PiTool {
   return {
@@ -771,7 +771,7 @@ export function getSelectedTextTool(): PiTool {
   };
 }
 
-// â”€â”€ Shell, files, clipboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shell, files, clipboard ──────────────────────────────────────────────────
 
 export function clipboardTool(): PiTool {
   return {

@@ -159,7 +159,10 @@ export class DatabaseManager {
         subtasks: [],
         outcome: trajectory.outcome,
       });
-      const totalDuration = trajectory.steps.reduce((sum, s) => sum + s.durationMs, 0);
+      // An explicit task duration wins: a turn that answered without calling a tool has no
+      // steps to sum, and time-to-solve is the number an evaluation actually needs.
+      const totalDuration = trajectory.durationMs
+        ?? trajectory.steps.reduce((sum, s) => sum + s.durationMs, 0);
 
       this.db!.run(`
         INSERT INTO desktop_trajectories (id, task_description, subtasks_json, outcome, success, total_duration_ms, created_at)

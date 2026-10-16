@@ -9,7 +9,9 @@ interface TaskMetricsProps {
 
 export function TaskMetricsDisplay({ metrics, defaultExpanded = false }: TaskMetricsProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const tokensPerSecond = calculateTokensPerSecond(metrics.tokensUsed, metrics.durationMs);
+  const tokensPerSecond = metrics.tokensUsed !== undefined
+    ? calculateTokensPerSecond(metrics.tokensUsed, metrics.durationMs)
+    : undefined;
   const durationSeconds = (metrics.durationMs / 1000).toFixed(1);
   const pricing = MODEL_PRICING.find(p => p.model === metrics.model);
   const inputCost = pricing && metrics.inputTokens !== undefined
@@ -28,32 +30,42 @@ export function TaskMetricsDisplay({ metrics, defaultExpanded = false }: TaskMet
         <ClockIcon className="task-metrics-icon" aria-hidden="true" />
         <span className="task-metrics-label">Task Details</span>
         <span className="task-metrics-preview">
-          {formatTokenCount(metrics.tokensUsed)} tokens · {formatCost(metrics.estimatedCost)} · {durationSeconds}s
+          {[
+            metrics.tokensUsed !== undefined ? `${formatTokenCount(metrics.tokensUsed)} tokens` : null,
+            metrics.estimatedCost !== undefined ? formatCost(metrics.estimatedCost) : null,
+            `${durationSeconds}s`,
+          ].filter(Boolean).join(' · ')}
         </span>
         <CaretDownIcon className="task-metrics-chevron" aria-hidden="true" />
       </summary>
 
       <div className="task-metrics-content">
         <div className="metrics-grid">
-          <div className="metric-item">
-            <span className="metric-label">Tokens</span>
-            <span className="metric-value">{formatTokenCount(metrics.tokensUsed)}</span>
-          </div>
+          {metrics.tokensUsed !== undefined && (
+            <div className="metric-item">
+              <span className="metric-label">Tokens</span>
+              <span className="metric-value">{formatTokenCount(metrics.tokensUsed)}</span>
+            </div>
+          )}
 
-          <div className="metric-item">
-            <span className="metric-label">Cost (est.)</span>
-            <span className="metric-value cost-highlight">{formatCost(metrics.estimatedCost)}</span>
-          </div>
+          {metrics.estimatedCost !== undefined && (
+            <div className="metric-item">
+              <span className="metric-label">Cost (est.)</span>
+              <span className="metric-value cost-highlight">{formatCost(metrics.estimatedCost)}</span>
+            </div>
+          )}
 
           <div className="metric-item">
             <span className="metric-label">Time</span>
             <span className="metric-value">{durationSeconds}s</span>
           </div>
 
-          <div className="metric-item">
-            <span className="metric-label">Speed</span>
-            <span className="metric-value">{formatTokenCount(tokensPerSecond)} tok/s</span>
-          </div>
+          {tokensPerSecond !== undefined && (
+            <div className="metric-item">
+              <span className="metric-label">Speed</span>
+              <span className="metric-value">{formatTokenCount(tokensPerSecond)} tok/s</span>
+            </div>
+          )}
         </div>
 
         {metrics.inputTokens !== undefined && metrics.outputTokens !== undefined && (

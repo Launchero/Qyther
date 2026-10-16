@@ -26,9 +26,13 @@ interface ChatWelcomeStateProps {
 const suggestionCards: SuggestionCard[] = [
   {
     icon: <FolderIcon weight="regular" aria-hidden="true" />,
-    title: 'Find code or files',
-    description: 'Search your workspace and get context-aware answers.',
-    exampleQuery: 'Where is the authentication middleware defined?',
+    // Name search only: Everything indexes file and folder names, and there is no
+    // full-text index in this app. The previous copy ("Search your workspace", with the
+    // example "Where is the authentication middleware defined?") advertised a content
+    // search the product cannot perform.
+    title: 'Find a file by name',
+    description: 'Search file and folder names across every drive, then attach a result and ask about it.',
+    exampleQuery: 'Find the project plan document',
     requiresBrowser: false,
   },
   {

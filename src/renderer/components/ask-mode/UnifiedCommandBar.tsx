@@ -1,6 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { PaperPlaneRightIcon, PaperclipIcon, XIcon, GlobeIcon, StopIcon } from '@phosphor-icons/react';
-import { SearchWebToggle } from './SearchWebToggle';
+import { PaperPlaneRightIcon, PaperclipIcon, XIcon, StopIcon } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { ShortcutKey } from '@/components/common/ShortcutKeys';
 import { getAriaKeyshortcuts } from '@/utils/shortcuts';
@@ -22,8 +21,6 @@ export interface UnifiedCommandBarProps {
   hasSentMessage: boolean;
   mcpCount?: number;
   onOpenMCPModal?: () => void;
-  webSearchEnabled?: boolean;
-  onToggleWebSearch?: () => void;
   attachedFiles?: AttachedFile[];
   onRemoveFile?: (index: number) => void;
   onAttachFile?: () => void;
@@ -43,8 +40,6 @@ export function UnifiedCommandBar({
   hasSentMessage,
   mcpCount = 0,
   onOpenMCPModal,
-  webSearchEnabled = false,
-  onToggleWebSearch,
   attachedFiles = [],
   onRemoveFile,
   onAttachFile,
@@ -133,7 +128,7 @@ export function UnifiedCommandBar({
       )}
 
       <div className="command-bar">
-        {windowMode === 'compact' && !hasSent && (attachedFiles.length > 0 || mcpCount > 0 || webSearchEnabled) && (
+        {windowMode === 'compact' && !hasSent && (attachedFiles.length > 0 || mcpCount > 0) && (
           <div className="context-indicator-compact">
             {attachedFiles.length > 0 && (
               <span className="context-badge" title={`${attachedFiles.length} files attached`}>
@@ -145,11 +140,6 @@ export function UnifiedCommandBar({
               <span className="context-badge" title={`${mcpCount} MCP servers`}>
                 <span className="mcp-status-dot" aria-hidden="true" />
                 {mcpCount}
-              </span>
-            )}
-            {webSearchEnabled && (
-              <span className="context-badge" title="Web search enabled">
-                <GlobeIcon className="context-badge-icon" weight="fill" aria-hidden="true" />
               </span>
             )}
           </div>
@@ -236,7 +226,7 @@ export function UnifiedCommandBar({
         )}
       </div>
 
-      {(attachedFiles.length > 0 || mcpCount > 0 || onToggleWebSearch) && windowMode !== 'compact' && (
+      {(attachedFiles.length > 0 || mcpCount > 0) && windowMode !== 'compact' && (
         <div className={cn('context-chips-above-input', hasSent && 'visible', attachedFiles.length > 0 && 'visible')}>
           {attachedFiles.map((file, index) => {
             const iconType = getFileIconType(file.name);
@@ -271,12 +261,6 @@ export function UnifiedCommandBar({
               <span className="mcp-chip-dot" aria-hidden="true" />
               {mcpCount} MCP{mcpCount > 1 ? 's' : ''}
             </Button>
-          )}
-          {onToggleWebSearch && (
-            <SearchWebToggle
-              enabled={webSearchEnabled}
-              onToggle={onToggleWebSearch}
-            />
           )}
         </div>
       )}

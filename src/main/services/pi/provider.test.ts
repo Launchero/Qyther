@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// The provider reads env at module load, so it must be imported fresh per case.
+// Fresh import per case keeps the stubbed env from leaking between them; the
+// provider itself no longer depends on load order (see the env-reading comment
+// in provider.ts), which the last case in this file pins.
 async function loadProvider(env: Record<string, string | undefined>) {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v as string);
   vi.resetModules();
@@ -45,5 +47,21 @@ describe("pi provider bootstrap", () => {
   it("returns a stable streamFn across calls", async () => {
     const p = await loadProvider({ MODEL: "m", API_KEY: "k", BASE_URL: BASE });
     expect(p.getPiStreamFn()).toBe(p.getPiStreamFn());
+  });
+
+  it("reads env at the call, not at module evaluation", async () => {
+    // The shipped defect: `main.ts` runs dotenv after this module had already
+    // captured `process.env` at import time, so a correctly configured machine
+    // reported "no model is configured". Importing with no env and populating it
+    // afterwards is exactly that order.
+    const p = await loadProvider({ MODEL: undefined, API_KEY: undefined, BASE_URL: undefined });
+    expect(p.isPiConfigured()).toBe(false);
+
+    vi.stubEnv("API_KEY", "sk-late");
+    vi.stubEnv("BASE_URL", BASE);
+    vi.stubEnv("MODEL", "qwen3.6-plus");
+
+    expect(p.isPiConfigured()).toBe(true);
+    expect(p.getPiModel()?.baseUrl).toBe(BASE);
   });
 });

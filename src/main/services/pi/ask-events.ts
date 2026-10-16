@@ -11,24 +11,29 @@
  *    the real node names (`browserSubgraph`, `postProcessNode`) matched none of them, so
  *    they rendered raw with no badge and no loading copy.
  *
- * Here the `step` string is derived from the **tool name**, and the handful of tools the
- * renderer already has copy for are mapped onto those strings by
- * `STEP_NAME_BY_TOOL` — so a new tool needs no registry edit to display, and the three
- * existing badges survive.
+ * Here the `step` string is the **tool name, verbatim**, and the human-readable copy comes
+ * from `FamilyIndex.displayLabelFor()` — the `label` each toolbox already declares on the
+ * tool itself. Nothing in this file, and nothing in the renderer, keeps a name→copy map.
+ *
+ * The previous shape mapped five tool names onto legacy graph-node strings
+ * (`search_web` → `externalSearch`, and so on) so that three old badges would keep working.
+ * That made the fall-through invisible: the other 39 first-party tools rendered their
+ * internal identifier, and the file's own comment called that "a readable label, not a
+ * blank". It was not readable and it was not a blank — it was `launch_app`.
  */
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import type { AgentLabel } from "../../../shared/ipc/agent-label";
 import type { Source } from "../../../shared/ipc/source";
 import type { UiPayload } from "../../../shared/ipc/ui-payload";
 import type { PiToolDetails } from "./toolbox";
-import { IDLE_AGENT_LABEL, type FamilyIndex } from "./families";
+import { IDLE_AGENT_LABEL, type FamilyIndex, type ToolFamily } from "./families";
 
 /** One thing worth pushing to the renderer. A single `AgentEvent` can yield several. */
 export type AskStreamEvent =
   | { kind: "token"; text: string }
   | { kind: "agent"; label: AgentLabel }
-  | { kind: "step-start"; step: string; detail: string; data: Record<string, unknown> }
-  | { kind: "step-complete"; step: string; detail: string }
+  | { kind: "step-start"; step: string; label: string; family: ToolFamily | null; detail: string; data: Record<string, unknown> }
+  | { kind: "step-complete"; step: string; label: string; family: ToolFamily | null; detail: string }
   | { kind: "ui-payload"; payload: UiPayload }
   | { kind: "sources"; sources: Source[] };
 
@@ -40,27 +45,12 @@ export interface AskSummary {
   readonly labels: readonly AgentLabel[];
 }
 
-/**
- * Tools the renderer already has bespoke copy for, mapped onto the step names it expects.
- *
- * `ThinkingSteps.tsx` holds `LOADING_MESSAGES` / `PHASE_LABELS` / a badge switch keyed on
- * exactly these strings, and `getStepBadge` fires a `web` badge for `externalSearch` and
- * `webFetch` and `compare`/`form`/`chart` badges for the `*Node` trio. Anything not
- * listed falls through to `PHASE_LABELS[step] || step`, i.e. the tool name itself — which
- * is a readable label, not a blank.
- */
-const STEP_NAME_BY_TOOL: Readonly<Record<string, string>> = {
-  search_web: "externalSearch",
-  fetch_page: "webFetch",
-  create_comparison: "comparisonNode",
-  create_form: "formNode",
-  create_chart: "chartNode",
-};
-
 /** `true` when the step string is one Pi hands us for a tool, not one we chose. */
 const TOOL_STEP = "tool_execution";
 
-const stepNameFor = (toolName: string): string => STEP_NAME_BY_TOOL[toolName] ?? toolName;
+/** The declared label, or the tool name itself when a toolbox supplied none. */
+const displayLabel = (families: FamilyIndex, toolName: string): string =>
+  families.displayLabelFor(toolName) ?? toolName;
 
 const detailsOf = (result: unknown): PiToolDetails | undefined =>
   (result as { details?: PiToolDetails } | undefined)?.details;
@@ -123,7 +113,9 @@ export class AskEventTranslator {
     if (changed) out.push({ kind: "agent", label: changed });
     out.push({
       kind: "step-start",
-      step: stepNameFor(event.toolName),
+      step: event.toolName,
+      label: displayLabel(this.families, event.toolName),
+      family: this.families.familyOf(event.toolName) ?? null,
       detail: `Executing: ${event.toolName}`,
       data: { toolName: event.toolName, toolCallId: event.toolCallId, type: TOOL_STEP },
     });
@@ -132,7 +124,13 @@ export class AskEventTranslator {
 
   private onToolEnd(event: Extract<AgentEvent, { type: "tool_execution_end" }>): AskStreamEvent[] {
     const out: AskStreamEvent[] = [
-      { kind: "step-complete", step: stepNameFor(event.toolName), detail: `Completed: ${event.toolName}` },
+      {
+        kind: "step-complete",
+        step: event.toolName,
+        label: displayLabel(this.families, event.toolName),
+        family: this.families.familyOf(event.toolName) ?? null,
+        detail: `Completed: ${event.toolName}`,
+      },
     ];
     const details = detailsOf(event.result);
     if (details?.uiPayload) {

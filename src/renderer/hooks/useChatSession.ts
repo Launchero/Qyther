@@ -2,17 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { logDebug, logError, logInfo, logWarn } from '../utils/debugLogger';
 
 import type { ChatSessionSummary } from '../../shared/ipc/sessions';
+import type { ThinkingStep } from '../../shared/ipc/thinking-step';
 import { isCurrentTurnEvent, type TurnEnvelope } from '../../shared/ipc/turn';
 import type { GenerativeUIType } from '../components/ask-mode/GenerativeUI';
-
-export interface ThinkingStep {
-  type: string;
-  step: string;
-  status: string;
-  detail: string;
-  data?: unknown;
-  update?: boolean;
-}
 
 export interface UIPayload {
   type: GenerativeUIType;

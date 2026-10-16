@@ -183,6 +183,13 @@ export interface TrajectoryRecord {
   outcome: string;
   success: boolean;
   createdAt: number;
+  /**
+   * Wall-clock duration of the whole task, which is not the same quantity as the sum of
+   * the step durations: an Ask turn that answers without calling a tool has no steps at
+   * all, and time-to-solve is a required metric for evaluating an agent. When absent,
+   * `saveTrajectory` falls back to the step sum, so pre-existing callers are unaffected.
+   */
+  durationMs?: number;
 }
 
 /**

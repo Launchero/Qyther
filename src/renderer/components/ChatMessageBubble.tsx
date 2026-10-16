@@ -7,7 +7,6 @@ import { TaskMetricsDisplay } from './ask-mode/Transparency/TaskMetrics';
 import { CodeBlock } from './ask-mode/CodeBlock';
 import { CitationBracket } from './ask-mode/CitationBracket';
 import { ThinkingSteps } from './ask-mode/ThinkingSteps';
-import { ConfidenceBadge } from './ask-mode/ConfidenceBadge';
 import { formatTime } from '../utils/formatTime';
 import { splitAtSettledBlock } from '../utils/markdownBlocks';
 import { safeExternalUrl } from '../utils/externalUrl';
@@ -60,10 +59,7 @@ export interface ChatMessage {
   qualityScore?: number;
   confidence?: number;
   verified?: boolean;
-  uiPayloadPending?: boolean;
   uiPayloadType?: GenerativeUIType;
-  uiGenerationProgress?: number;
-  uiProgressMessage?: string;
   agent?: { label: string } | null;
 }
 
@@ -317,17 +313,6 @@ function AnswerSignals({ message }: Pick<ChatMessageBubbleProps, 'message'>) {
       )}
 
       {message.agent && !message.isStreaming && <AgentIndicator agent={message.agent} />}
-
-      {message.confidence !== undefined && message.confidence > 0 && !message.isStreaming && (
-        <ConfidenceBadge
-          className="animate-fade-in"
-          confidence={message.confidence}
-          verified={message.verified}
-          selfCorrected={message.selfCorrected}
-          qualityScore={message.qualityScore}
-          iterationsUsed={message.iterationsUsed}
-        />
-      )}
     </>
   );
 }
@@ -452,8 +437,6 @@ export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExp
     prevProps.message.hasStructuredData === nextProps.message.hasStructuredData &&
     prevProps.message.sources?.length === nextProps.message.sources?.length &&
     prevProps.message.thinkingSteps?.length === nextProps.message.thinkingSteps?.length &&
-    prevProps.message.confidence === nextProps.message.confidence &&
-    prevProps.message.verified === nextProps.message.verified &&
     prevProps.message.selfCorrected === nextProps.message.selfCorrected &&
     prevProps.message.qualityScore === nextProps.message.qualityScore &&
     prevProps.message.iterationsUsed === nextProps.message.iterationsUsed &&
@@ -462,9 +445,6 @@ export const ChatMessageBubble = React.memo(({ message, className, onCopy, onExp
     prevProps.message.metrics?.durationMs === nextProps.message.metrics?.durationMs &&
     prevProps.message.metrics?.inputTokens === nextProps.message.metrics?.inputTokens &&
     prevProps.message.metrics?.outputTokens === nextProps.message.metrics?.outputTokens &&
-    prevProps.message.uiPayloadPending === nextProps.message.uiPayloadPending &&
-    prevProps.message.uiGenerationProgress === nextProps.message.uiGenerationProgress &&
-    prevProps.message.uiProgressMessage === nextProps.message.uiProgressMessage &&
     prevProps.message.uiPayloads?.length === nextProps.message.uiPayloads?.length &&
     prevProps.message.agent?.label === nextProps.message.agent?.label &&
     prevProps.className === nextProps.className

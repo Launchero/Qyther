@@ -8,7 +8,14 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractDocument, getFormatConfig, DOCUMENT_EXTENSIONS } from '../services/utils/document-loader';
 import type { ChatSessionSummary } from '../../shared/ipc/sessions';
+import type { ThinkingStep } from '../../shared/ipc/thinking-step';
 import { createLogger } from '../utils/logger';
+import { buildTurnRecord } from '../services/pi/turn-record';
+// Direct from the module, not the `services/database` barrel: `index.ts` re-exports the
+// row interfaces (`TrajectoryRow`, `TrajectoryStepRow`, `FailureRow`, `MigrationRow`,
+// `DatabaseStats`) as values, and rolldown fails the main build with five "Missing
+// export" errors the moment anything pulls the barrel into the bundled graph.
+import { getDatabaseManager } from '../services/database/database-manager';
 
 const log = createLogger('Chat');
 
@@ -16,20 +23,10 @@ const log = createLogger('Chat');
  * How long the pump waits before giving up on the renderer.
  *
  * Replaces the `timeout: GRAPH_TIMEOUT_MS` option the old `graph.streamEvents()` call
- * passed � LangGraph enforced it, and now the pump owns it. It is a leash on *waiting*,
+ * passed — LangGraph enforced it, and now the pump owns it. It is a leash on *waiting*,
  * not on the run: `ask-turn.ts` has its own 10-minute `ASK_RUN_TIMEOUT_MS` for that.
  */
 const ASK_PUMP_TIMEOUT_MS = 120_000;
-
-/** One entry per push the translator produced; the shape the renderer folds into a message. */
-interface ThinkingStepRow {
-  type: string;
-  step: string;
-  status: string;
-  detail: string;
-  data?: unknown;
-  update?: boolean;
-}
 
 /**
  * Turns whose stream pump is currently running, so `chat:cancelTurn` can stop one and so
@@ -407,17 +404,56 @@ export function registerChatHandlers(): void {
        * among steps in flight; that is what lets the renderer's fold match a completion onto
        * the right open step.
        */
-      const thinkingSteps: ThinkingStepRow[] = [];
-      const openSteps = new Map<string, ThinkingStepRow>();
+      const thinkingSteps: ThinkingStep[] = [];
+      const openSteps = new Map<string, ThinkingStep>();
+      // Per-step wall clock for the trajectory record. Keyed by tool name, which is safe
+      // only because `toolExecution: "sequential"` makes a name unique among steps in
+      // flight — the same property the renderer's fold depends on.
+      const stepStartedAt = new Map<string, number>();
+      const stepEndedAt = new Map<string, number>();
       let streamedContent = '';
       let lastEmittedAgent = '';
       const startedAt = Date.now();
 
-      const pushStep = (row: ThinkingStepRow) => {
-        if (row.status === 'completed') openSteps.delete(row.step);
-        else openSteps.set(row.step, row);
+      const pushStep = (row: ThinkingStep) => {
+        if (row.status === 'completed') {
+          openSteps.delete(row.step);
+          stepEndedAt.set(row.step, Date.now());
+        } else {
+          openSteps.set(row.step, row);
+          stepStartedAt.set(row.step, Date.now());
+        }
         thinkingSteps.push(row);
         send('chat:thinking-step', row as unknown as Record<string, unknown>);
+      };
+
+      /**
+       * Write the episodic record for this turn. The tables and the manager method have had
+       * no caller since `desktop/desktop-memory.ts` was deleted at the Pi cutover — this is
+       * the writer they were built for, and the evidence base for evaluating the agent.
+       *
+       * Never awaited and never throws into the turn: the terminal chunk has already gone
+       * out, the database may never have opened (boot degrades to a warn), and a lost
+       * record must not cost the user their answer.
+       */
+      const persistTurn = (answer: string, success: boolean) => {
+        try {
+          const record = buildTurnRecord({
+            turnId: turnThreadId,
+            taskDescription: content,
+            steps: thinkingSteps,
+            startedAt,
+            endedAt: Date.now(),
+            answer,
+            success,
+            stepStartedAt,
+            stepEndedAt,
+          });
+          void getDatabaseManager().saveTrajectory(record)
+            .catch((err: unknown) => log.warn('Turn record write failed:', err));
+        } catch (error) {
+          log.debug('No turn record written:', error);
+        }
       };
 
       const onEvent = (event: AskStreamEvent) => {
@@ -433,13 +469,13 @@ export function registerChatHandlers(): void {
             }
             return;
           case 'step-start':
-            pushStep({ type: 'tool_start', step: event.step, status: 'in_progress', detail: event.detail, data: event.data });
+            pushStep({ type: 'tool_start', step: event.step, label: event.label, family: event.family, status: 'in_progress', detail: event.detail, data: event.data });
             return;
           case 'step-complete': {
             const open = openSteps.get(event.step);
-            const row: ThinkingStepRow = open
+            const row: ThinkingStep = open
               ? { ...open, status: 'completed', detail: event.detail, update: true }
-              : { type: 'node_end', step: event.step, status: 'completed', detail: event.detail };
+              : { type: 'node_end', step: event.step, label: event.label, family: event.family, status: 'completed', detail: event.detail };
             pushStep(row);
             return;
           }
@@ -481,11 +517,15 @@ export function registerChatHandlers(): void {
           isComplete: true,
           error: 'Request timed out. Please try again.',
         });
+        persistTurn(streamedContent, false);
         return { success: false, error: 'Ask turn timed out' };
       }
 
       if (abortController.signal.aborted && turn.cancelledByUser) {
         send('chat:stream-chunk', { chunk: '', isComplete: true });
+        // A user Stop ends the turn as *completed* for the transcript, but it is not a
+        // model success. Recording it as one would inflate the only number that matters.
+        persistTurn(streamedContent, false);
         return { success: true, response: streamedContent };
       }
 
@@ -493,12 +533,15 @@ export function registerChatHandlers(): void {
       const uiPayloads: UiPayload[] = [...run.summary.uiPayloads];
       const sources: Source[] = [...run.summary.sources];
 
-      const estimatedTokens = Math.floor(fullResponse.length / 4);
+      /**
+       * Only what this process actually measured. The turn's wall clock and the
+       * configured model are facts; a token count derived from `fullResponse.length / 4`
+       * and a currency figure from a hard-coded price are not, and they used to be
+       * presented as a "49 tokens · < $0.0001" breakdown the model never reported.
+       * When Pi's usage record reaches this scope, add the real fields here rather
+       * than restoring an estimate.
+       */
       const metrics = {
-        tokensUsed: estimatedTokens,
-        inputTokens: Math.floor(estimatedTokens * 0.3),
-        outputTokens: Math.floor(estimatedTokens * 0.7),
-        estimatedCost: (estimatedTokens * 0.0002) / 1000,
         durationMs: Date.now() - startedAt,
         model: process.env.MODEL || 'qwen3.6-plus',
       };
@@ -524,6 +567,7 @@ export function registerChatHandlers(): void {
         });
       }
 
+      persistTurn(fullResponse, true);
       return { success: true, response: fullResponse };
     } catch (error) {
       log.error('Ask turn error:', error);
@@ -531,6 +575,9 @@ export function registerChatHandlers(): void {
         ? 'AI endpoint is not configured (MODEL/BASE_URL/API_KEY)'
         : error instanceof Error ? error.message : 'Unknown error occurred';
       send('chat:stream-chunk', { chunk: '', isComplete: true, error: message });
+      // Not recorded: the step accumulators and `turnThreadId` live in the try scope, so a
+      // throw before them exists has nothing to write. Tools never throw (they set
+      // `isError`), so this path is a model or loop failure with no trajectory to keep.
       return { success: false, error: message };
     } finally {
       // Every exit path — normal completion, a Stop press, a thrown tool, the timeout —

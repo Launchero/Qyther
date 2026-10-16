@@ -3,8 +3,6 @@ import { DataTable, TableData, TableColumn } from './DataTable';
 import { FormPreview, FormField } from './FormPreview';
 import { ComparisonTable, ComparisonItem, ComparisonCriteria } from './ComparisonTable';
 import { ChartView, ChartDataPoint } from './ChartView';
-import { GenerativeUISkeleton } from './GenerativeUISkeleton';
-import { GenerativeUIProgress } from './GenerativeUIProgress';
 
 export type GenerativeUIType = 'table' | 'form' | 'comparison' | 'list' | 'chart';
 
@@ -97,5 +95,5 @@ export function GenerativeUI({ resultType, data, title, onExport, onConfirm, onE
   }
 }
 
-export { DataTable, FormPreview, ComparisonTable, ChartView, GenerativeUISkeleton, GenerativeUIProgress };
+export { DataTable, FormPreview, ComparisonTable, ChartView };
 export type { TableData, TableColumn, FormField, ComparisonItem, ComparisonCriteria, ChartDataPoint };

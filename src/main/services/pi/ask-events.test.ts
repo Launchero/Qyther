@@ -15,11 +15,11 @@ import { buildFamilyIndex, IDLE_AGENT_LABEL, type Toolboxes } from "./families";
 import type { UiPayload } from "../../../shared/ipc/ui-payload";
 
 const TOOLBOXES: Toolboxes = {
-  desktop: [{ name: "screenshot" }, { name: "click" }],
+  desktop: [{ name: "screenshot", label: "Capture the screen" }, { name: "click", label: "Click" }],
   browser: [{ name: "browser_click" }],
-  document: [{ name: "create_docx" }],
-  web: [{ name: "search_web" }, { name: "fetch_page" }],
-  ui: [{ name: "create_table" }, { name: "create_chart" }, { name: "create_list" }],
+  document: [{ name: "create_docx", label: "Create Word document" }],
+  web: [{ name: "search_web", label: "Search the web" }, { name: "fetch_page", label: "Read a page" }],
+  ui: [{ name: "create_table", label: "Create table" }, { name: "create_chart", label: "Create chart" }, { name: "create_list" }],
   mcp: [{ name: "mcp_echo" }],
 };
 
@@ -103,15 +103,26 @@ describe("AskEventTranslator", () => {
     });
   });
 
-  it("maps the three tools the renderer has bespoke copy onto its step names", () => {
-    // `ThinkingSteps.tsx` badges and loading copy key on exactly these strings.
-    for (const [tool, step] of [
-      ["search_web", "externalSearch"],
-      ["fetch_page", "webFetch"],
-      ["create_chart", "chartNode"],
+  it("sends the tool name verbatim and the label from the registry", () => {
+    // Replaces "maps the three tools the renderer has bespoke copy onto its step names".
+    // That mapping was the defect: five names got legacy graph-node strings so three old
+    // badges kept working, and the other 39 tools fell through to their own identifier.
+    for (const [name, label] of [
+      ["search_web", "Search the web"],
+      ["fetch_page", "Read a page"],
+      ["create_chart", "Create chart"],
     ] as const) {
-      expect(stepStartOf(translator().translate(toolStart(tool))).step).toBe(step);
+      const start = stepStartOf(translator().translate(toolStart(name)));
+      expect(start.step).toBe(name);
+      expect(start.label).toBe(label);
     }
+  });
+
+  it("falls back to the tool name as the label when a toolbox declared none", () => {
+    const start = stepStartOf(translator().translate(toolStart("browser_click")));
+
+    expect(start.label).toBe("browser_click");
+    expect(start.family).toBe("browser");
   });
 
   it("uses the tool name as the step for everything else, so a new tool needs no registry edit", () => {
@@ -162,7 +173,7 @@ describe("AskEventTranslator", () => {
   it("emits no source event for an empty source list", () => {
     // The renderer applies `sources` only when `length > 0`, so an empty array is noise.
     expect(translator().translate(toolEnd("fetch_page", { status: "complete", sources: [] }))).toEqual([
-      { kind: "step-complete", step: "webFetch", detail: "Completed: fetch_page" },
+      { kind: "step-complete", step: "fetch_page", label: "Read a page", family: "web", detail: "Completed: fetch_page" },
     ]);
   });
 
@@ -219,6 +230,6 @@ describe("AskEventTranslator", () => {
       isError: true,
     } as AgentEvent;
     const out: AskStreamEvent[] = translator().translate(event);
-    expect(out).toEqual([{ kind: "step-complete", step: "click", detail: "Completed: click" }]);
+    expect(out).toEqual([{ kind: "step-complete", step: "click", label: "Click", family: "desktop", detail: "Completed: click" }]);
   });
 });

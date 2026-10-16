@@ -8,7 +8,6 @@ import { ChatMessagesList } from './ask-mode/ChatMessagesList';
 import { BrowserProgressPanel } from './ask-mode/BrowserProgressPanel';
 import { UnifiedCommandBar } from './ask-mode/UnifiedCommandBar';
 import { browserReducer, initialBrowserState } from '../hooks/useBrowserState';
-import { desktopReducer, initialDesktopState } from '../hooks/useDesktopState';
 import { usesMetaKey } from '@/utils/shortcuts';
 import type { BrowserProgress } from './ask-mode/BrowserProgressPanel';
 import type { InlineChatSession } from './ask-mode/RecentChatsInline';
@@ -69,7 +68,6 @@ export function AskModeExpanded({
   const [showMCPModal, setShowMCPModal] = useState(false);
   const [welcomeState, setWelcomeState] = useState(true);
   const [hasSentMessage, setHasSentMessage] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
   // Notify parent when hasSentMessage changes
   useEffect(() => {
@@ -78,9 +76,6 @@ export function AskModeExpanded({
 
   // Browser automation state with useReducer
   const [browserState, dispatch] = useReducer(browserReducer, initialBrowserState);
-
-  // Desktop automation state with useReducer
-  const [desktopState, desktopDispatch] = useReducer(desktopReducer, initialDesktopState);
 
   const handleStopTurn = useCallback(() => {
     void cancelTurn();
@@ -104,17 +99,6 @@ export function AskModeExpanded({
     return () => {
       cleanupProgress();
       cleanupError();
-    };
-  }, []);
-
-  // Desktop automation event listeners
-  useEffect(() => {
-    // Note: desktop events come through the chat session stream, not separate IPC
-    // The progress is emitted by the Pi desktop agent and forwarded via chat:thinking-step
-    // We handle desktop progress through the existing chat streaming mechanism
-
-    return () => {
-      // No cleanup needed - desktop events flow through chat session
     };
   }, []);
 
@@ -165,10 +149,6 @@ export function AskModeExpanded({
         e.preventDefault();
         handleCloseBrowserSession();
       }
-      if (metaOrCtrl && e.shiftKey && e.key === 'D') {
-        e.preventDefault();
-        handleToggleDesktopMode();
-      }
       // Ctrl/Cmd+Shift+N: new chat session
       if (metaOrCtrl && e.shiftKey && e.key === 'N') {
         e.preventDefault();
@@ -208,7 +188,7 @@ export function AskModeExpanded({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browserState.enabled, browserState.sessionActive, desktopState.enabled, desktopState.sessionActive, handleStopTurn, messages, searchQuery]);
+  }, [browserState.enabled, browserState.sessionActive, handleStopTurn, messages, searchQuery]);
 
   const handleNewChat = useCallback(async () => {
     onClearAttachments?.();
@@ -325,22 +305,7 @@ export function AskModeExpanded({
     }
   }, []);
 
-  // Desktop mode handlers
-  const handleToggleDesktopMode = useCallback(async () => {
-    const newEnabled = !desktopState.enabled;
-    desktopDispatch({ type: 'TOGGLE_MODE', enabled: newEnabled });
-    logInfo('[AskModeExpanded] Desktop mode toggled:', newEnabled ? 'enabled' : 'disabled');
-  }, [desktopState.enabled]);
 
-  // Desktop elapsed time timer
-  useEffect(() => {
-    if (desktopState.sessionActive && desktopState.startTime && !desktopState.isPaused) {
-      const timer = setInterval(() => {
-        desktopDispatch({ type: 'SET_ELAPSED', elapsedMs: Date.now() - desktopState.startTime! });
-      }, 100);
-      return () => clearInterval(timer);
-    }
-  }, [desktopState.sessionActive, desktopState.startTime, desktopState.isPaused]);
 
   // MCP keyboard shortcuts
   useMCPKeyboardShortcuts({
@@ -432,22 +397,6 @@ export function AskModeExpanded({
           />
         )}
 
-        {/* Desktop Session Status Indicator */}
-        {desktopState.sessionActive && desktopState.progress && (
-          <BrowserProgressPanel
-            progress={desktopState.progress as unknown as BrowserProgress}
-            reasoning={desktopState.progress.status === 'capturing' ? 'Capturing screen to understand current state' : undefined}
-            upcomingSteps={
-              desktopState.progress.status === 'capturing'
-                ? ['Analyze screen content', 'Plan next action', 'Execute interaction']
-                : undefined
-            }
-            metrics={{
-              elapsedMs: desktopState.elapsedMs,
-            }}
-            onStop={() => { void cancelTurn(); desktopDispatch({ type: 'RESET' }); }}
-          />
-        )}
 
         {/* Main Chat Area with Welcome State and Messages */}
         <div className="chat-body">
@@ -456,7 +405,7 @@ export function AskModeExpanded({
             isLoading={isLoading}
             welcomeState={welcomeState}
             browserModeEnabled={browserState.enabled}
-            desktopModeEnabled={desktopState.enabled}
+
             activeAgent={activeAgent}
             onSendExample={(query) => {
               handleSendMessage(query);
@@ -494,8 +443,8 @@ export function AskModeExpanded({
           onAddFile={onAddFile}
           mcpCount={mcpCount}
           onOpenMCPModal={() => setShowMCPModal(true)}
-          webSearchEnabled={webSearchEnabled}
-          onToggleWebSearch={() => setWebSearchEnabled(prev => !prev)}
+
+
           registerInput={registerInput}
         />
 

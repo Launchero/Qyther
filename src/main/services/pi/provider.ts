@@ -12,10 +12,20 @@ const log = createLogger("Pi");
  */
 export const PROVIDER_ID = "qyther";
 
-/** Fallbacks mirror research-agent.ts:17 — same env contract, no second config surface. */
-const MODEL_ID = process.env.MODEL || "qwen3.6-plus";
-const API_KEY = process.env.API_KEY;
-const BASE_URL = process.env.BASE_URL;
+/**
+ * Env is read at the point of use, never at module evaluation.
+ *
+ * `main.ts` imports `dotenv/config` first precisely so that nothing reads
+ * `process.env` before it is populated, but the bundled main process evaluates
+ * module bodies in dependency order and this file is reached through
+ * `handlers.ts → chat-handlers.ts → langchain/agent.ts`, which is not a guarantee.
+ * A module-scope `const API_KEY = process.env.API_KEY` here measured `undefined`
+ * while `process.env.API_KEY` was already set, so `isPiConfigured()` reported false
+ * and Ask mode rendered its not-configured card on a correctly configured machine.
+ */
+const modelId = (): string => process.env.MODEL || "qwen3.6-plus";
+const apiKey = (): string | undefined => process.env.API_KEY;
+const baseUrl = (): string | undefined => process.env.BASE_URL;
 
 /**
  * Qyther already resolves the key through its own api-config settings, so this
@@ -25,8 +35,9 @@ const API_KEY_AUTH: ApiKeyAuth = {
   name: "Qyther endpoint API key",
   resolve: async ({ signal }) => {
     signal.throwIfAborted();
-    if (!API_KEY) return undefined;
-    return { auth: { apiKey: API_KEY }, source: "API_KEY" };
+    const key = apiKey();
+    if (!key) return undefined;
+    return { auth: { apiKey: key }, source: "API_KEY" };
   },
 };
 
@@ -35,14 +46,15 @@ const API_KEY_AUTH: ApiKeyAuth = {
  * API, which a Chat-Completions-only proxy does not speak. The completions path
  * is the `openai-completions` API, which is what deepseekProvider() uses.
  */
-const PROVIDER = createProvider({
-  id: PROVIDER_ID,
-  name: "Qyther endpoint",
-  baseUrl: BASE_URL,
-  auth: { apiKey: API_KEY_AUTH },
-  api: openAICompletionsApi(),
-  models: [buildModel(MODEL_ID)],
-});
+const buildProvider = () =>
+  createProvider({
+    id: PROVIDER_ID,
+    name: "Qyther endpoint",
+    baseUrl: baseUrl(),
+    auth: { apiKey: API_KEY_AUTH },
+    api: openAICompletionsApi(),
+    models: [buildModel(modelId())],
+  });
 
 function buildModel(id: string) {
   return {
@@ -53,7 +65,7 @@ function buildModel(id: string) {
     type: "chat" as const,
     // Model-level baseUrl is required by Model even though the provider also
     // carries one; it inherits the same env value.
-    baseUrl: BASE_URL ?? "",
+    baseUrl: baseUrl() ?? "",
     reasoning: false,
     input: ["text"] as ("image" | "text")[],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -82,15 +94,15 @@ let streamFn: MutableModels["streamSimple"] | null = null;
 export function getPiModels() {
   if (!models) {
     models = createModels();
-    models.setProvider(PROVIDER);
-    log.info("Pi models ready", { provider: PROVIDER_ID, model: MODEL_ID, hasKey: isPiConfigured() });
+    models.setProvider(buildProvider());
+    log.info("Pi models ready", { provider: PROVIDER_ID, model: modelId(), hasKey: isPiConfigured() });
   }
   return models;
 }
 
 /** `getModel` is not narrowed by the provider's TApi, so narrow with `hasApi`. */
 export function getPiModel(): Model<"openai-completions"> | undefined {
-  const model = getPiModels().getModel(PROVIDER_ID, MODEL_ID);
+  const model = getPiModels().getModel(PROVIDER_ID, modelId());
   return model && hasApi(model, "openai-completions") ? model : undefined;
 }
 
@@ -105,5 +117,5 @@ export function getPiStreamFn() {
 }
 
 export function isPiConfigured(): boolean {
-  return Boolean(API_KEY && BASE_URL);
+  return Boolean(apiKey() && baseUrl());
 }

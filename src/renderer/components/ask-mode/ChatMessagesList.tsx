@@ -17,7 +17,6 @@ interface ChatMessagesListProps {
   isLoading: boolean;
   welcomeState: boolean;
   browserModeEnabled: boolean;
-  desktopModeEnabled?: boolean;
   activeAgent?: { label: string } | null;
   onSendExample: (query: string) => void;
   onEnableBrowserMode?: () => void;
@@ -40,7 +39,6 @@ export function ChatMessagesList({
   isLoading,
   welcomeState,
   browserModeEnabled,
-  desktopModeEnabled: _desktopModeEnabled = false,
   activeAgent = null,
   onSendExample,
   onEnableBrowserMode,

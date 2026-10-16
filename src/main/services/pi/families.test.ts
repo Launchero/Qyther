@@ -23,10 +23,68 @@ import {
   type NamedTool,
   type Toolboxes,
 } from "./families";
+import { createPiWebToolbox } from "./tools/web-tools";
+import { createPiUiToolbox } from "./tools/ui-tools";
 
 const RENDERER_INDICATOR = "src/renderer/components/ask-mode/AgentIndicator.tsx";
 
-const tool = (name: string): NamedTool => ({ name });
+const tool = (name: string, label?: string): NamedTool => ({ name, label });
+
+describe("tool display labels", () => {
+  it("returns the label declared on the tool, and undefined when there is none", () => {
+    const index = buildFamilyIndex({
+      desktop: [tool("launch_app", "Launch app"), tool("no_label_tool")],
+    });
+
+    expect(index.displayLabelFor("launch_app")).toBe("Launch app");
+    expect(index.displayLabelFor("no_label_tool")).toBeUndefined();
+    expect(index.displayLabelFor("not_a_tool")).toBeUndefined();
+  });
+
+  it("every real first-party tool declares a label the transcript can show", () => {
+    // This is the gate that would have caught the shipped defect: `ThinkingSteps.tsx`
+    // keyed its copy on deleted graph-node names and the bridge translated only five
+    // tool names, so 39 of 44 tools rendered their internal identifier. Nothing failed.
+    // The desktop family's 32 are already frozen by `toolbox.test.ts` asserting a truthy
+    // `label` per tool, so this sweeps the families that were not covered.
+    const families = [
+      ["web", createPiWebToolbox()],
+      ["ui", createPiUiToolbox()],
+    ] as const;
+
+    for (const [name, tools] of families) {
+      expect(tools.length, `${name} toolbox is empty`).toBeGreaterThan(0);
+      for (const t of tools) {
+        expect(t.label, `${name}.${t.name} label`).toBeTruthy();
+        expect(t.label!.trim().length, `${name}.${t.name} label is whitespace`).toBeGreaterThan(0);
+        // A label equal to the name is not a label — it renders the identifier anyway.
+        expect(t.label!.trim(), `${name}.${t.name} label duplicates its name`).not.toBe(t.name);
+      }
+    }
+  });
+});
+
+describe("step copy is derived, never mirrored", () => {
+  const THINKING_STEPS = "src/renderer/components/ask-mode/ThinkingSteps.tsx";
+  const ASK_EVENTS = "src/main/services/pi/ask-events.ts";
+
+  it("the transcript holds no tool-name→copy map and no graph-node vocabulary", () => {
+    const source = readFileSync(join(process.cwd(), THINKING_STEPS), "utf8");
+
+    for (const banned of ["PHASE_LABELS", "LOADING_MESSAGES", "PHASE_ORDER", "STEP_NAME_BY_TOOL"]) {
+      expect(source, `${THINKING_STEPS} still declares ${banned}`).not.toContain(`const ${banned}`);
+    }
+    // Every surviving identifier-shaped string is a name list waiting to drift.
+    expect(source).not.toMatch(/step\.step === '[a-z_]+Node'/);
+  });
+
+  it("the bridge translates no tool names onto legacy step strings", () => {
+    const source = readFileSync(join(process.cwd(), ASK_EVENTS), "utf8");
+
+    expect(source, `${ASK_EVENTS} reintroduced a name→step map`).not.toContain("STEP_NAME_BY_TOOL");
+    expect(source).not.toMatch(/"(externalSearch|webFetch|comparisonNode|formNode|chartNode)"/);
+  });
+});
 
 describe("family→agent-label table", () => {
   it("only emits labels the renderer actually has a row for", () => {

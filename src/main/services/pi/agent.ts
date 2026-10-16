@@ -12,9 +12,14 @@
  *    its verdict back with `agent.steer()` — the native replacement for pushing a corrective
  *    `HumanMessage` into the transcript.
  *
- * Wired: `research-agent.ts` (`desktopAgentNode`) and `document-delegation.ts`
- * (`delegateToDesktopNode`) both call `runPiDesktopTask`, and `chat-handlers.ts` calls
- * `abortPiDesktopRun()` on every exit from the chat pump so a run cannot outlive its turn.
+ * NOT wired: this class has no production caller. `runPiDesktopTask()` and
+ * `getPiDesktopAgent()` are referenced nowhere outside this file — the Ask loop took the
+ * desktop tools directly through `getDesktopToolbox()`, so a shipped turn runs the same 32
+ * tools with no verifier in the loop. What IS live here is the shared substrate:
+ * `getDesktopRuntime()`/`getDesktopToolbox()` (bound by `ask-tools.ts`) and
+ * `disposeDesktopRuntime()`, reached at quit through `closePiDesktopAgent()`. Wiring the
+ * verifier back in means either routing Ask turns through this class or lifting the
+ * `details.verifies` check into `ask-turn.ts`; deleting this half is the other option.
  */
 import { screen } from "electron";
 import { Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
@@ -119,8 +124,9 @@ export class PiDesktopAgent {
    * see `./events.ts` for the translation from Pi's `AgentEvent`.
    *
    * `signal` is optional and additive: pass one and aborting it stops the run. With no
-   * signal the run is still stoppable through `abortPiDesktopRun()`, which is what the chat
-   * pump calls when it abandons a turn — that path is why this cannot hang indefinitely.
+   * signal the run is still stoppable through `abortPiDesktopRun()` — but nothing calls
+   * that today. The chat pump no longer reaches this class at all: Ask mode's own
+   * `AbortController` is passed into `runAskTurn`, which aborts the `Agent` it built.
    */
   async run(
     task: string,

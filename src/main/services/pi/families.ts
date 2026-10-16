@@ -53,9 +53,18 @@ export const AGENT_LABEL_BY_FAMILY: Record<ToolFamily, AgentLabel> = {
  */
 export const IDLE_AGENT_LABEL: AgentLabel = "General";
 
-/** Structural minimum: a tool is just its name for every purpose here. */
+/**
+ * Structural minimum: a tool is its name for family routing, and its `label` for display.
+ *
+ * `label` is already declared by every toolbox (`toolbox.test.ts` asserts it is truthy for
+ * all 32 desktop tools), so carrying it here costs no new bookkeeping. It exists on this
+ * type because the renderer must not keep its own name→copy map: `ThinkingSteps.tsx` did
+ * exactly that against the deleted graph's node names, and 39 of the 44 first-party tools
+ * have been rendering their internal `snake_case` identifier ever since.
+ */
 export interface NamedTool {
   readonly name: string;
+  readonly label?: string;
 }
 
 /**
@@ -69,6 +78,11 @@ export type Toolboxes = Readonly<Partial<Record<ToolFamily, readonly NamedTool[]
 export interface FamilyIndex {
   /** The label to attribute a turn to. Unknown tool names fall back to `General`. */
   labelFor(toolName: string): AgentLabel;
+  /**
+   * The human-readable name declared on the tool, or `undefined` when no toolbox
+   * contributed it. This is the only source of step copy the renderer may use.
+   */
+  displayLabelFor(toolName: string): string | undefined;
   /** `undefined` for a name no toolbox contributed. */
   familyOf(toolName: string): ToolFamily | undefined;
   /** Distinct tool names across every family. */
@@ -88,6 +102,7 @@ export interface FamilyIndex {
  */
 export function buildFamilyIndex(toolboxes: Toolboxes): FamilyIndex {
   const byName = new Map<string, ToolFamily>();
+  const displayByName = new Map<string, string>();
   const emptyFamilies: ToolFamily[] = [];
   const collisions: string[] = [];
 
@@ -104,6 +119,9 @@ export function buildFamilyIndex(toolboxes: Toolboxes): FamilyIndex {
         continue;
       }
       byName.set(tool.name, family);
+      if (tool.label && tool.label.trim().length > 0) {
+        displayByName.set(tool.name, tool.label.trim());
+      }
     }
   }
 
@@ -118,6 +136,7 @@ export function buildFamilyIndex(toolboxes: Toolboxes): FamilyIndex {
 
   return {
     labelFor,
+    displayLabelFor: (toolName: string) => displayByName.get(toolName),
     familyOf: (toolName: string) => byName.get(toolName),
     size: byName.size,
     emptyFamilies,

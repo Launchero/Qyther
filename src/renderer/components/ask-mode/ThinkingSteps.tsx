@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Spinner, Circle, CaretDown, CaretRight, Robot } from '@phosphor-icons/react';
-import type { ThinkingStep } from '../../hooks/useChatSession';
+import type { ThinkingStep } from '../../../shared/ipc/thinking-step';
 
 interface ThinkingStepsProps {
   steps: ThinkingStep[];
@@ -8,125 +8,70 @@ interface ThinkingStepsProps {
   durationMs?: number;
 }
 
-const LOADING_MESSAGES: Record<string, string> = {
-  classify: 'Understanding your question...',
-  classifyIntent: 'Understanding your question...',
-  externalSearch: 'Searching the web...',
-  webFetch: 'Reading source pages...',
-  synthesizeWithSelfCheck: 'Composing answer...',
-  synthesize: 'Composing answer...',
-  quickVerify: 'Quick verification...',
-  fastPath: 'Responding...',
-  internalKnowledge: 'Checking knowledge...',
-  replan: 'Looking deeper...',
-  generalChat: 'Generating response...',
-  tool_execution: 'Running tool...',
-  chartNode: 'Creating visualization...',
-  comparisonNode: 'Building comparison...',
-  formNode: 'Generating form schema...',
+/**
+ * Badges are keyed on the tool **family**, which the bridge derives from the registry, so
+ * this is the only name list in the file and it cannot drift from the tool set — a family
+ * row is one entry here at most, not one per tool.
+ *
+ * The three maps this replaces (`LOADING_MESSAGES`, `PHASE_LABELS`, `PHASE_ORDER`) and the
+ * `getStepBadge` switch were keyed on LangGraph node names. The graph is gone; the maps
+ * stayed, so 39 of the 44 first-party tools rendered their internal `snake_case` name, the
+ * sort was a no-op that only looked like a contract, and the "Reviewed N iterations" line
+ * wrote itself onto a `validate` step that can never arrive.
+ */
+const FAMILY_BADGE: Record<string, { label: string; className: string }> = {
+  web: { label: 'web', className: 'step-badge web' },
+  document: { label: 'doc', className: 'step-badge file' },
+  desktop: { label: 'tool', className: 'step-badge tool' },
+  browser: { label: 'browser', className: 'step-badge tool' },
 };
-
-const PHASE_ORDER = [
-  'classify', 'classifyIntent', 'externalSearch', 'webFetch',
-  'generalChat', 'internalKnowledge', 'synthesizeWithSelfCheck', 'synthesize',
-  'quickVerify', 'validate', 'replan', 'fastPath', 'tool_execution',
-];
-
-const PHASE_LABELS: Record<string, string> = {
-  classify: 'Classified intent',
-  classifyIntent: 'Classified intent',
-  externalSearch: 'Searched web',
-  webFetch: 'Read source pages',
-  generalChat: 'Generated response',
-  internalKnowledge: 'Checked knowledge',
-  synthesizeWithSelfCheck: 'Synthesized answer',
-  synthesize: 'Synthesized answer',
-  quickVerify: 'Verified quality',
-  validate: 'Reviewed',
-  replan: 'Refined search',
-  fastPath: 'Fast response',
-  chartNode: 'Created visualization',
-  comparisonNode: 'Built comparison',
-  formNode: 'Generated form',
-};
-
-function getLoadingMessage(activeStep: string): string {
-  return LOADING_MESSAGES[activeStep] || 'Thinking...';
-}
 
 function getStepBadge(step: ThinkingStep): { label: string; className: string } | null {
-  if (step.type === 'tool_start' || step.step === 'tool_execution') {
-    return { label: 'tool', className: 'step-badge tool' };
-  }
-  if (step.step === 'externalSearch' || step.step === 'webFetch') {
-    return { label: 'web', className: 'step-badge web' };
-  }
-  if ((step.data as { name?: string } | undefined)?.name === 'web_search') {
-    return { label: 'web', className: 'step-badge web' };
-  }
-  if (step.step.includes('file') || step.step.includes('read')) {
-    return { label: 'file', className: 'step-badge file' };
-  }
-  if (step.step === 'chartNode') {
-    return { label: 'chart', className: 'step-badge chart' };
-  }
-  if (step.step === 'comparisonNode') {
-    return { label: 'compare', className: 'step-badge compare' };
-  }
-  if (step.step === 'formNode') {
-    return { label: 'form', className: 'step-badge form' };
-  }
-  return null;
+  return step.family ? FAMILY_BADGE[step.family] ?? null : null;
 }
 
-function aggregateSteps(steps: ThinkingStep[]): ThinkingStep[] {
-  const nodeRunCounts = new Map<string, number>();
-  const seenPhases = new Set<string>();
-  const aggregated: ThinkingStep[] = [];
-  let retryCount = 0;
+/** The declared label, or the tool name when a toolbox supplied none. Never a local map. */
+function stepLabel(step: ThinkingStep): string {
+  const label = step.label?.trim();
+  return label && label.length > 0 ? label : step.step;
+}
+/**
+ * Fold each completion onto the step it completed, and keep everything else as its own row.
+ *
+ * The pump marks an update row with `update: true` and reuses the tool name, so the fold is
+ * by name **among rows that are still open** — which is what lets three `search_web` calls
+ * show as three rows. The version this replaces deduped by name unconditionally, so a
+ * retry, a loop and a third attempt all collapsed into one line and the user lost exactly
+ * the evidence that would have told them the plan had gone wrong. There is also no sort:
+ * arrival order is execution order, and `toolExecution: "sequential"` is what guarantees it.
+ */
+export function foldSteps(steps: ThinkingStep[]): ThinkingStep[] {
+  const folded: ThinkingStep[] = [];
 
   for (const step of steps) {
-    if (step.step === 'node_start' || step.step === 'node_end') continue;
-
-    const count = (nodeRunCounts.get(step.step) || 0) + 1;
-    nodeRunCounts.set(step.step, count);
-
-    if (count > 1) {
-      retryCount++;
-    }
-
-    if (!seenPhases.has(step.step)) {
-      seenPhases.add(step.step);
-      aggregated.push({
-        ...step,
-        status: step.status,
-      });
-    } else {
-      const existingIdx = aggregated.findIndex(s => s.step === step.step);
-      if (existingIdx !== -1) {
-        aggregated[existingIdx] = {
-          ...aggregated[existingIdx],
+    if (step.update) {
+      let openIdx = -1;
+      for (let i = folded.length - 1; i >= 0; i--) {
+        if (folded[i].step === step.step && folded[i].status !== 'completed') {
+          openIdx = i;
+          break;
+        }
+      }
+      if (openIdx !== -1) {
+        folded[openIdx] = {
+          ...folded[openIdx],
           status: step.status,
           detail: step.detail,
+          label: step.label ?? folded[openIdx].label,
+          family: step.family ?? folded[openIdx].family,
         };
+        continue;
       }
     }
+    folded.push(step);
   }
 
-  aggregated.sort((a, b) => {
-    const aIdx = PHASE_ORDER.indexOf(a.step);
-    const bIdx = PHASE_ORDER.indexOf(b.step);
-    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
-  });
-
-  if (retryCount > 0) {
-    const validateStep = aggregated.find(s => s.step === 'validate');
-    if (validateStep) {
-      validateStep.detail = `Reviewed ${retryCount + 1} iterations`;
-    }
-  }
-
-  return aggregated;
+  return folded;
 }
 
 function StepIcon({ status }: { status: string }) {
@@ -141,7 +86,7 @@ function StepIcon({ status }: { status: string }) {
 
 function StepItem({ step, isLast }: { step: ThinkingStep; isLast: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const displayName = PHASE_LABELS[step.step] || step.step;
+  const displayName = stepLabel(step);
   const hasDetail = !!step.detail && step.detail.length > 0;
   const badge = getStepBadge(step);
   const headerClassName = `thinking-step-header ${hasDetail ? 'expandable' : ''}`;
@@ -203,7 +148,7 @@ function ExpandedThinkingSteps({ steps }: { steps: ThinkingStep[] }) {
 export function ThinkingSteps({ steps, isComplete, durationMs }: ThinkingStepsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const aggregatedSteps = aggregateSteps(steps);
+  const aggregatedSteps = foldSteps(steps);
 
   useEffect(() => {
     if (isComplete) {
@@ -221,7 +166,11 @@ export function ThinkingSteps({ steps, isComplete, durationMs }: ThinkingStepsPr
   const duration = durationMs ? `${(durationMs / 1000).toFixed(1)}s` : '';
 
   const activeStep = aggregatedSteps.find(s => s.status === 'in_progress');
-  const loadingMessage = activeStep ? getLoadingMessage(activeStep.step) : null;
+  // The running line names the tool the agent is actually in, from that tool's own
+  // declaration, and keeps the progress count. The copy used to come from a
+  // `LOADING_MESSAGES` map keyed on deleted graph nodes, so every real tool step fell
+  // through to the generic "Thinking...".
+  const activeLabel = activeStep ? `${stepLabel(activeStep)}…` : 'Thinking…';
 
   if (!isComplete) {
     return (
@@ -234,7 +183,7 @@ export function ThinkingSteps({ steps, isComplete, durationMs }: ThinkingStepsPr
         <div className="thinking-steps-header">
           <Spinner className="w-3 h-3 animate-spin text-muted-foreground" aria-hidden="true" />
           <span className="thinking-steps-label">
-            {loadingMessage || `Thinking... ${completedCount}/${totalCount}`}
+            {activeLabel} {completedCount}/{totalCount}
           </span>
         </div>
         <ExpandedThinkingSteps steps={aggregatedSteps} />

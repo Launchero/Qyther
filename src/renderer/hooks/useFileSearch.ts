@@ -306,7 +306,7 @@ export function useFileSearch(query: string, options: UseFileSearchOptions) {
     return ({
       id: `file-${index}-${file.path}`,
       title: file.name,
-      subtitle: `${file.path}${file.size ? ` � ${file.size}` : ''}${file.dateModified ? ` � ${file.dateModified}` : ''}`,
+      subtitle: `${file.path}${file.size ? ` · ${file.size}` : ''}${file.dateModified ? ` · ${file.dateModified}` : ''}`,
       icon: isFolder ? '' : '📄',
       type: 'file',
       action: file.path,

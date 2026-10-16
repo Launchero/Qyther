@@ -18,25 +18,32 @@ export interface TokenUsage {
   model?: string;
 }
 
+/**
+ * What main measured about a turn.
+ *
+ * `tokensUsed` and `estimatedCost` are optional because the Ask loop does not
+ * always have a usage record to report, and a token count derived from the
+ * length of the answer is not a measurement of anything. A row is rendered only
+ * when its value exists; absence is the honest state, not zero.
+ */
 export interface TaskMetrics {
-  tokensUsed: number;
+  tokensUsed?: number;
   inputTokens?: number;
   outputTokens?: number;
-  estimatedCost: number;
+  estimatedCost?: number;
   durationMs: number;
   model?: string;
 }
 
-export function calculateCost(usage: TokenUsage): number {
+/** Undefined when the model's price is not known — never a borrowed price. */
+export function calculateCost(usage: TokenUsage): number | undefined {
   const pricing = MODEL_PRICING.find(p => p.model === usage.model);
-  
   if (!pricing) {
-    // Default to Qwen pricing if model not found
-    return (usage.inputTokens * 0.0002 + usage.outputTokens * 0.0006) / 1000;
+    return undefined;
   }
-  
+
   return (
-    (usage.inputTokens * pricing.inputPricePer1K + 
+    (usage.inputTokens * pricing.inputPricePer1K +
      usage.outputTokens * pricing.outputPricePer1K) / 1000
   );
 }

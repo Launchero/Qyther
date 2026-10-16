@@ -4,8 +4,8 @@ import {
   withAgentLabel,
   withThinkingStep,
   type ChatMessage,
-  type ThinkingStep,
 } from './useChatSession';
+import type { ThinkingStep } from '../../shared/ipc/thinking-step';
 
 /**
  * The two transcript folds are pure functions of `(messages, push)`, so they are tested without
