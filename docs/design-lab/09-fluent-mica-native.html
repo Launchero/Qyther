@@ -119,6 +119,8 @@
 }
 
 /* ══ token block: shared geometry, type ramp, motion, and the lab sheet's own chrome ══ */
+/* taste: kept by design — Mica plate gradient + translucent layer, 1px white top-edge highlight,
+   Reveal two-ring focus, Windows type ramp at 14px (native-material UI identity) */
 :root {
   /* material stack + 4px grid (the exact Fluent step table could not be fetched: approximation) */
   --plate-angle: 158deg;
@@ -138,14 +140,14 @@
   --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
   --pad-card: var(--space-3);
   --gap-inline: var(--space-2);
-  --gap-block: var(--space-3);
-  --gap-section: var(--space-4);
+  --gap-block: var(--space-4);
+  --gap-section: var(--space-6);
   --pad-row: var(--space-2);
   --gap-tight: var(--space-1);
   /* fixed geometry from the brief */
   --palette-w: 800px;
-  --header-h: 72px;
-  --chat-header-h: 56px;
+  --header-h: 60px;
+  --chat-header-h: 48px;
   --row-h: 40px;                   /* --target-row */
   --target-min: 32px;              /* --target-min, the README control floor */
   --target-touch: 40px;            /* Fluent minimum for a standalone target */
@@ -232,7 +234,7 @@ h1 { font-family: var(--font-display); font-size: var(--text-subtitle); line-hei
   text-transform: uppercase; color: var(--page-muted); margin: 0 0 var(--gap-inline); text-align: center; font-weight: var(--weight-semibold); }
 .surface { margin-bottom: var(--page-surface-gap); }
 .surface-label { font-size: var(--text-caption); line-height: var(--lh-caption); letter-spacing: var(--tracking-label);
-  text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--gap-inline); font-weight: var(--weight-semibold); }
+  text-transform: uppercase; color: var(--page-muted); margin: 0 0 var(--gap-inline); font-weight: var(--weight-semibold); }
 .surface-label code { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; }
 .page { background: var(--background); color: var(--foreground); padding: var(--space-6); border-radius: var(--radius-card); }
 
@@ -432,9 +434,9 @@ mark { background: var(--mark-bg); color: inherit; border-radius: var(--radius-x
 .step { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-caption);
   line-height: var(--lh-caption); color: var(--muted-foreground); }
 .step .dot { width: var(--dot-size); height: var(--dot-size); border-radius: var(--radius-pill);
-  display: grid; place-items: center; background: var(--success-soft); color: var(--success);
+  display: grid; place-items: center; background: var(--success);
   font-size: var(--text-caption); }
-.step[data-state="running"] .dot { background: var(--warning-soft); color: var(--warning);
+.step[data-state="running"] .dot { background: var(--warning);
   animation: breathe var(--cycle-skeleton) var(--easing-smooth) infinite; }
 .step .tag { margin-left: auto; padding: 0 var(--space-1); border-radius: var(--radius-xs);
   background: var(--muted); color: var(--muted-foreground); font-family: var(--font-mono); }
@@ -566,8 +568,47 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: var(--caret-dim); } }
 @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: var(--skeleton-dim); } }
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+}
+
+/* ── expressive overlay: M3X type + spring + liquid-glass vocabulary (theme-independent) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* EXPRESSIVE tier — spring micro-motion + expressive display type (no glass card-morph) */
+.btn, .tile, .chip, .keycap { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover, .tile:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1, .answer { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* EXPRESSIVE keyframes: ex-enter on the hero surfaces (staggered, spring, one-shot); ex-pulse on the agent panel; ex-sweep on the progress rule */
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) both; }
+.palette:nth-child(2) { animation-delay: 60ms; }
+.palette:nth-child(3) { animation-delay: 120ms; }
+.agent-panel { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.progress { position: relative; }
+.progress::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); opacity: .4; animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .palette, .agent-panel, .progress::after { animation: none !important; }
 }
 </style>
 </head>
@@ -599,7 +640,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
 <section class="col" data-theme="light">
   <h2>Light — tinted paper (approximation)</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query — Mica plate → layer → card; clear button disabled</p>
     <div class="desktop">
       <div class="layer">
@@ -629,7 +670,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, permanent Reveal focus, opening, skeleton. Rendered in the <b>flat fallback</b>: the same tokens with the window inactive</p>
     <div class="desktop" data-material="flat">
       <div class="layer">
@@ -664,7 +705,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics; send disabled on an empty field</p>
     <div class="page">
       <div class="palette" style="box-shadow:none">
@@ -677,10 +718,10 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
-            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot"></span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer" role="article" aria-label="Assistant response">
             <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
@@ -719,7 +760,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace — ok, error, pending</p>
     <div class="page">
       <div class="agent-panel">
@@ -744,7 +785,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows (transient acrylic), and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">
@@ -775,7 +816,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
 <section class="col" data-theme="dark">
   <h2>Dark — Campbell, verbatim</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query — Mica plate → layer → card; clear button disabled</p>
     <div class="desktop">
       <div class="layer">
@@ -805,7 +846,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, permanent Reveal focus, opening, skeleton. Rendered in the <b>flat fallback</b>: the same tokens with the window inactive</p>
     <div class="desktop" data-material="flat">
       <div class="layer">
@@ -840,7 +881,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics; send disabled on an empty field</p>
     <div class="page">
       <div class="palette" style="box-shadow:none">
@@ -853,10 +894,10 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
-            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot"></span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer" role="article" aria-label="Assistant response">
             <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
@@ -895,7 +936,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace — ok, error, pending</p>
     <div class="page">
       <div class="agent-panel">
@@ -920,7 +961,7 @@ summary:focus-visible { outline: var(--ring-w) solid var(--ring); outline-offset
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows (transient acrylic), and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">

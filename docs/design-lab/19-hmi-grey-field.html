@@ -64,9 +64,9 @@
 }
 /* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 960px; --header-h: 48px; --row-h: 32px; --target: 32px;
   --r: 8px; --r-md: 6px; --r-sm: 4px; --r-xs: 2px;
-  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 48rem;
   --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
   --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
@@ -88,6 +88,9 @@ h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
 .col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: center; }
 .surface { margin-bottom: 36px; }
 .lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+/* taste: surface captions sit on the neutral lab wall, not the operator-station field — give them their own ink so the 4.5:1 check is real */
+[data-theme] .lbl { color: #9c9ea4; }
+[data-theme="dark"] .lbl { color: #b9bdc4; }
 .desktop, .page { border-radius: 12px; padding: 24px; }
 .desktop { background: var(--plate); }
 .page { background: var(--background); color: var(--foreground); }
@@ -195,6 +198,9 @@ summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spa
 .alert h4 { margin: 0; font-size: var(--t14); }
 .alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
 
+/* taste: kept by design — ISA-101 operator-station HMI: grey field with colour reserved for alarm only,
+   stroke-weight hierarchy (2px matters / 1px exists), zero shadows, 13px rows, ack-blink as the sole motion (HMI safety UI).
+   Marketing rules that assume photography are N/A for this UI-screen reference. */
 /* ══ 19 · HMI idiom (appended) ══════════════════════════════════════════════
    Type: 13/17 rows, 12/16 mono values, every numeral tabular, labels 11/16 tracked caps.
    Depth: none. Emphasis is stroke weight — 2px means "this matters", 1px means "this exists".
@@ -205,6 +211,25 @@ summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spa
   --t13: 13px; --lh17: 17px; --t11: 11px; --lh11: 16px; --lh2: 2px; --lh1: 1px;
   --ack-period: .667s; /* 1.5 on/off cycles per second — under the WCAG 2.3.1 three-flash ceiling */
   --hero-min: 320px; --sheet: 16px; --spec-hmi: 96px; --spec2-hmi: 44px; --slab-w: 62px; --slab-h: 16px;
+}
+/* ── EXPRESSIVE OVERLAY — theme-independent :root tokens (direction 19 = WITHHOLD-Safety: block + reduced-motion only, the one acknowledge sweep stays as authored) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
 }
 * { font-family: var(--ff-hmi); }
 body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { font-variant-numeric: tabular-nums; }
@@ -218,6 +243,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
 .row.hov .t, .row.hov .k, .row.hov .p, .row.hov svg { color: var(--accent-foreground) }
 .row.foc { box-shadow: none; outline: var(--lh2) solid var(--ring); outline-offset: calc(var(--lh2) * -1) }
 .st i { width: 12px; height: 12px; border-radius: 0; font-size: var(--t11); background: none; border: var(--lh2) solid var(--success); color: var(--success) }
+.st i.done::before { content: ""; width: 100%; height: 100%; background: currentColor; }
 .st.run i { background: none; border-color: var(--warning); color: var(--warning) }
 .st em { border-left: var(--lh2) solid var(--hmi-struct) } .pill, .chip { border-width: var(--lh1) }
 /* a caution badge IS an amber plate with black ink — the hue never becomes a label */
@@ -305,6 +331,9 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   /* every animated state's static twin is already the information-complete one: the unacknowledged
      row settles to the acknowledged look — a solid alarm-colour border on the flat field. */
   .blink, .blink .badge, .bxu { animation: none }
+  /* uniform reduced-motion opt-out (expressive overlay): kill any transition/transform vocabulary too */
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
 }
 </style>
 </head>
@@ -351,7 +380,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="hero-blink"><span class="bx bxu"></span><span>unacknowledged — alarm border blinks, chip blinks the fill, 1.5 cycles/s</span><span class="bx acked"></span><span>acknowledged — alarm-colour border only, which is the state the blink settles to</span></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -364,7 +393,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -379,14 +408,14 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i class="done"></i>Understanding your question…</div>
+      <div class="st"><i class="done"></i>Searching the web…<em>web</em></div>
+      <div class="st"><i class="done"></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -415,7 +444,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -445,7 +474,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   </div>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -475,7 +504,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="hero-blink"><span class="bx bxu"></span><span>unacknowledged — alarm border blinks, chip blinks the fill, 1.5 cycles/s</span><span class="bx acked"></span><span>acknowledged — alarm-colour border only, which is the state the blink settles to</span></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -488,7 +517,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -503,14 +532,14 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, alarm-level key, token-budget tank bar, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i class="done"></i>Understanding your question…</div>
+      <div class="st"><i class="done"></i>Searching the web…<em>web</em></div>
+      <div class="st"><i class="done"></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -539,7 +568,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity — flow chevrons, the acknowledge state machine, and a greyed-out pending block</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -569,7 +598,7 @@ body, .row, kbd, .chip, td.n, .met b, .tr td, .alert ul, .st em, .hero-kicker { 
   </div>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

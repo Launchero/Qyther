@@ -2,6 +2,49 @@
 
 > **Status**: mockup — research record and visual references for design directions that are **not** implemented. Nothing here describes current behaviour; `src/renderer/styles/AGENTS.md` and `design-systems/SHADCN-DESIGN-SYSTEM.md` do.
 
+## Direction 29 — Composed Stack (a synthesis, not a thirtieth research direction)
+
+`29-composed-stack.html` is the stack a critical read of the other 38 produces. It is recorded here as a **proposal**, not as a peer candidate: it borrows one named mechanism from five existing directions rather than researching a sixth system, and its own header cites each donor at the point of use.
+
+| Donated by | Mechanism taken |
+|---|---|
+| `28` | Seed → derivative → alias tiering; a 12-step ramp; the control state quartet; a foreground partner per role |
+| `10` | Named elevation ladder (`--surface-base/-raised/-overlay/-sunken`, `--border` ≠ `--input`) and `--s-cond`/`--s-norm` wired to `[data-window-mode]` |
+| `17` | The numeric contract — `tabular-nums`, right alignment, a fixed sign gutter, row rules instead of zebra, no rounding of the last significant digit |
+| `18` | Colour as a published contract: every status hue carries a **shape** and a **word**, so colour is never the only channel. Extended past `18`'s four states to six, because a five-state tool vocabulary has nowhere to go in a four-state law |
+| `27` | Named elevation roles |
+| `05` | A `-shade` / `-foreground` partner per role |
+
+**What it adds that no other file does: surface 0, the mode band.** The app's default surface is `MODE_CONFIGS.compact.height` = 72px, and `--container-header-height` is contractually equal to it, so the compact card *is* one header tall — yet every other mock authors `--header-h` between 40px and 80px and renders only the expanded card. **13 of the 28 directions therefore cannot physically render the app's default state.** `29` renders it at 72px, beside a 300px icon-only dock and a condensed/expanded density pair, all off the same aliases. Surface 6 is a specimen for the ladder, the law and the numeric column. That is why this file has seven surfaces per theme rather than five.
+
+Three findings from the live pass are recorded here because they change how the other files should be judged:
+
+1. **A themed background is not a themed surface.** `.desktop` set `background: var(--plate)` and no `color`, so content sitting directly on the plate inherited the lab page chrome's near-white text — **measured 1.02:1** on the density pair in the light column. This is latent in `00`–`28` because every row there lives inside a `.palette`, which does set `color`; the mode band is the first content on the plate itself.
+2. **Lab chrome and themed surfaces need different text tokens.** `.lbl` sits on the page chrome while `.note` sits inside `.desktop`/`.page`; giving both the same token makes one of them fail (`.lbl` measured **2.39:1** before the split). `29` declares `--lab-ink` / `--lab-mute` / `--lab-line` in `:root` for the former — the same reason the control hardcodes `#8f929c` there.
+3. **A 1px border is not 1px at 125% DPI.** Measured here at `devicePixelRatio: 1.25`, every 1px border in this file computes `border-bottom-width: 0.8px`. That is the sub-pixel hairline hazard already recorded for `03`, confirmed on real hardware, and it is why ring-versus-border is not cosmetic at that scale.
+
+### Geometry & spacing retune of `29` (2026-10-16, researched)
+
+`29` is the one file here whose dimensions were set against **primary sources** rather than a direction's aesthetic. Five values moved:
+
+| Token | Was | Now | Why — primary source |
+|---|---|---|---|
+| `--palette-w` | 800px | **680px** | Every launcher with a shipped dimension is narrower. VS Code's Quick Open is `width: 600px` in shipped `quickInput.css`; PowerToys Run is `Width="640"` in shipped `MainWindow.xaml`; Raycast is community-reported near 750px. The convergence band is 600–760 and **nothing primary supports 800**. The only principled ceiling anyone publishes is readability (~70ch, Baymard; ≤80ch per WCAG 1.4.8) — no vendor publishes a launcher max. |
+| `--target` | 32px | **40px** | 32px clears WCAG 2.2 SC 2.5.8 AA (24×24 plus the 24px-circle spacing rule) but sits **under Microsoft's own 7.5mm / 40px targeting guideline** — the wrong floor for a Windows app. 40px is also Carbon's `md` button. |
+| `--space-*` | px literals | **rem, on Carbon v11's `$spacing-01…13`** (2/4/8/12/16/24/32/40/48/64/80/96/160) | rem is the majority output across Primer, Carbon, Atlassian, Tailwind and USWDS — only Radix documents px — and a px rhythm stops scaling under WCAG 1.4.4 (200% text resize). Hairlines and icon geometry stay px; a 1px rule is optical, not a rhythm value. |
+| `td`/`th` inline padding | 12px | **16px** | Carbon's data-table spec uses `$spacing-05` = 16px on both column axes. |
+| `.row` padding | `6px 12px` physical | **`padding-block` / `padding-inline`** | Logical properties flip correctly under RTL and vertical writing modes; no counter-argument found in current sources. |
+
+**Deliberately *not* moved.** `--header-h` and `--palette-w` stay **px** even though the rest of the rhythm moved to rem: both must keep equalling `MODE_CONFIGS.compact.height` and `MODE_CONFIGS.*.width` in the main process, and a rem value would silently stop matching the window the moment a user changed their root font size — the same "fifth copy of `MODE_CONFIGS`" failure the token file exists to prevent. The row ladder stays 32/40/48 because it was **already** Carbon's `sm`/`md`/`lg` verbatim. `--header-h` stays 72px because no launcher publishes a search-field height at all; 72px is the app's contract, not a design choice.
+
+**Density is two discrete modes, not a multiplier.** A global `calc(var(--x) * var(--density))` breaks icon grids, 1px borders and type rhythm, and no major system ships one — Fluent exposes exactly two levels (default/compact), and Material 3 defines density as changing "top and bottom padding" with text size explicitly untouched. Both rules are honoured: `[data-window-mode="compact"]` remaps `--pad`, `--gap`, `--gap-2`, `--row-h`, `--row-pad-block` and `--target`, and no type token.
+
+**Container queries replace three hand-authored variants.** `container-type: inline-size` plus size queries are Baseline Widely available (Chrome 105 / Safari 16 / Firefox 110), so a frameless window the user can resize from 280px to full width responds to *its own* width — no viewport breakpoint is ever correct for it. Measured: the 300px dock and the 680px result list carry **byte-identical row markup** (4 children each), yet `.p` and `.k` compute `display:none` in the dock and `block` at full width, with the grid collapsing from 4 columns to 3. This is the first responsive mechanism in the folder.
+
+**Verification after the retune.** Gate `all 38 pass` (`29`: 957 lines, 14 surfaces, 166 CSS variables); 88/88 markup classes covered, no dangling `var()`; compact strip measures **680 × 72.00**; `--target` 40px default / 32px compact; density paddings 0.75rem / 0.5rem; **40 painted colour pairs re-measured, none below 4.5:1**.
+
+**Earlier verification, before the retune.** `node tmp/design-lab-check.mjs` → **all 38 pass** (`29` at 877 lines, 14 surface blocks, 152 CSS variables). A separate coverage pass confirmed all 88 markup classes have a CSS rule and no `var()` is undeclared — the defect class that shipped `18` with an unstyled Settings surface. Live read over CDP: the tier chain resolves in both themes, with **19 theme-scoped roles correctly absent on `<html>`** and present inside a themed column, which is the seed/derivative/alias contract measured rather than asserted. `[data-window-mode="compact"]` re-points `--row-h` 40px → 32px and `--pad` 12px → 8px; the compact strip measures **exactly 72.00px** with the header at 70.4px inside it. `tabular-nums` computes on `td.n`, `.met b` and `.dens .n`. All six status marks are geometrically distinct (filled circle 9px, ring 10px, square 9px, rotated square 14.1px, clip-path diamond 11px, ring 10px). **38 painted colour pairs measured from the rendered nodes, none below 4.5:1**, after fixing `.lbl` (2.39 → 7.65), `--st-caution` (3.69 → 5.12), `--st-armed` (4.32 → 4.96) and the unthemed plate foreground (1.02 → 16.46). The reduced-motion block uses the universal `!important` reset rather than a per-selector `animation: none`, matching the conclusion recorded in `src/renderer/styles/AGENTS.md`.
+
 ## Why this folder exists
 
 Qyther ships one visual system: shadcn/ui + Radix primitives on Tailwind v4, OKLCH tokens in `src/renderer/styles/tokens/`, semantic roles in `src/renderer/styles/semantic/theme.css`, dark via the `.dark` class. The question this lab answers is what the app would look like under **other** design systems, and what adopting each would actually cost.
@@ -10,9 +53,9 @@ Ten directions, each rendered as a self-contained HTML mock of the real screens 
 
 ## Screen brief — the content every mock must reproduce
 
-Every mock renders the same five surfaces with the same words and the same data. Only the design language changes. Copy strings marked *(verbatim)* are the app's real strings, taken from the components named in `docs/design-lab/README.md` → Source strings below; a mock that invents a nicer string is testing a fake.
+Every mock renders the same five surfaces with the same words and the same data — the content never changes. What changes is the design language and its dimensions: each direction retunes its own card width, row/control heights, spacing and type scale (see the "Geometry & typography re-tune" note below). Copy strings marked *(verbatim)* are the app's real strings, taken from the components named in `docs/design-lab/README.md` → Source strings below; a mock that invents a nicer string is testing a fake.
 
-Geometry is fixed: the palette card is **800 CSS px wide** (`--container-command-palette`), header 72 px (`--container-header-height`), row height floor 40 px (`--target-row`), control target floor 32 px (`--target-min`), compact density. Window is frameless, always-on-top, centred in the work area with its top edge at a fixed offset — mocks draw the card on a desktop plate, never inside a browser chrome.
+The control (`00-current-baseline.html`) keeps the app's real dimensions: 800 CSS px card (`--container-command-palette`), 72 px header (`--container-header-height`), 40 px row floor (`--target-row`), 32 px control floor (`--target-min`), compact density. The other directions are no longer pinned to those numbers: each sets its own card width, header/row/control heights, spacing and type scale to the value its research calls authentic (or a conservative *unverified* one where the source is thin) — the geometry pin was lifted on 2026-10-16, see the "Geometry & typography re-tune" note. The window is frameless, always-on-top, centred in the work area; mocks draw the card on a desktop plate, never inside a browser chrome.
 
 ### 1. Palette — Files tab, empty query
 
@@ -79,7 +122,7 @@ Shared structure (the markup is fixed; the styling is the entire point):
 </header>
 ```
 
-Requirements: the banner is at least 320 px tall, spans the column, uses the direction's real palette as blocks of colour, shows a display-size type specimen (the actual face stack, at the scale the direction is famous for), and carries **at least one signature device** native to the direction — a rotated band, a seal, a reticle, a halftone field, a misregistered duplicate, a gauge arc, a bevel, a rule grid, an ink wash. The banner must be composed, not stacked: use the direction's own grid, alignment and asymmetry. Everything below it stays byte-comparable to wave 1 — same five surfaces, same strings, same data — so the only thing that changes is authorship.
+Requirements: the banner is at least 320 px tall, spans the column, uses the direction's real palette as blocks of colour, shows a display-size type specimen (the actual face stack, at the scale the direction is famous for), and carries **at least one signature device** native to the direction — a rotated band, a seal, a reticle, a halftone field, a misregistered duplicate, a gauge arc, a bevel, a rule grid, an ink wash. The banner must be composed, not stacked: use the direction's own grid, alignment and asymmetry. Everything below it stays byte-comparable in *content* to wave 1 — same five surfaces, same strings, same data — so the only things that change are authorship and the direction's own dimensions and type.
 
 The five surfaces, the states, and the per-mock page requirements above apply unchanged.
 
@@ -202,7 +245,7 @@ Each row's values were fetched from a primary source in the session that produce
 
 **09 Fluent / Mica.** Mica is an **opaque** wallpaper-tinted base for long-lived windows with content on a low-opacity layer above it; Acrylic is the translucent material Microsoft's own guidance restricts to transient surfaces. Both fall back to a solid colour when the window is inactive, when transparency effects are off, on battery saver and on low-end hardware — and a palette is inactive nearly all of its life. Electron exposes it first-party as `win.setBackgroundMaterial('mica'|'acrylic'|'tabbed')`, Windows-only, needing 22H2+; CSS `backdrop-filter` cannot substitute because Chromium cannot sample behind the window (electron/electron#30412, #38532, #19765). Windows' stated type floor — 14px Semibold, 12px Regular, Semibold over Bold, no italic — is where this app already sits. The 4px grid steps, the exact `LayerFillColorDefault` alphas and the Reveal CSS recipe could **not** be fetched, so the mock labels them as approximations.
 
-**10 Carbon.** `background → layer-01 → layer-02 → layer-03` with borders indexed to the current layer, so a raised surface is a named plane rather than a shadow opinion; g100 runs `#161616 → #262626 → #393939 → #525252`, `--cds-field-01` is a **fill** not an outline, `--cds-border-strong-01: #8d8d8d` is the control underline, `--cds-icon-interactive: #0f62fe`. Body is 14px natively and labels 12px — the two sizes this app runs on — and density is a real axis (`padding-inline` condensed `.5rem` vs normal `1rem`), which maps one-to-one onto the existing `[data-window-mode="compact"]` token reassignment. Its most transferable idea is the **additive** type law, `Xn = Xn-1 + {INT[(n-2)/4] + 1} × 2`, because a 1.25 modular ratio skips the rungs a dense UI needs. The trap: layers only work if every subtree redeclares its tokens under a layer wrapper, so copying the flat variable list breaks the maths.
+**10 Carbon.** `background → layer-01 → layer-02 → layer-03` with borders indexed to the current layer, so a raised surface is a named plane rather than a shadow opinion; g100 runs `#161616 → #262626 → #393939 → #525252`, `--cds-field-01` is a **fill** not an outline, `--cds-border-strong-01: #8d8d8d` is the control underline, `--cds-icon-interactive: #0f62fe`. Body is 14px natively and labels 12px — the two sizes this app runs on. Its most transferable idea is the **additive** type law, `Xn = Xn-1 + {INT[(n-2)/4] + 1} × 2`, because a 1.25 modular ratio skips the rungs a dense UI needs. The trap: layers only work if every subtree redeclares its tokens under a layer wrapper, so copying the flat variable list breaks the maths. **Correction (2026-10-16, re-derived against the v11 migration guide):** the density claim this section previously made — *"`padding-inline` condensed `.5rem` vs normal `1rem` is a real axis, mapping one-to-one onto `[data-window-mode="compact"]`"* — is **v10 language and no longer true of the version the mock quotes** (`@carbon/styles@1.117.0`). Carbon v11 has **no named density modes at all**: the official migration guide lists `$carbon--layout-01…04` as *Removed, replaced by* `$spacing-05/06/07/09`, and the v10 tall/normal/short/compact row model was superseded by one per-component size ladder — **xs 24 / sm 32 / md 40 / lg 48 / xl 64 / 2xl 80** (fetched from the data-table spec, updated Sep 30 2026). The ladder is the more useful half, and it is what `29` uses.
 
 ## Candidates considered and excluded
 
@@ -305,6 +348,92 @@ Two directions were forked four ways each to test how far "minimal radius" can g
 - `18d` — the 12px chamfer computes on seven elements per column with every `border-radius` at `0px`.
 
 **A defect found while forking:** `18` had shipped without the control's dialogs block — `.dlg`, `.set`, `.btn`, `.sw2`, `.dot`, `.alert` were all referenced by surface 5's markup and defined by nothing, so the Settings and MCP surfaces rendered as bare text. The static gate cannot see that class of bug (it checks token resolution and structure, not whether a selector exists), and no one had read surface 5 of that file. Restored in `18` and inherited correctly by all four variants; live-verified after the fix — `.dlg` now computes a 1px `#a2aeb8` border on the day card, `.btn` a 32px control, and the status dot resolves to the engaged green `#00683a`. The same class of miss in the generator itself (the dead `--r-knob`) was only caught by reading the variants' computed styles rather than trusting the fork's own prose.
+
+## Geometry & typography re-tune (2026-10-16)
+
+The original lab pinned every direction to the app's real dimensions (800 px card, 72 px header, 40 px row, 32 px control) so that only the skin varied. That pin was lifted: each of the 28 directions (`01`–`28`) now carries its own card width, header/row/control heights, spacing rungs and type scale, set to what online research says is authentic for that system — and, where a system publishes no dimensional spec, to a conservative value the file marks *unverified* in its header. The rule that keeps the five surfaces comparable: **only token values move.** No DOM, no content strings, no data rows, no light/dark layout, no banner markup, and no font *families* (the "no webfonts / inline only" rule holds). The gate still passes all 37 files, and the radius forks (`18a`–`18d`, `27a`–`27d`) were regenerated so they inherit their parents' new dimensions.
+
+Re-derived from the files on 2026-10-16 (`--palette-w` / `--header-h` / `--row-h` / `--target`):
+
+| # | width | header | row | control |
+|---|---|---|---|---|
+| `01`–`02` | 800 | 72 | 40 | 32 |
+| `03` | 800 | 72 | 28 | 32 |
+| `04`–`05` | 800 | 72 | 40 | 32 |
+| `06` | 920 | 48 | 32 | 28 |
+| `07` | 720 | 64 (ask 52) | 44 | 40 |
+| `08` | 640 | 54 | 44 | 36 |
+| `09` | 800 | 60 | 40 | 32 |
+| `10` | 800 | 40 | 48 | 48 |
+| `11` | 800 | 72 | 40 | 32 |
+| `12` | 720 | 72 | 40 | 32 |
+| `13` | 800 | 80 | 40 | 32 |
+| `14`–`15` | 800 | 72 | 40 | 32 |
+| `16` | 640 | 64 | 44 | 32 |
+| `17` | 720 | 56 | 32 | 32 |
+| `18` | 1024 | 56 | 32 | 32 |
+| `19` | 960 | 48 | 32 | 32 |
+| `20` | 640 | 56 | 28 | 28 |
+| `21` | 880 | 72 | 44 | 32 |
+| `22` | 840 | 72 | 44 | 32 |
+| `23`–`24` | 800 | 72 | 44 | 32 |
+| `25` | 640 | 56 | 32 | 32 |
+| `26` | 760 | 64 | 44 | 36 |
+| `27` | 840 | 76 | 48 | 36 |
+| `28` | 840 | 72 | 40 | 32 |
+
+A few rows read identical to the control on purpose: `02`, `04`, `09`, `11` and `28` were checked against their research and already sat on the authentic values, so they moved only a type or spacing rung, not a dimension. Rows that are a judgment call rather than a published spec (mostly `12`, `13`, `14`, `15`, `16`) are flagged *unverified* in their own headers. Spacing rungs and the display/hero type were retuned in most files too; those are recorded in each file's header block rather than tabulated here.
+
+## Expressive UI overlay (2026-10-16)
+
+A second pass layers the *principles* of **Google Material 3 Expressive** (expressive type ramp, spring motion, shape morphing, tonal colour), **spring physics** and **Apple Liquid Glass** material onto the mocks, so each reads as a living product rather than a flat skin. Everything stays static: CSS-only, no JS, no webfonts, and the DOM / content / strings are unchanged. Three read-only research subagents sourced the principles this session (M3X type/shape/motion token specs; Google Sans Flex's variable `opsz` axis; M3 motion easing/duration plus M3X spring tokens; Framer / react-spring defaults; Liquid Glass "functional-layer" glass; Rive state machines; WCAG 2.3.1 / 2.3.3). The consolidated vocabulary lives in the scratch contract `tmp/design-lab-expressive-contract.md` and is inlined into every file.
+
+**Uniform `:root` block.** Every mock — all 28 and the 8 forks, which were regenerated so they inherit it — carries one theme-independent `:root { --ex-* }` block: the sourced M3 easing curves (`--ex-ease-out` `cubic-bezier(0.2,0,0,1)`, decel `0.05,0.7,0.1,1`, accel `0.3,0,0.8,0.15`), a spring-approximation `--ex-ease-spring` (*unverified* default), duration rungs 120 / 300 / 480 ms, a display weight 800 with −0.03 em tracking, and a `backdrop-filter` blur + edge-light pair for the glass tier. A `@media (prefers-reduced-motion: reduce)` opt-out zeroes it in every file.
+
+**Applied per direction, not blanket.** The "smartly" is the withhold matrix — expressiveness is matched to the doctrine:
+
+| Tier | Directions | Treatment |
+|---|---|---|
+| FULL | `07`, `26` | liquid-glass material + spring morph on cards/hero + expressive type |
+| EXPRESSIVE | `01`, `02`, `04`, `08`, `09`, `13`, `15`, `27`, `28` | spring micro-motion on controls + bolder/tighter display type (no glass card-morph) |
+| MEANINGFUL | `05`, `10`, `11`, `14`, `23` | one disciplined standard transition + bold headings, no overshoot |
+| OPACITY | `03`, `06`, `17`, `20` | dense / terminal — state by fade only |
+| CALM | `24` | one slow decelerating transition, no bounce |
+| WITHHOLD | `12`, `16`, `18` (+forks), `19`, `21`, `22`, `25` | safety / print / period — no decorative motion; `18` and `19` keep only the single authored state-sweep |
+
+The gate still passes all 37, and the `--ex-*` tokens are self-contained in the one `:root` block so the scope-trap check stays green. The spring curve and the lift/scale/blur amounts are conservative *defaults* (no primary px spec) and are marked *unverified* in the block; the M3 easing/duration values and the type-weight guidance are the documented ones. Live-verified this session: `26` computes `backdrop-filter: blur(10px)` plus a 0.48 s decel transform transition and h1 at weight 800; `18` (WITHHOLD-safety) carries the block but no surface transition, and its h1 was deliberately left un-bumped.
+
+**Keyframe animation patterns (second wave, 2026-10-16).** On top of the hover/focus *transitions*, the motion-friendly tiers now also self-run `@keyframes` so each mock feels alive on load. The vocabulary — all `ex-`-prefixed so it never collides with a file's existing loops — is: `ex-enter` (a one-shot staggered entrance, `both` fill so content ends visible), `ex-pulse` (a ~3 s single-channel ambient state on the agent panel), `ex-sweep` (a slow scan across a progress/selection rule via a `::after` layer), and `ex-breathe` (a 6 s glass layer, FULL tier only). Coverage by tier: FULL (`07`,`26`) get all four; EXPRESSIVE (`01`,`02`,`04`,`08`,`09`,`13`,`15`,`27`,`28`) get enter + pulse + sweep; MEANINGFUL (`05`,`10`,`11`,`14`,`23`) get enter + sweep (no ambient loop, decel not spring); OPACITY (`03`,`06`,`17`,`20`) get a fade-in enter + sweep; CALM (`24`) gets a single slow enter only (no loops — *ma* = stillness). The WITHHOLD tiers (`12`,`16`,`18`+forks,`19`,`21`,`22`,`25`) get none — the safety/print/period doctrine holds, and `19` keeps only its authored `hmiAck*` acknowledge sweep. Every loop is single-channel and ≥ 2.8 s (no strobing → WCAG 2.3.1 safe), and each file's `prefers-reduced-motion` block explicitly zeroes the animated selectors *including the `::after` sweep* (the global `*` rule does not reach pseudo-elements). The `27` forks regenerate and inherit `27`'s keyframes; `18`'s forks correctly carry none. Live-verified this session: `26` computes `hero→ex-enter`, `palette→ex-enter,ex-breathe`, `ag→ex-pulse`, `prog::after→ex-sweep`, and `18` has zero `ex-` keyframes.
+
+## Taste correction (tasteskill v2 pass, 2026-10-16)
+
+A final pass ran the design-lab mocks through the anti-slop taste skill (`design-taste-frontend`),
+which is a **marketing-page** tool. Because these are **UI-screen references of the app**, most of
+its "tell" rules target things a UI mock is not meant to have, so the pass was scoped honestly:
+
+- **Scoping.** Each mock's five app surfaces carry a `data-ui` attribute (the skill's
+  interface-fragment exemption for a product's own borders/shadows). The lab's own banner (`.hero`)
+  and meta (`.brief`) are *not* scoped, so they stay judged. This cleared the product's own
+  `shadow`/`hairline`/`outlined-box`/`few-pictures`/`focal` inspector failures without touching the
+  design.
+- **Genuine craft defects, fixed** (all recorded in the inspector): the lab's caption/label
+  **contrast** raised to ≥4.5:1 on both light and dark grounds; the `✓` status **emoji** replaced by
+  the file's CSS status dot or the word "ok"; underbuilt final screens filled or put on a colour
+  field; and any **default indigo/violet** accent swapped (none survived — `03`'s indigo is Linear's
+  own brand colour, kept). Two real 1:1 colour bugs were found and fixed (`07`'s light-column text
+  never set `color`; `08`'s "text@5" alpha idiom compositing against the dark board).
+- **Kept by design (identity).** Each file carries one `/* taste: kept by design — … */` note: the
+  direction's signature tells — monospace file paths & keycaps, card elevation, 1px UI dividers,
+  glass/`backdrop-filter`, gradient material, SBB index numbering, dense 13–14 px launcher/terminal
+  density, the seven-segment/console readouts. Stripping these would delete the research.
+- **N/A for a UI mock.** The skill's photography-based rules (a hero picture, footage, a large
+  focal image, a first-screen button) do not apply to a screens reference and were not forced.
+
+The taste gate will still list the identity tells (the static `lint.mjs` flags `mono`/`gradient`
+/etc. in the CSS block regardless of `data-ui`); that is expected, not a failure to hide — the
+right measure for these interface fragments is the `inspect.mjs` output with the surfaces
+`data-ui`-scoped, which is what the per-file "kept by design" notes refer to. The control
+(`00-current-baseline.html`) was **not** touched.
 
 ## Known gaps in this record
 

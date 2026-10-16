@@ -30,6 +30,7 @@
 -->
 <style>
 /* ══ token block: light — GOV.UK palette, our role names ═══════════════════ */
+/* taste: kept by design — GOV.UK black/white/grey ramp + govuk blue, focus-first 2px ring, square corners, 1px dividers, 13px dense rows, mono keycaps (public-service utility UI) */
 [data-theme="light"] {
   --background: #f3f3f3;            /* black tint-95 — the page plate */
   --foreground: #0b0c0c;            /* black — 19.59:1 on white */
@@ -189,10 +190,12 @@
   --font-mono: "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
   --text-xs: 13px;  --lh-xs: 1.35;  --ls-xs: 0;      /* the ramp is COMPRESSED: their real scale */
   --text-sm: 13px;  --lh-sm: 1.4;   --ls-sm: 0;      /* is 16/19/21/24/32/48/80px with 24-50px    */
-  --text-base: 16px; --lh-base: 1.5; --ls-base: 0;   /* leading, a page scale. 13px is the floor */
-  --text-lg: 20px;  --lh-lg: 1.5;                     /* here, so the 16px body is where type     */
-  --text-xl: 28px;  --lh-xl: 1.25;                    /* starts to feel like the real thing.      */
-  --text-2xl: 40px; --lh-2xl: 1.1;                    /* 24px is their first heading rung.        */
+  --text-base: 19px; --lh-base: 1.3158; --ls-base: 0;  /* GOV.UK body = govuk-body 19/25px on large screens
+      (service manual: "majority of your body copy should use the standard 19px paragraph size"),
+      16/20 on small; 25px is a multiple of the 5px rhythm, not a unitless 1.5. */
+  --text-lg: 24px;  --lh-lg: 1.25;                    /* their first heading rung: 24/30px */
+  --text-xl: 27px;  --lh-xl: 1.1111;                  /* 27/30px rung */
+  --text-2xl: 48px; --lh-2xl: 1.0417;                 /* 48/50px display rung */
   --tracking-label: 0.03em;
   --weight-regular: 400;
   --weight-bold: 700;
@@ -233,7 +236,7 @@ h1 { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: var(--
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-size: var(--text-base); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-faint); margin: var(--sp-0) 0 var(--sp-3); text-align: center; border-bottom: var(--rule-w-heavy) solid var(--lab-rule); padding-bottom: var(--sp-1); }
 .surface { margin-bottom: var(--sp-7); }
-.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground); margin: var(--sp-0) 0 var(--sp-1); font-weight: var(--weight-bold); }
+.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-muted); margin: var(--sp-0) 0 var(--sp-1); font-weight: var(--weight-bold); }
 .page { background: var(--background); color: var(--foreground); padding: var(--sp-4); }
 .desktop { background: var(--desktop-plate); }
 
@@ -483,6 +486,41 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
 .btn, .ghost-btn, .chip, .badge, .keycap, .mode-pill, .pill, .icon-btn, .send, .search, .ask-pill { border-radius: var(--radius-sm); }
 .count, mark, .step .tag, .skeleton, .answer code { border-radius: var(--radius-xs); }
 .progress, .progress i, .switch, .switch::after, .spinner { border-radius: var(--radius-pill); }
+
+/* ── expressive overlay: M3X type + spring + liquid-glass vocabulary (theme-independent) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* MEANINGFUL tier — austere doctrine: one disciplined standard transition + bold heading, no deco */
+.row, .btn { transition: background-color var(--ex-dur-1) var(--ex-ease-out), border-color var(--ex-dur-2) var(--ex-ease-out); }
+h1 { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* keyframe animations (second wave) — ex- prefixed so they never collide with an existing loop */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+/* MEANINGFUL tier — one disciplined enter on the primary surface (.palette, the hero-equivalent), decel not spring; sweep shimmer on the progress rule; no pulse */
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) both; }
+.progress { position: relative; }
+.progress::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent, var(--input), transparent); opacity:.3; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .palette, .progress::after { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -509,7 +547,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
 <section class="col" data-theme="light">
   <h2>Light</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
     <div class="desktop">
       <div class="palette">
@@ -537,7 +575,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
     <div class="desktop">
       <div class="palette">
@@ -569,7 +607,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette">
@@ -582,9 +620,9 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -624,7 +662,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel ib">
@@ -649,7 +687,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">
@@ -678,7 +716,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
 <section class="col" data-theme="dark">
   <h2>Dark</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
     <div class="desktop">
       <div class="palette">
@@ -706,7 +744,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
     <div class="desktop">
       <div class="palette">
@@ -738,7 +776,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette">
@@ -751,9 +789,9 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -793,7 +831,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel ib">
@@ -818,7 +856,7 @@ summary { padding: var(--sp-2); font-size: var(--text-sm); font-weight: var(--we
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">

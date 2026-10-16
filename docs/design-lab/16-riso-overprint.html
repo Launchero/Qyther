@@ -10,17 +10,19 @@
   the control; the difference is authorship (a misregistered two-plate print language + the wave-2 banner).
 -->
 <style>
+/* taste: kept by design — two-ink riso print: misregistration offset plate, halftone dots, paper grain, 0/2px radius (a risograph does not round).
+   Marketing-page rules that assume photography (hero picture, footage) are N/A for this UI-screen reference. */
 /* ── LIGHT — Fluorescent Pink + Blue on DERIVED cream paper, Midnight body, Black keyline ── */
 [data-theme="light"] {
   --background: #f6f1e7; --foreground: #435060;               /* paper / Midnight body ink 8.4:1 */
   --card: #fbf8f1; --card-foreground: #435060;
   --popover: #fffdf7; --popover-foreground: #333d4a;
   --primary: #0078BF; --primary-foreground: #ffffff;          /* Blue — FILL only, 4.1:1 as text */
-  --secondary: #efe7d6; --secondary-foreground: #435060;
-  --muted: #ece3d0; --muted-foreground: #5c6675;
+  --secondary: #efe7d6; --secondary-foreground: #45230a;     /* pill ink: ~9:1 on the light secondary (taste: was #435060, 2.3:1 via --warning) */
+  --muted: #ece3d0; --muted-foreground: #435060;                /* caption/label ink: 8.4:1 on paper, 3.5:1 on the neutral page wall (lab chrome, not a printed surface) */
   --accent: #e3d8c1; --accent-foreground: #333d4a;
-  --destructive: #F65058; --destructive-foreground: #ffffff;  /* Scarlet */
-  --success: #67B346; --warning: #FF6C2F; --info: #0078BF;    /* Kelly / Orange / Blue — fills */
+  --destructive: #c1272e; --destructive-foreground: #ffffff;  /* trace-error ink 4.8:1 on the light card (taste: was #F65058, 3.0:1); the lamp fill stays --ink-c */
+  --success: #3e7a26; --warning: #8a3708; --info: #0078BF;    /* Kelly / Orange / Blue — fills; Kelly 4.9:1 & Orange 7.0:1 on the light card so pill text clears 4.5 (taste: were #67B346 2.4:1 / #FF6C2F 2.3:1) */
   --success-soft: #67B34633; --warning-soft: #FF6C2F33;
   --info-soft: #0078BF2e; --destructive-soft: #F6505833;
   --agent: #9D7AD2;                                            /* Violet */
@@ -40,7 +42,7 @@
   --popover: #333c48; --popover-foreground: #f6f1e7;
   --primary: #0078BF; --primary-foreground: #ffffff;
   --secondary: #2f3844; --secondary-foreground: #f0ead9;
-  --muted: #2f3844; --muted-foreground: #b3bac6;
+  --muted: #2f3844; --muted-foreground: #c9d0db;                 /* ink-dyed dark half caption: 4.5:1 on card / popover */
   --accent: #3a4450; --accent-foreground: #f6f1e7;
   --destructive: #ff8a90; --destructive-foreground: #1a1f27;
   --success: #67B346; --warning: #FFB511; --info: #62A8E5;
@@ -53,20 +55,39 @@
   --grain: rgba(246,241,231,.03); --ink-yellow-on: #12161d;
   --key: 0 2px 0 0 rgba(0,0,0,.6);
   --elev: 2px 2px 0 0 var(--ink-a); --elev-sm: 2px 2px 0 0 var(--ink-b);
-  --ink-a: #FF6EBB; --ink-b: #62A8E5; --ink-c: #F65058; --ink-d: #FF6C2F; --ink-e: #86C46A;
+  --ink-a: #FF6EBB; --ink-b: #0d3553; --ink-c: #F65058; --ink-d: #FF6C2F; --ink-e: #86C46A;
   --ink-f: #B79CE6; --ink-g: #F0FA32; --ink-h: #AEB8C6; --ink-i: #FFC24D; --ink-j: #7FBBEF; --ink-l: #88898A;
+}
+/* ── EXPRESSIVE OVERLAY — theme-independent :root tokens (direction 16 = WITHHOLD: block + reduced-motion only, no surface transitions) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
 }
 /* ── GEOMETRY (identical in both themes) — literal values only, nothing theme-scoped here ── */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 640px; --header-h: 64px; --row-h: 44px; --target: 32px;
   --r: 0px; --r-md: 0px; --r-sm: 2px; --r-xs: 2px;            /* radius is 0 or 2, nothing between */
-  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
-  --grid: 4px; --mis: 2px; --bw: 1px;
+  --pad: 16px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 38rem;
+  --grid: 4px; --mis: 1px; --bw: 1px;
   --ff: Inter, Overpass, system-ui, "Segoe UI", Roboto, sans-serif;
   --disp: "Space Grotesk", Inter, system-ui, sans-serif;       /* UNVERIFIED licence — see header */
   --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
-  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t18: 18px; --t20: 20px; --t24: 24px; --t32: 32px; --t40: 40px;
-  --ls-label: .08em;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t18: 18px; --t20: 20px; --t24: 24px; --t32: 32px; --t40: 44px;
+  --ls-label: .1em;
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
@@ -83,7 +104,10 @@ h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: center; }
 .surface { margin-bottom: 36px; }
-.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; margin: 0 0 8px; }
+/* taste: surface captions sit on the neutral lab wall, not the paper / ink-dyed grounds — give them their own ink so the 4.5:1 check is real */
+[data-theme] .lbl { color: #c7cbd4; }
+[data-theme="dark"] .lbl { color: #b9c2d1; }
 .desktop, .page { border-radius: 0; padding: 24px; }
 .desktop { background: var(--plate); }
 .page { background: var(--background); color: var(--foreground); }
@@ -124,6 +148,7 @@ mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); p
 .steps { display: grid; gap: 6px; padding: 10px 12px; border: var(--bw) solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
 .st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
 .st i { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--success-soft); color: var(--success); }
+.st i.done::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .st.run i { background: var(--warning-soft); color: var(--warning); }
 .st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
 .ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
@@ -203,8 +228,8 @@ summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spa
 .halftone::after { content:""; position:absolute; inset:0; color: var(--ink-h); opacity:.28; pointer-events:none;
   background-image: radial-gradient(currentColor 1px, transparent 1.5px); background-size: 3px 3px;
   transform: rotate(15deg); mix-blend-mode: multiply; }
-.hero { min-height: 320px; background: var(--background); align-content: center; }
-.hero-title { font-family: var(--disp); font-size: var(--t32); line-height: .95; text-transform: uppercase;
+.hero { min-height: 360px; background: var(--background); align-content: center; }
+.hero-title { font-family: var(--disp); font-size: var(--t40); line-height: .95; text-transform: uppercase;
   letter-spacing: .01em; color: var(--foreground); position: relative; }
 .hero-title::before { content: attr(data-ghost); position: absolute; top: calc(-1 * var(--mis)); left: var(--mis);
   color: var(--ink-a); opacity: .85; mix-blend-mode: multiply; z-index: -1; }
@@ -226,17 +251,24 @@ summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spa
   mix-blend-mode: multiply; border: var(--bw) solid var(--border); }
 .tabs .tab.on { background: var(--ink-b); color: #ffffff; }
 .tabs .tab:not(.on) { background: var(--ink-a); color: var(--ink-yellow-on); margin-left: calc(-1 * var(--gap)); z-index: -1; }
+/* taste: 12px tab labels are text — pink plate gets a near-black riso ink, not a 4.1:1 mid-ink */
+[data-theme="light"] .tabs .tab:not(.on) { color: #14161a; }
 .row.sel { position: relative; }
 .row.sel::before { content:""; position:absolute; inset:0; background: var(--ink-a); opacity:.85;
   mix-blend-mode: multiply; transform: translate(calc(-1 * var(--mis)), calc(-1 * var(--mis))); z-index:-1; }
 .cnt { height: auto; min-width: 0; padding: 0; background: transparent; font-family: var(--mono); }
 .cnt .hb { font-size: var(--t40); line-height: .8; color: var(--ink-yellow-on); position: relative; isolation: isolate; }
 .cnt .hb::before { content:""; position:absolute; inset:-2px -4px; z-index:-1; background: var(--ink-g); opacity:.9; mix-blend-mode: multiply; }
-kbd { background: var(--ink-b); color: var(--primary-foreground); }
+kbd { background: var(--ink-b); color: #ffffff; }
 .prog { position: relative; height: 16px; background: var(--muted); border-radius: 0; border: var(--bw) solid var(--border); }
 .prog i { width: 66%; background: var(--ink-b); background-image: radial-gradient(var(--ink-a) 1px, transparent 1.6px);
   background-size: 3px 3px; border-right: var(--bw) solid var(--ink-b); }
 .me { border-radius: var(--r-sm); }
+/* ── reduced-motion opt-out (uniform, every direction) — 16 is WITHHOLD: no surface motion to remove, but the vocabulary is here ── */
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+}
 </style>
 </head>
 <body>
@@ -284,7 +316,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="cbar hero-bar"><i></i><i></i><i></i><i></i><i></i><i></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="tab on">Files</span><span class="tab">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -297,7 +329,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span> <span class="cbar"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="tab on">Files</span><span class="tab">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt"><span class="hb">6</span></span></p>
@@ -312,14 +344,14 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span> <span class="cbar"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="tabs"><span class="tab">Files</span><span class="tab on">Ask</span></span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i class="done"></i>Understanding your question…</div>
+      <div class="st"><i class="done"></i>Searching the web…<em>web</em></div>
+      <div class="st"><i class="done"></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -340,7 +372,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -359,7 +391,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -390,7 +422,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="cbar hero-bar"><i></i><i></i><i></i><i></i><i></i><i></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="tab on">Files</span><span class="tab">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -403,7 +435,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span> <span class="cbar"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="tab on">Files</span><span class="tab">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt"><span class="hb">6</span></span></p>
@@ -418,14 +450,14 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span> <span class="cbar"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="tabs"><span class="tab">Files</span><span class="tab on">Ask</span></span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i class="done"></i>Understanding your question…</div>
+      <div class="st"><i class="done"></i>Searching the web…<em>web</em></div>
+      <div class="st"><i class="done"></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -446,7 +478,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -465,7 +497,7 @@ kbd { background: var(--ink-b); color: var(--primary-foreground); }
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

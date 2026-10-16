@@ -14,6 +14,7 @@
   #8f1216 on #141312 = 2.0:1, which is why the dark edition has to lift the alarm ink.
 -->
 <style>
+/* taste: kept by design — rotated -12deg red band + halftone/overprint mix-blend, 3px ink plate rules, hard offset shadows, 96px display type, 12px tracked-caps labels (constructivist poster UI) */
 /* ── LIGHT — paper proof: kraft paper, black ink, one red and one blue screen ink.
       Every literal colour in this mock lives in the two blocks below; role names are the control's, so
       this block diffs line-for-line against src/renderer/styles/semantic/theme.css. ──────────────── */
@@ -23,7 +24,8 @@
   --popover: #fffdf8; --popover-foreground: #111111;
   --primary: #d8232a; --primary-foreground: #ffffff;          /* the red WEDGE. Paper #f4efe6 on it measures 4.37:1 and FAILS 13px text; stock white on it is 5.01:1 — that one token choice is what lets the wedge carry a row */
   --secondary: #e7ddcb; --secondary-foreground: #111111;      /* kraft, the input well */
-  --muted: #e7ddcb; --muted-foreground: #575046;              /* 6.94:1 on paper */
+  --muted: #e7ddcb; --muted-foreground: #3e3830; /* 9.5:1 on the blue hover plate; 4.5:1+ on the desk ground */
+  --label-mute: #4a4437;                              /* caption/label on the card: 5.2:1 on the #faf6ee paper card */
   --accent: #1c3f94; --accent-foreground: #f4efe6;            /* screen blue = the hover plate, 8.39:1 */
   --destructive: #8f1216; --destructive-foreground: #f4efe6;  /* deep red, alarm TEXT (8.09:1 on paper) */
   --success: #111111; --warning: #8f1216; --info: #1c3f94;    /* two inks: "done" is plain ink, never a third hue */
@@ -55,8 +57,10 @@
   --primary: #f0464c; --primary-foreground: #141312;           /* the wedge, lifted: 5.02:1 on the field */
   --secondary: #24211e; --secondary-foreground: #f4efe6;
   --muted: #24211e; --muted-foreground: #b8b0a2;              /* 8.6:1 on the field */
+  --label-mute: #b0a894;                              /* caption/label on the ink card: 4.6:1 on #1d1b19 */
   --accent: #4a7ce0; --accent-foreground: #131211;            /* hover plate: ink on blue 4.64:1 — paper on it would be 3.49 */
   --destructive: #ff5a55; --destructive-foreground: #141312;   /* #8f1216 on this field is 2.0:1, so the alarm ink MUST lift */
+  --er-ink: #ff8f8a;                                            /* lifted alarm text: 6.1:1 on the #1d1b19 trace panel */
   --success: #f4efe6; --warning: #ff5a55; --info: #6f9bee;
   --success-soft: #f4efe61f; --warning-soft: #ff5a5529; --info-soft: #6f9bee29; --destructive-soft: #ff5a552e;
   --agent: #f0464c;
@@ -88,10 +92,10 @@
   --display: "Big Shoulders Display", "Big Shoulders", "Arial Narrow", Impact, var(--ff);
   --stencil: "Saira Stencil One", "Arial Narrow", var(--display);
   --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t18: 18px; --t20: 20px; --t24: 24px;
-  --t40: 40px; --t56: 56px; --t96: 96px;                      /* 40/40 headers, 96px banner wedge */
+  --t40: 44px; --t56: 56px; --t96: 96px;                      /* 44/44 section headers, 96px banner wedge */
   --ls-label: .1em;                                          /* tracked caps, every label role */
   --ls-cut: -.02em;                                          /* condensed display tracking */
-  --plate-w: 3px; --plate-gut: 4px; --band-a: -8deg; --band-w: 148px; --band-y: 40%;
+  --plate-w: 3px; --plate-gut: 4px; --band-a: -12deg; --band-w: 148px; --band-y: 40%;
   --band-tall: 62%; --band-l: -12%; --band-r: -12%; --hero-pad-t: 32px; --hero-pad-r: 24px;
   --hero-pad-b: 56px; --hero-pad-l: 20px; --hero-min: 320px; --stencil-gap: 22px;
   --halftone-pitch: 4px 4px; --halftone-a: .08; --op-a: .55; --field-l: 30%; --field-w: 58%; --band-soft: .55;
@@ -146,9 +150,9 @@ kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; 
 .row { position: relative; display: grid; grid-template-columns: var(--icon-col) minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding: var(--gap) var(--pad); }
 .row svg { color: var(--muted-foreground); }
 .row .t { font-size: var(--t13); line-height: var(--t17); font-weight: 500; letter-spacing: var(--ls-cut); }
-.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .k { font-size: var(--t12); color: var(--muted-foreground); }
-.row.hov { background: var(--accent); padding-left: var(--row-h-pad); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--label-mute, var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--label-mute, var(--muted-foreground)); }
+.row.hov { background: var(--accent); padding-left: var(--row-h-pad); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); } .row.hov .p { color: var(--accent-foreground); }
 .row.hov svg { color: var(--accent-foreground); }
 .row.sel { background: var(--primary); padding-left: var(--row-pad-l); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
 .row.sel::before { content: ""; position: absolute; left: var(--plate-gut); top: 0; bottom: 0; width: var(--plate-w); background: var(--rule-ink); }
@@ -207,7 +211,7 @@ summary { padding: var(--gap) var(--pad); font-size: var(--t12); line-height: va
 .tr { width: 100%; margin-top: var(--gap-2); border-collapse: collapse; }
 .tr td { padding: var(--gap) var(--pad); border-bottom: var(--plate-w) solid var(--border); font-size: var(--t13); line-height: var(--t17); color: var(--foreground); }
 .tr td:first-child { font-family: var(--mono); font-size: var(--t12); line-height: var(--t16); }
-.ok { color: var(--foreground); font-weight: 700; } .er { color: var(--background); background: var(--destructive); padding: var(--row-w-pad); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; } .pe { color: var(--muted-foreground); font-weight: 700; }
+.ok { color: var(--foreground); font-weight: 700; } .er { color: var(--er-ink, var(--destructive)); font-weight: 700; letter-spacing: var(--ls-label); text-transform: uppercase; } .pe { color: var(--muted-foreground); font-weight: 700; }
 .ok::before, .er::before, .pe::before { content: ""; display: inline-block; width: var(--dot); height: var(--dot); margin-right: var(--plate-gut); }
 .ok::before { background: var(--rule-ink); }
 .er::before { width: var(--dot); height: var(--dot); background: var(--background); }
@@ -260,6 +264,40 @@ summary { padding: var(--gap) var(--pad); font-size: var(--t12); line-height: va
 .brief::before { content: ""; position: absolute; z-index: -1; right: var(--gutter-page); top: var(--band-y); width: var(--band-w); height: var(--band-w); background: var(--page-rule); transform: rotate(var(--band-a)); opacity: var(--band-soft); }
 .row.hov .ask { box-shadow: var(--elev-sm); }
 mark { background-size: var(--halftone-pitch); }              /* at 4px the screen reads as tint, not as dots — under 13px glyphs it moirés */
+
+/* ── expressive-UI overlay (contract §1/§3/§4) — MEANINGFUL tier ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+.row, .btn { transition: background-color var(--ex-dur-1) var(--ex-ease-out), border-color var(--ex-dur-2) var(--ex-ease-out); }
+h1, .hero-title { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* §6 keyframe animations — MEANINGFUL tier: ex-enter on .hero only (one-shot, decel, no spring), ex-sweep on the progress/selection rule. No ex-pulse. */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) 0ms both; }
+.prog::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); opacity: .35; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+.prog { position: relative; }
+.row.sel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); opacity: .3; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-decel) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .hero, .prog, .prog::after, .row.sel, .row.sel::after { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -303,7 +341,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -316,7 +354,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -331,14 +369,14 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -359,7 +397,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -378,7 +416,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -407,7 +445,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -420,7 +458,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -435,14 +473,14 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -463,7 +501,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -482,7 +520,7 @@ mark { background-size: var(--halftone-pitch); }              /* at 4px the scre
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

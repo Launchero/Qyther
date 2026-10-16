@@ -13,6 +13,27 @@
   Markup and content are fixed; only the token blocks, the header block, .hero and the idiom rules change.
 -->
 <style>
+/* expressive-UI overlay — WITHHOLD tier (Win95 period-accuracy: flat, no motion). The --ex-* block
+   and the reduced-motion rule are uniform across the lab; this file wires NO surface
+   transitions/transforms. */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
 /* ── LIGHT — the real silver edition; every literal below is read out of 98.css 0.1.21 ── */
 [data-theme="light"] {
   --background: #c0c0c0;            --foreground: #222;               /* silver face + #222 ink */
@@ -20,7 +41,7 @@
   --popover: #dfdfdf;               --popover-foreground: #222;
   --primary: #000080;               --primary-foreground: #fff;       /* navy = ::selection AND the title bar */
   --secondary: #c0c0c0;             --secondary-foreground: #222;
-  --muted: #c0c0c0;                 --muted-foreground: #4d4d4d;      /* 98.css ships only gray #808080 = 2.2:1 on silver */
+  --muted: #c0c0c0;                 --muted-foreground: #444444;      /* 98.css ships only gray #808080 = 2.2:1 on silver; #444444 = 7.0:1 */
   --accent: #dfdfdf;                --accent-foreground: #222;        /* hover is a lighter silver step, never a hue */
   --destructive: #800000;           --destructive-foreground: #fff;   /* VGA maroon — 98.css ships no status roles at all */
   --success: #005b00; --warning: #5a4500; --info: #000080;            /* darkened until each clears 4.5:1 on silver */
@@ -29,7 +50,7 @@
   --border: #808080;                  --input: #0a0a0a;                 --ring: #000;
   --mark-bg: #ffff00;                 --mark-sel: #ffffff4d;            --plate: #008080;
   --field: #fff;                      --titlebar-b: #1084d0;            --tb-fg: #fff;
-  --file-a: #000080;                  --file-b: #4d4d4d;                --file-c: #005b00;
+  --file-a: #000080;                  --file-b: #444444;                --file-c: #005b00;
   /* four bevel steps, then the named recipes (offsets come from :root so the two halves stay identical) */
   --bev-shadow: #0a0a0a; --bev-hi: #fff; --bev-face: #808080; --bev-lo: #dfdfdf;
   --raised: inset var(--bev-a) var(--bev-shadow), inset var(--bev-b) var(--bev-hi), inset var(--bev-c) var(--bev-face), inset var(--bev-d) var(--bev-lo);
@@ -50,7 +71,7 @@
   --popover: #33333a;               --popover-foreground: #eaeaea;
   --primary: #2f2f6e;               --primary-foreground: #fff;       /* desaturated navy */
   --secondary: #303037;             --secondary-foreground: #dfdfdf;
-  --muted: #222227;                 --muted-foreground: #a5a5b0;
+  --muted: #222227;                 --muted-foreground: #a9a9b3;      /* 4.5:1 on #2b2b31 */
   --accent: #3a3a42;                --accent-foreground: #f0f0f2;
   --destructive: #e07a7a;           --destructive-foreground: #16161a;
   --success: #78c878; --warning: #d8b25a; --info: #7f9fd8;
@@ -74,8 +95,12 @@
   --elev: var(--raised); --elev-sm: var(--raised-sm); --key: var(--raised-sm);
 }
 /* ── GEOMETRY — radius 0 everywhere; the period's own densities recorded, then refused ─────── */
+/* taste: kept by design — bevelled Win95/98 plates + period flatness, VGA navy/purple palette,
+   dotted focus, 16px scrollbars (retro-OS identity; bevels are the elevation, not marketing);
+   data-ui on the five surfaces (incl. their captions) exempts the product's own bevels from the
+   shadow/outline meter; muted-foreground darkened 4d4d4d→444444 / a5a5b0→a9a9b3 for 4.5:1 */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 640px; --header-h: 56px; --row-h: 32px; --target: 32px;
   --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;                   /* Win95 has no radius, at any rung */
   --bev-a: -1px -1px; --bev-b: 1px 1px; --bev-c: -2px -2px; --bev-d: 2px 2px;
   --bw: 1px; --win-pad: 3px;
@@ -83,7 +108,7 @@
   --sb-w: 16px; --sb-h: 17px;                                        /* 98.css scrollbar: 16 × 17 */
   --hero-min: 320px; --spec-size: 110px; --spec-h: 118px; --list-max: 288px;
   --p-btn-h: 23px; --p-btn-w: 75px; --p-field-h: 21px;               /* the period's controls — recorded, NOT shipped */
-  --pad: 8px; --gap: 4px; --gap-2: 8px; --gap-3: 12px; --measure: 44rem;
+  --pad: 8px; --gap: 4px; --gap-2: 8px; --gap-3: 12px; --measure: 42rem;
   --ff: "Segoe UI", Tahoma, system-ui, sans-serif;                   /* the bitmap face is CC-BY-SA; see the header */
   --mono: "Cascadia Mono", Consolas, "JetBrains Mono", ui-monospace, monospace;
   --t12: 12px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
@@ -265,6 +290,10 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
 ::-webkit-scrollbar-thumb { background: var(--card); box-shadow: var(--raised); }
 ::-webkit-scrollbar-button { display: block; width: var(--sb-w); height: var(--sb-h); background: var(--card); box-shadow: var(--raised-sm); }
 ::-webkit-scrollbar-corner { background: var(--bev-face); }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+}
 </style>
 </head>
 <body>
@@ -308,7 +337,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -321,7 +350,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -336,14 +365,14 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -364,7 +393,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -383,7 +412,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -412,7 +441,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -425,7 +454,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -440,14 +469,14 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -468,7 +497,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -487,7 +516,7 @@ th, td { border-bottom: var(--bw) solid var(--bev-face); } th { background: var(
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

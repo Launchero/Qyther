@@ -11,7 +11,12 @@ Hold the value types and pure semantics that cross the IPC boundary. Not a place
 | Path | Owns |
 |---|---|
 | `ipc/turn.ts` | `TurnEnvelope` (`{threadId?, sessionId?, seq?}`) and `isCurrentTurnEvent()`, the renderer's stale-event predicate |
+| `ipc/thinking-step.ts` | `ThinkingStep` — one tool step of an Ask turn as it crosses from the chat pump to the transcript. Types-only. It used to be declared twice (`ThinkingStepRow` in `src/main/ipc/chat-handlers.ts`, `ThinkingStep` in `src/renderer/hooks/useChatSession.ts`) and drifted the moment the bridge gained a human `label`: only one copy would have known about it. `label` is the tool's own declared `label`, resolved by `FamilyIndex.displayLabelFor()` — the renderer holds no name→copy map |
+| `ipc/source.ts` | `Source` — one web source the agent read, shipped in the terminal `chat:stream-chunk` as `sources`. Types-only; it existed as a third and fourth parallel declaration before this folder absorbed it |
+| `ipc/ui-payload.ts` | `UiPayload` — the generative-UI payload main pushes in the terminal chunk. Types-only; this shape was declared **four** times across three layers before it was consolidated here, which is exactly the drift this folder exists to stop |
+| `ipc/agent-label.ts` | `AgentLabel` — the **closed** set of agent labels the renderer can actually paint. `src/renderer/components/ask-mode/AgentIndicator.tsx` holds the only label→config map and returns `null` for an unknown label, so a label emitted from main that is not in this union renders as nothing. `pi/families.ts` and `families.test.ts` are bound to this set |
 | `ipc/sessions.ts` | `ChatSessionSummary` — one row of the list main pushes on `chat:sessions-changed`; types-only, imported by main, preload and the renderer, so the history list cannot be declared three ways |
+| `ipc/settings.ts` | `SettingsSnapshot` (`theme` / `reducedMotion` / `recentFilesLimit`) + `SettingsPatch` — the main-owned appearance/general shape carried by `settings:get`/`set`/`changed`; types-only, no default (the default lives in `main`) |
 | `ipc/turn.test.ts` | Asserts both directions of that predicate — dropping a superseded turn and accepting an unstamped one |
 
 `ipc/hitl-decision.ts` (`HitlDecision`, `toHitlDecision`, `isApproved`) and its test were **deleted** with the approval gate. Nothing in `src/` imports a HITL type; `HitlDecision` must not be reintroduced as a shape, because there is no channel left to carry it.

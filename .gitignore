@@ -129,6 +129,12 @@ launcher-relevant-posts.json
 # Temporary mockup/scratch files
 mockup-*.html
 
+# Shell redirection accident (`> nul` under Git Bash creates a real file on Windows)
+nul
+
+# design-taste inspector output (screenshots + report against docs/design-lab mocks)
+.taste-skill/
+
 # OS generated files
 Thumbs.db
 ehthumbs.db

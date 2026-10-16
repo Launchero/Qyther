@@ -15,6 +15,7 @@
 -->
 <style>
 /* ══ token block: DARK (the primary theme for this direction) ═══════════════ */
+/* taste: kept by design — mono file paths & keycaps, dense 13px hairline density, inset-ring (not shadow) elevation, 1px hairline dividers; accent is Linear/Attio's own violet #5b5bd6 (fill) / #8b7bff (text), not a default indigo */
 [data-theme="dark"] {
   --background: #0b0c0f;
   --foreground: #e2e4e7;                 /* 15.35:1 on --background */
@@ -130,12 +131,12 @@
 :root {
   --palette-w: 800px;
   --header-h: 72px;
-  --row-h: 32px;                 /* direction calls 28-32; mock sits at the legal ceiling — see header */
+  --row-h: 28px;                 /* the dense direction's floor, not its ceiling */
   --target-min: 32px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --pad-card: 12px;
-  --pad-row-y: 4px;
+  --pad-row-y: 3px;
   --gap-inline: 8px;
   --gap-block: 12px;
   --gap-section: 16px;
@@ -242,7 +243,7 @@ h1 { font-family: var(--font-display); font-size: var(--text-3xl); line-height: 
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-ink-soft); margin: 0 0 var(--space-3); text-align: center; }
 .surface { margin-bottom: var(--surface-gap); }
-.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--space-2); }
+.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--lab-ink-soft); margin: 0 0 var(--space-2); }
 .surface-label code { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; }
 .page { background: var(--background); color: var(--foreground); padding: var(--space-6); border-radius: var(--radius-md); box-shadow: var(--edge-inset); }
 .desktop { background: var(--desktop-plate); border-radius: var(--radius-md); padding: var(--space-6); }
@@ -476,6 +477,45 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
   *, *::before, *::after { animation-duration: 0ms !important; animation-delay: 0ms !important; transition-duration: 0ms !important; }
   .caret-bar--idle { opacity: 1; }
 }
+
+/* ── expressive overlay: M3X type + spring + liquid-glass vocabulary (theme-independent) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* OPACITY tier — dense ledger; state by fade only, no transform/spring/blur */
+.row, .btn { transition: opacity var(--ex-dur-1) var(--ex-ease-out), background-color var(--ex-dur-1) var(--ex-ease-out); }
+h1 { font-weight: var(--ex-weight-title); font-optical-sizing: auto; }
+/* keyframe animations (second wave) — ex- prefixed so they never collide with the existing spin / sweep / caretBlink / enter loops */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+/* OPACITY tier — one-shot fade enter on the surfaces; sweep shimmer on the progress rule; no pulse (dense ledger) */
+.surface { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) both; }
+.surface:nth-of-type(2) { animation-delay: 60ms; }
+.surface:nth-of-type(3) { animation-delay: 120ms; }
+.surface:nth-of-type(4) { animation-delay: 180ms; }
+.surface:nth-of-type(5) { animation-delay: 240ms; }
+.progress { position: relative; }
+.progress::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent, var(--accent-text), transparent); opacity:.3; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .surface, .progress::after { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -505,7 +545,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
 <section class="col" data-theme="light">
   <h2>Light</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (clear button disabled, 32px rows)</p>
     <div class="desktop">
       <div class="palette">
@@ -533,7 +573,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — selected, hover, focus ring, opening, skeleton</p>
     <div class="desktop">
       <div class="palette">
@@ -564,7 +604,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — hairline transcript, solid/idle carets, generative-UI table</p>
     <div class="page">
       <div class="palette">
@@ -577,9 +617,9 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -619,7 +659,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace (error, pending)</p>
     <div class="page">
       <div class="agent-panel">
@@ -644,7 +684,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows (one disabled), and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">
@@ -673,7 +713,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
 <section class="col" data-theme="dark">
   <h2>Dark</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (clear button disabled, 32px rows)</p>
     <div class="desktop">
       <div class="palette">
@@ -701,7 +741,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — selected, hover, focus ring, opening, skeleton</p>
     <div class="desktop">
       <div class="palette">
@@ -732,7 +772,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — hairline transcript, solid/idle carets, generative-UI table</p>
     <div class="page">
       <div class="palette">
@@ -745,9 +785,9 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -787,7 +827,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace (error, pending)</p>
     <div class="page">
       <div class="agent-panel">
@@ -812,7 +852,7 @@ summary { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); fon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows (one disabled), and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">

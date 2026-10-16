@@ -2,7 +2,7 @@
 
 **Last Updated**: April 2026  
 **Version**: 1.0.0  
-**Stack**: Electron 41 + React 19 + TypeScript 5.7 + Vite 6 + Tailwind CSS v4
+**Stack**: Electron 42 + React 19 + TypeScript 6 + Vite 8 + Tailwind CSS v4
 
 ## Table of Contents
 
@@ -106,12 +106,12 @@ flowchart TB
 | ------------------------- | ---------------------------------- | ------- |
 | **Radix UI**              | Headless primitives, accessibility | Latest  |
 | **Tailwind CSS**          | Utility-first styling              | v4      |
-| **TypeScript**            | Type safety                        | 5.7     |
+| **TypeScript**            | Type safety                        | ^6.0.3  |
 | **CVA**                   | Component variant management       | ^0.7.1  |
-| **clsx + tailwind-merge** | Class name composition             | Latest  |
-| **React Hook Form**       | Form state management              | Latest  |
-| **Zod**                   | Schema validation                  | ^4.3.6  |
-| **TanStack Table**        | Data tables (optional)             | Latest  |
+| **clsx + tailwind-merge** | Class name composition             | ^2.1.1 / ^3.5.0 |
+| **React Hook Form**       | Form state management              | **not installed** — this doc describes the shadcn convention, not this project's deps; forms here are plain controlled state |
+| **Zod**                   | Schema validation                  | declared `^4.4.3`, **imported by nothing** — LLM-boundary schemas are TypeBox (`@earendil-works/pi-ai`) |
+| **TanStack Table**        | Data tables (optional)             | **not installed** — tables are `recharts` plus the hand-built `GenerativeUI/DataTable.tsx` |
 
 
 ---
@@ -720,10 +720,11 @@ export function EditDialog() {
    - Add custom logic in `components/common/`
    - Extend with domain-specific variants
    - Control behavior globally
-6. **Compose blocks**
+6. **Compose blocks** — *planned layer, not built in this repo*
    - Build reusable patterns in `components/blocks/`
    - Examples: auth forms, pricing sections, dashboards
    - Combine primitives into feature-specific UI
+   - `src/renderer/components/blocks/` does **not** exist on disk (the folder is `ui/`, `common/`, `ask-mode/`, `settings/`), and `src/renderer/components/ui/AGENTS.md` records that it must not be created unasked — today feature composition lives in `components/common/` and the app shell
 7. **Use `cn()` for class merging**
    ```tsx
     // Always use cn() utility
@@ -923,7 +924,9 @@ export function ConfirmDialog({
 
 ---
 
-#### Layer 3: Composed Blocks (components/blocks/)
+#### Layer 3: Composed Blocks (components/blocks/) — **planned layer, not built**
+
+> `src/renderer/components/blocks/` does not exist in this checkout. This layer is part of the design language this document describes, and it is the one layer with no directory behind it: nothing here is implemented, and `src/renderer/components/ui/AGENTS.md` forbids creating the folder unasked. Read the rest of this section as the pattern to follow *if and when* a composed-block layer is requested.
 
 **Purpose**: Feature-specific UI sections, reusable patterns
 
@@ -933,10 +936,10 @@ export function ConfirmDialog({
 - Build complete UI sections
 - Implement business logic
 
-**Example**:
+**Example** (illustrative markup, not repo code — `@/components/ui/command` and `@/components/ui/form` are likewise not among the 16 primitives vendored in `src/renderer/components/ui/`):
 
 ```tsx
-// src/renderer/components/blocks/auth-form.tsx
+// src/renderer/components/blocks/auth-form.tsx — blocks/ is the planned layer, not built
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -957,7 +960,8 @@ export function AuthForm() {
   )
 }
 
-// src/renderer/components/blocks/command-palette.tsx
+// src/renderer/components/blocks/command-palette.tsx — planned location only; the real palette
+// lives at src/renderer/components/CommandPalette.tsx in the app shell, and uses no ui/command primitive
 import {
   Command,
   CommandDialog,
@@ -1001,8 +1005,8 @@ flowchart TD
     B -->|Component Variants| E[Layer 2: Wrapper Components]
     E --> F[Create components/common/]
     
-    B -->|Complete UI Sections| G[Layer 3: Composed Blocks]
-    G --> H[Create components/blocks/]
+    B -->|Complete UI Sections| G[Layer 3: Composed Blocks — planned, not built]
+    G --> H[components/blocks/ does not exist yet — needs an explicit request]
     
     D --> I[Done]
     F --> I
@@ -1471,13 +1475,13 @@ git commit -m "ui: customize button with brand variants"
 
 | Technology         | Version | Purpose               |
 | ------------------ | ------- | --------------------- |
-| **Electron**       | 41.1.1  | Desktop app framework |
-| **React**          | 19.0.0  | UI framework          |
-| **TypeScript**     | 5.7.2   | Type safety           |
-| **Vite**           | 6.0.0   | Build tool            |
-| **Tailwind CSS**   | 4.2.2   | Styling               |
-| **Radix UI**       | 1.4.3   | Primitives            |
-| **Phosphor Icons** | 2.1.10  | Icon library          |
+| **Electron**       | ^42.0.1  | Desktop app framework |
+| **React**          | ^19.2.6  | UI framework          |
+| **TypeScript**     | ^6.0.3   | Type safety           |
+| **Vite**           | ^8.0.11  | Build tool            |
+| **Tailwind CSS**   | ^4.3.0   | Styling               |
+| **Radix UI**       | ^1.4.3   | Primitives (the `radix-ui` barrel, not per-package installs) |
+| **Phosphor Icons** | ^2.1.10  | Icon library          |
 
 
 ### Adding New Components

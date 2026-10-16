@@ -12,6 +12,7 @@
   Nothing in this folder is implemented; docs/design-lab/README.md is mockup, not inventory.
 -->
 <style>
+/* taste: kept by design — one green signal dot (filled=on, ringed=off), 12px tracked-caps labels, 1px moulded joints, keycap faces, zero elevation (Rams/ET66 panel UI) */
 /* ── LIGHT — paper field, black key faces ──────────────────────────────────── */
 [data-theme="light"] {
   --background: #e7e4dd; --foreground: #141414;
@@ -19,7 +20,7 @@
   --popover: #f6f4ef; --popover-foreground: #141414;
   --primary: #141414; --primary-foreground: #f6f4ef;
   --secondary: #dcd7cb; --secondary-foreground: #141414;
-  --muted: #e3e0d8; --muted-foreground: #5f5c55;
+  --muted: #e3e0d8; --muted-foreground: #54504a; /* caption/label 4.5:1 on both lab grounds (#26262a) */
   --accent: #d9d3c4; --accent-foreground: #141414;
   --destructive: #b23a20; --destructive-foreground: #f6f4ef;
   --success: #1d7a3a; --warning: #6b5a12; --info: #1f4f86;
@@ -28,7 +29,7 @@
   --agent: #7a5aa8;
   --border: #b9b4a7; --input: #5b5b5d; --ring: #2f6fb6;
   --mark-bg: #c8b73cb3; --plate: #dcd8ce;
-  --file-a: #1f4f86; --file-b: #5f5c55; --file-c: #6b5a12;
+  --file-a: #1f4f86; --file-b: #595549; --file-c: #6b5a12; /* file-b 4.5:1 on the paper card */
   --elev: none; --elev-sm: none;
   --key: inset 0 1px 0 oklch(1 0 0 / .55), 0 1px 0 #b3ada0;
   /* direction-specific, all DERIVED from the objects named in the header */
@@ -57,7 +58,7 @@
   --agent: #b6a2d8;
   --border: #5b5b5d; --input: #a8a6a1; --ring: #7fb0e2;
   --mark-bg: #c8b73c66; --plate: #2a2a2c;
-  --file-a: #7fb0e2; --file-b: #a8a6a1; --file-c: #c8b73c;
+  --file-a: #7fb0e2; --file-b: #b8b6b0; --file-c: #c8b73c; /* file-b lifted for 4.5:1 on the keyface */
   --elev: none; --elev-sm: none;
   --key: inset 0 1px 0 oklch(1 0 0 / .07), 0 1px 0 #1c1c1e;
   --keyface: #242426; --keyface-ink: #f2f1ee;
@@ -71,7 +72,7 @@
 }
 /* ── GEOMETRY + TYPE (identical in both themes; literals only — no theme var) ─ */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 720px; --header-h: 72px; --row-h: 40px; --target: 32px;
   --r: 0px; --r-panel: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 2px;
   --r-key: 2px; --r-round: 50%;
   --g: 4px; --s8: 8px; --s12: 12px; --s16: 16px; --s20: 20px; --s24: 24px; --s32: 32px;
@@ -87,7 +88,7 @@
   --ff: Overpass, "DIN Alternate", "Bahnschrift SemiCondensed", "Roboto Condensed", Arial, sans-serif;
   --mono: "Overpass Mono", "JetBrains Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
   --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px;
-  --t18: 16px; --t20: 16px; --t24: 16px;
+  --t18: 16px; --t20: 14px; --t24: 16px;
   --lh-row: 17px; --lh-label: 13px; --lh-title: 22px; --lh-body: 28px; --lh-1: 1;
   --ls-label: .12em;
   --page: #26262a; --page-ink: #e8e6df; --page-muted: #a9a69e; --page-code: #d8d5cc;
@@ -249,6 +250,31 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
 .alert h4 { margin: 0; font-size: var(--t13); line-height: var(--lh-row); color: var(--fault); letter-spacing: var(--ls-label); text-transform: uppercase; }
 .alert ul { margin: 0; padding-left: var(--s16); font-family: var(--mono); font-size: var(--t12); line-height: var(--lh-row); }
 .alert .btn { background: var(--popover); color: var(--popover-foreground); border-color: var(--input); }
+
+/* ── expressive-UI overlay (contract §1/§4) — WITHHOLD tier: uniform vocabulary, no surface motion ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* documented withhold: "as little design as possible" — no transitions/transforms wired onto surfaces */
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+}
 </style>
 </head>
 <body>
@@ -298,7 +324,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode">Files</span><span class="mode off">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -311,7 +337,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode">Files</span><span class="mode off">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -326,14 +352,14 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode off">Files</span><span class="mode">Ask</span></span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -354,7 +380,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -373,7 +399,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -406,7 +432,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode">Files</span><span class="mode off">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -419,7 +445,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode">Files</span><span class="mode off">Ask</span></span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -434,14 +460,14 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette">
   <div class="head"><span class="tabs"><span class="mode off">Files</span><span class="mode">Ask</span></span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -462,7 +488,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -481,7 +507,7 @@ summary { padding: var(--s8) var(--s12); font-size: var(--t12); line-height: var
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

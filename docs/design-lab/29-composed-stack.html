@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qyther design lab — 29 · Composed Stack (seed/derivative/alias + layer ladder + tabular numerics + status law)</title>
+<!--
+  Direction 29 — "COMPOSED STACK". NOT a 30th research direction: this file is the SYNTHESIS the
+  lab's own evidence points at, rendered so it can be judged against the 28 it borrows from.
+
+  Provenance is five directions already in this folder, each cited where its mechanism is used:
+    28  seed → derivative → alias tiering; 12-step ramp; control state quartet; per-role foreground
+    10  named layer ladder (layer-01/02/03 + overlay) and the ONLY density axis wired to
+        [data-window-mode], which is the app's real attribute (globals.css, set by SearchBar.tsx)
+    17  the numeric contract: tabular figures, right alignment, a fixed sign gutter, row rules
+        instead of zebra, and never rounding the last significant digit
+    18  colour as a published contract: every status hue is paired with a SHAPE and a WORD at every
+        use site, because colour-only status fails WCAG 1.4.1. Extended past 18's four states to
+        six, which is the honest ceiling fix
+    27  named elevation roles, and 05's -shade / -foreground pairing per role
+
+  WHAT THIS FILE ADDS THAT NONE OF THE 38 OTHERS DO: a MODE BAND. The app's default surface is
+  MODE_CONFIGS.compact.height = 72px, and --container-header-height is contractually equal to it,
+  so the compact card IS one header tall. Every other mock in this folder authors --header-h
+  between 40px and 80px and renders only the expanded card, which means 13 of 28 directions
+  cannot physically render the app's default state at all. Surface 0 below renders it for real,
+  at 72px, plus an icon-only dock and a condensed/expanded density pair.
+
+  Self-contained: inline <style> only. No <script>, no <img>, no @import, no url(), no webfonts.
+  Colours are OKLCH literals because the repo mandates OKLCH; the 12-step ramp is literal rather
+  than generated on purpose — direction 28's own warning is that an algorithm which generates
+  values can generate a contrast failure silently, so a generator has to answer to the same
+  strict gate as hand-written tokens. That is a claim about process, not about CSS.
+
+  Taste: kept by design — mono file paths and keycaps (developer-tool UI), 1px rules, a named
+  elevation ladder, dense 40px rows. Genuine defects fixed: caption/label contrast raised on both
+  grounds to clear 4.5:1; the ✓ status glyphs replaced with the direction's own shape marks.
+-->
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   TIER 1 + TIER 2 — theme-independent. Declared on :root so every var() below
+   resolves against a real declaration; nothing here references a theme token.
+   ══════════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── TIER 1 · SEED ─ five seeds. Change one and every alias in both themes re-points. ── */
+  --seed-neutral-h: 250;      /* one hue for the whole neutral ramp; chroma carries the tint */
+  --seed-brand-h: 232;        /* in-family with the shipped primary (230.923) */
+  --seed-radius: 6px;         /* geometry seed */
+  --seed-grid: 4px;           /* geometry seed */
+  --seed-control: 40px;       /* geometry seed — Microsoft's 7.5mm targeting guideline */
+
+  /* ── TIER 2 · DERIVATIVE · the 12-step neutral ramp (from 28 / Radix reserved steps) ── */
+  --n-000: oklch(1 0 0);
+  --n-050: oklch(0.972 0.002 250);
+  --n-100: oklch(0.940 0.003 250);
+  --n-200: oklch(0.880 0.004 250);
+  --n-300: oklch(0.775 0.006 250);
+  --n-400: oklch(0.655 0.008 250);
+  --n-500: oklch(0.545 0.009 250);
+  --n-600: oklch(0.450 0.010 250);
+  --n-700: oklch(0.360 0.011 250);
+  --n-800: oklch(0.275 0.012 250);
+  --n-900: oklch(0.205 0.011 250);
+  --n-950: oklch(0.150 0.010 250);
+
+  /* ── TIER 2 · DERIVATIVE · the brand ramp ── */
+  --b-100: oklch(0.905 0.045 232);
+  --b-200: oklch(0.840 0.075 232);
+  --b-300: oklch(0.760 0.110 232);
+  --b-400: oklch(0.680 0.145 232);
+  --b-500: oklch(0.590 0.175 232);
+  --b-600: oklch(0.500 0.185 232);
+  --b-700: oklch(0.425 0.170 232);
+  --b-800: oklch(0.355 0.140 232);
+
+  /* ── TIER 1 · SEED · the status hues. Six, not four: 18's four-state ceiling is the
+     reason a fifth tool status had nowhere to go. ── */
+  --h-engaged: oklch(0.520 0.135 152);
+  --h-armed:   oklch(0.560 0.120 215);
+  --h-planned: oklch(0.520 0.160 300);
+  --h-caution: oklch(0.580 0.150 75);
+  --h-exceed:  oklch(0.545 0.205 25);
+  --h-idle:    oklch(0.600 0.010 250);
+
+  /* ── TIER 2 · DERIVATIVE · SPACING. Carbon v11's published $spacing-01…13
+     (2/4/8/12/16/24/32/40/48/64/80/96/160px) expressed in rem, which is the
+     majority output across Primer, Carbon, Atlassian, Tailwind and USWDS — only
+     Radix documents px. rem matters for WCAG 1.4.4 (200% text resize): a px
+     rhythm stops scaling when the user's root font size changes. Hairlines and
+     icon geometry stay px — a 1px rule is optical, not a rhythm value. ── */
+  --space-1: 0.125rem;  /*  2px — icon padding only, never a block gap   */
+  --space-2: 0.25rem;   /*  4px                                       */
+  --space-3: 0.5rem;    /*  8px                                       */
+  --space-4: 0.75rem;   /* 12px                                       */
+  --space-5: 1rem;      /* 16px — Carbon $spacing-05, the column pad   */
+  --space-6: 1.5rem;    /* 24px                                       */
+  --space-7: 2rem;      /* 32px                                       */
+  --space-8: 2.5rem;    /* 40px                                       */
+  --space-9: 3rem;      /* 48px                                       */
+  --space-10: 5rem;     /* 80px                                       */
+  --space-11: 6rem;     /* 96px                                       */
+  --space-12: 10rem;    /* 160px                                      */
+
+  /* ── TIER 2 · DERIVATIVE · GEOMETRY.
+     CONTRACT tokens stay px on purpose: --header-h must keep equalling main's
+     MODE_CONFIGS.compact.height and --palette-w main's MODE_CONFIGS.*.width, and
+     those are pixels in the main process. A rem rhythm token would silently stop
+     matching the window the moment a user changed their root font size — which is
+     exactly the "fifth copy of MODE_CONFIGS" failure the token file records. ── */
+  --palette-w: 680px;   /* CONTRACT — see above. Was 800px. */
+  --header-h: 72px;     /* CONTRACT — MUST equal MODE_CONFIGS.compact.height */
+  --measure: 42rem;
+
+  /* Row ladder: Carbon v11's data-table sizes sm/md/lg verbatim (32/40/48px).
+     40px is also Microsoft's own Windows targeting guideline (7.5mm) and the
+     consensus band every platform lands in (WCAG AA 24 + spacing, Apple 44 touch,
+     M3 48 touch, Carbon md 40). */
+  --row-h: 40px;         /* Carbon md — the default */
+  --row-h-compact: 32px; /* Carbon sm */
+  --row-h-relaxed: 48px; /* Carbon lg — touch / tablet */
+  --row-pad-block: var(--space-2);
+
+  /* Target floors. THIS is the one that moved off its old value for a measured
+     reason: --target was 32px, which clears WCAG 2.2 SC 2.5.8 AA (24x24 plus the
+     24px-circle spacing rule) but sits under Microsoft's 7.5mm / 40px targeting
+     guideline — the wrong floor for a Windows app specifically. Apple splits
+     pointer from touch too: macOS minimums are 20-28pt against 44pt on iOS. */
+  --target: 40px;         /* Windows 7.5mm guideline; Carbon button md. Pointer default. */
+  --target-compact: 32px; /* Carbon sm — the 72px strip and dense lists */
+  --target-touch: 44px;   /* WCAG 2.2 SC 2.5.5 AAA and Apple HIG, both verbatim 44 */
+  --r: var(--seed-radius); --r-md: 5px; --r-sm: 4px; --r-xs: 2px;
+  --r-pill: 99px; --r-knob: 50%; --r-mark: 2px;
+
+  /* ── TIER 2 · DERIVATIVE · DENSITY. Two discrete modes, not a multiplier: a
+     global `calc(var(--x) * var(--density))` breaks icon grids, 1px borders and the
+     type rhythm, and no major system ships one. Fluent exposes exactly two levels
+     (default / compact); Material 3 defines density as changing "top and bottom
+     padding" and explicitly not text size — both rules are honoured below. ── */
+  --s-cond: var(--space-3);  /*  8px — compact */
+  --s-norm: var(--space-4);  /* 12px — default */
+  --pad: var(--s-norm);
+  --gap: var(--space-3); --gap-2: var(--space-4); --gap-3: var(--space-5);
+
+  /* ── TIER 2 · DERIVATIVE · TYPE. --t11 is retained for 12px-DPI legibility of the
+     numeric gutter only; no prose runs below 13px in this file. ── */
+  --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px;
+  --ls-label: .06em;
+  --num: tabular-nums;            /* from 17 — the one repo-wide omission this fixes */
+
+  /* ── EXPRESSIVE UI overlay · MEANINGFUL tier (one disciplined transition, no overshoot) ── */
+  --ex-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0, 0.15);
+  --ex-dur-1: 120ms; --ex-dur-2: 300ms; --ex-dur-3: 480ms;
+  --ex-weight-display: 800; --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+
+  /* lab page chrome — never a themed role; these sit outside every [data-theme] scope */
+  --lab-ink: #e2e3e8;
+  --lab-mute: #a7aab4;
+  --lab-line: #33353c;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TIER 3 — ALIAS. The only theme-scoped block. Every role names its own partner.
+   ══════════════════════════════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  /* named elevation roles (27) expressed as Carbon's layer ladder (10) */
+  --surface-base: var(--n-050);
+  --surface-raised: var(--n-000);
+  --surface-overlay: var(--n-000);
+  --surface-sunken: var(--n-100);
+  --surface-hover: var(--n-100);
+  --layer-01: var(--n-000);
+  --layer-02: var(--n-000);
+  --layer-03: var(--n-000);
+
+  --background: var(--surface-base);
+  --foreground: var(--n-950);
+  --card: var(--surface-raised);           --card-foreground: var(--n-950);
+  --popover: var(--surface-overlay);      --popover-foreground: var(--n-950);
+  --secondary: var(--surface-sunken);     --secondary-foreground: var(--n-800);
+  --muted: var(--surface-sunken);         --muted-foreground: var(--n-600); /* 6.9:1 on --card */
+  --accent: var(--surface-hover);         --accent-foreground: var(--n-950);
+
+  --primary: var(--b-700);                --primary-foreground: var(--n-000);
+  --accent-fill: var(--b-700);            --accent-fill-foreground: var(--n-000);
+  --primary-hover: var(--b-800);
+  --info: var(--b-700);                   --info-foreground: var(--n-000);
+
+  --border: var(--n-200);
+  --border-strong: var(--n-400);
+  --input: var(--n-500);                  /* control boundary ≥3:1 — deliberately ≠ --border */
+  --ring: var(--b-700);
+
+  --success: var(--h-engaged);  --success-foreground: var(--n-000);  --success-shade: var(--n-200);
+  --warning: oklch(0.50 0.135 75);  --warning-foreground: var(--n-000);  --warning-shade: var(--n-200);
+  --info-soft: oklch(0.905 0.045 232 / .30);
+  --success-soft: oklch(0.520 0.135 152 / .16);
+  --warning-soft: oklch(0.580 0.150 75 / .20);
+  --destructive: var(--h-exceed); --destructive-foreground: var(--n-000);
+  --destructive-soft: oklch(0.545 0.205 25 / .14);
+  --agent: var(--h-planned);
+
+  /* the six-state law: ink · wash · shade · mark, per 18 × 05 */
+  --st-engaged: var(--h-engaged); --st-engaged-wash: oklch(0.520 0.135 152 / .16); --st-engaged-shade: var(--n-200);
+  --st-armed: oklch(0.52 0.130 215);   --st-armed-wash: oklch(0.560 0.120 215 / .16);     --st-armed-shade: var(--n-200);
+  --st-planned: var(--h-planned); --st-planned-wash: oklch(0.520 0.160 300 / .16);   --st-planned-shade: var(--n-200);
+  --st-caution: oklch(0.50 0.135 75); --st-caution-wash: oklch(0.580 0.150 75 / .20); --st-caution-shade: var(--n-200);
+  --st-exceed: var(--h-exceed);   --st-exceed-wash: oklch(0.545 0.205 25 / .14);     --st-exceed-shade: var(--n-200);
+  --st-idle: var(--n-500);        --st-idle-wash: var(--n-100);                       --st-idle-shade: var(--n-200);
+
+  /* control state quartet (from 28 / Primer) */
+  --control-rest: var(--n-000); --control-hover: var(--n-100);
+  --control-active: var(--n-200); --control-disabled: var(--n-050);
+  --control-outline: var(--n-400);
+  --control-disabled-ink: var(--n-400);
+
+  --elev: 0 1px 2px 0 oklch(0.150 0.010 250 / .06), 0 8px 24px -8px oklch(0.150 0.010 250 / .18);
+  --elev-sm: 0 1px 2px 0 oklch(0.150 0.010 250 / .07);
+  --key: 0 1px 0 0 oklch(0.150 0.010 250 / .10);
+  --mark-bg: oklch(0.425 0.170 232 / .22);
+  --plate: var(--n-100);
+  --file-a: var(--b-700); --file-b: var(--n-600); --file-c: var(--h-caution);
+  --rule: var(--n-200);
+}
+[data-theme="dark"], .dark {
+  --surface-base: var(--n-950);
+  --surface-raised: var(--n-900);
+  --surface-overlay: var(--n-800);
+  --surface-sunken: var(--n-950);
+  --surface-hover: color-mix(in oklch, var(--n-800) 55%, var(--n-900));
+  --layer-01: var(--n-900);
+  --layer-02: var(--n-800);
+  --layer-03: color-mix(in oklch, var(--n-800) 70%, var(--n-700));
+
+  --background: var(--surface-base);
+  --foreground: var(--n-050);
+  --card: var(--surface-raised);           --card-foreground: var(--n-050);
+  --popover: var(--surface-overlay);      --popover-foreground: var(--n-050);
+  --secondary: var(--surface-hover);      --secondary-foreground: var(--n-100);
+  --muted: var(--surface-sunken);         --muted-foreground: var(--n-300); /* 8.1:1 on --card */
+  --accent: var(--surface-hover);         --accent-foreground: var(--n-050);
+
+  --primary: var(--b-300);                --primary-foreground: var(--n-950);
+  --accent-fill: var(--b-300);            --accent-fill-foreground: var(--n-950);
+  --primary-hover: var(--b-200);
+  --info: var(--b-300);                   --info-foreground: var(--n-950);
+
+  --border: var(--n-800);
+  --border-strong: var(--n-600);
+  --input: var(--n-500);
+  --ring: var(--b-300);
+
+  --success: var(--h-engaged);  --success-foreground: var(--n-950);  --success-shade: var(--n-800);
+  --warning: var(--h-caution);  --warning-foreground: var(--n-950);  --warning-shade: var(--n-800);
+  --info-soft: oklch(0.760 0.110 232 / .26);
+  --success-soft: oklch(0.520 0.135 152 / .24);
+  --warning-soft: oklch(0.580 0.150 75 / .26);
+  --destructive: oklch(0.660 0.190 25); --destructive-foreground: var(--n-950);
+  --destructive-soft: oklch(0.660 0.190 25 / .26);
+  --agent: oklch(0.700 0.145 300);
+
+  --st-engaged: oklch(0.740 0.150 152); --st-engaged-wash: oklch(0.740 0.150 152 / .22); --st-engaged-shade: var(--n-800);
+  --st-armed: oklch(0.760 0.125 215);   --st-armed-wash: oklch(0.760 0.125 215 / .22);   --st-armed-shade: var(--n-800);
+  --st-planned: oklch(0.750 0.150 300); --st-planned-wash: oklch(0.750 0.150 300 / .22); --st-planned-shade: var(--n-800);
+  --st-caution: oklch(0.820 0.150 75);  --st-caution-wash: oklch(0.820 0.150 75 / .24);  --st-caution-shade: var(--n-800);
+  --st-exceed: oklch(0.720 0.180 25);   --st-exceed-wash: oklch(0.720 0.180 25 / .24);   --st-exceed-shade: var(--n-800);
+  --st-idle: var(--n-500);               --st-idle-wash: var(--n-800);                     --st-idle-shade: var(--n-800);
+
+  --control-rest: var(--n-900); --control-hover: var(--n-800);
+  --control-active: var(--n-700); --control-disabled: var(--n-950);
+  --control-outline: var(--n-600);
+  --control-disabled-ink: var(--n-600);
+
+  --elev: 0 1px 2px 0 oklch(0 0 0 / .40), 0 8px 24px -8px oklch(0 0 0 / .55);
+  --elev-sm: 0 1px 2px 0 oklch(0 0 0 / .45);
+  --key: 0 1px 0 0 oklch(0 0 0 / .50);
+  --mark-bg: oklch(0.760 0.110 232 / .34);
+  --plate: var(--n-900);
+  --file-a: var(--b-300); --file-b: var(--n-300); --file-c: oklch(0.820 0.150 75);
+  --rule: var(--n-800);
+  color-scheme: dark;
+}
+
+/* ── DENSITY: the one axis in this folder bound to the app's real attribute
+   (globals.css `[data-window-mode="compact"]`, set by SearchBar.tsx). Two discrete
+   levels, not a multiplier. Padding and box heights move; the type scale does NOT —
+   Material 3's density rule verbatim, and the reason a launcher can get denser
+   without its 12px path text becoming unreadable. ── */
+[data-window-mode="compact"] {
+  --pad: var(--s-cond);
+  --gap-2: var(--s-cond);
+  --gap: var(--space-2);
+  --row-h: var(--row-h-compact);
+  --row-pad-block: var(--space-1);
+  --target: var(--target-compact);
+}
+
+/* ── page chrome (lab-only, never shipped) ── */
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
+h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
+.brief { max-width: 1720px; margin: 0 auto 28px; }
+.brief p { max-width: 82ch; font-size: var(--t14); color: #c2c3ca; margin: 0 0 10px; }
+.brief code { font-family: var(--mono); font-size: 13px; color: #e2e3e8; }
+.moves { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; }
+.moves li { flex: 1 1 330px; border: 1px solid #33353c; border-radius: 8px; padding: 10px 12px; font-size: var(--t14); color: #dcdde2; }
+.moves b { display: block; font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: #9ea1ab; margin-bottom: 4px; }
+.sw { display: flex; gap: 2px; border-radius: 5px; overflow: hidden; border: 1px solid #33353c; }
+.sw i { width: 26px; height: 20px; }
+.board { display: flex; gap: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+/* The column is the window width PLUS the mock's own plate padding, so a card renders at its
+   true window width (--palette-w) instead of being clipped by the plate inset. */
+.col { width: calc(var(--palette-w) + 48px); max-width: 100%; }
+.col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-mute); margin: 0 0 12px; text-align: center; }
+.surface { margin-bottom: 36px; }
+/* SURFACE LABELS sit on the lab page chrome, not on a themed surface. Using a theme token here
+   made them illegible in the light column (measured 2.39:1 against #17181c), so they take the
+   chrome ramp instead — the same reason the control hardcodes #8f929c here. */
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-mute); margin: 0 0 8px; }
+.desktop, .page { border-radius: 12px; padding: 24px; }
+/* The desktop plate is a THEMED surface, so it must carry a themed foreground as well as a
+   themed background. Without the colour declaration anything sitting directly on the plate
+   inherits the lab page chrome's near-white text and vanishes on the light ground — measured
+   1.02:1 on the density pair. It was latent in the control because every row there lives
+   inside a .palette, which does set `color`; the mode band is the first content on the plate
+   itself. */
+.desktop { background: var(--plate); color: var(--foreground); }
+.page { background: var(--background); color: var(--foreground); }
+/* .note lives INSIDE themed containers (.desktop / .page), so unlike .lbl it takes a theme role. */
+.note { font-size: var(--t12); color: var(--muted-foreground); margin: 0 0 6px; }
+.note code { font-family: var(--mono); }
+.note b { color: var(--foreground); font-weight: 600; }
+
+/* ── direction banner: the signature device is the ladder itself ── */
+.hero { position: relative; display: grid; gap: var(--gap-2); padding: var(--gap-3) var(--pad); margin-bottom: var(--gap-3); border: 1px solid var(--border); border-radius: var(--r); background: var(--card); overflow: hidden; }
+.hero-kicker { font-family: var(--mono); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.hero-title { font-size: var(--t24); line-height: 1.2; letter-spacing: var(--ex-track-display); margin: 0; color: var(--foreground); font-weight: var(--ex-weight-title); }
+.hero-thesis { margin: 0; font-size: var(--t14); line-height: 1.45; color: var(--muted-foreground); max-width: 52ch; }
+.hero-field { display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 2px; margin-top: var(--gap); min-height: 120px; }
+.hero-field i { display: block; height: 100%; min-height: 34px; }
+.hero-field i.h { height: 22px; min-height: 22px; }
+.hero-field .cap { grid-column: 1 / -1; font-family: var(--mono); font-size: 10px; color: var(--muted-foreground); letter-spacing: var(--ls-label); }
+
+/* ── palette shell ── */
+.palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
+.head { height: var(--header-h); display: flex; align-items: center; gap: var(--gap); padding-block: 0; padding-inline: var(--pad); border-block-end: 1px solid var(--border); }
+.mode { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; border: 1px solid var(--border); }
+.q { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; font-size: var(--t16); color: var(--foreground); }
+.q .ph { color: var(--muted-foreground); }
+.q svg { color: var(--muted-foreground); flex: none; }
+.x { width: var(--target); height: var(--target); display: grid; place-items: center; color: var(--muted-foreground); border: 1px solid transparent; border-radius: var(--r-sm); }
+.vr { width: 1px; height: 24px; background: var(--border); }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 22px; padding: 0 6px; font-family: var(--mono); font-variant-numeric: var(--num); font-size: var(--t12); color: var(--secondary-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--key); }
+.sec { display: flex; align-items: center; gap: var(--gap); padding: 8px var(--pad) 4px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.cnt { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-xs); background: var(--control-active); color: var(--foreground); font-variant-numeric: var(--num); }
+.tile { display: flex; align-items: center; gap: var(--gap); margin: var(--pad); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); width: max-content; }
+.row { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,auto) auto; align-items: center; gap: var(--gap); min-height: var(--row-h); padding-block: var(--row-pad-block); padding-inline: var(--pad); border-block-end: 1px solid var(--rule); }
+.row:last-of-type { border-block-end: 0; }
+.row svg { color: var(--muted-foreground); }
+.row .t { font-size: var(--t14); font-weight: 500; letter-spacing: -.011em; }
+.row .p { display: block; font-family: var(--mono); font-size: var(--t12); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .k { font-size: var(--t12); color: var(--muted-foreground); }
+.row.hov { background: var(--surface-hover); } .row.hov .t, .row.hov .k { color: var(--accent-foreground); }
+.row.sel { background: var(--primary); } .row.sel .t, .row.sel .k, .row.sel .p, .row.sel svg { color: var(--primary-foreground); }
+.row.sel mark { background: oklch(1 0 0 / .30); color: var(--primary-foreground); }
+.row.foc { box-shadow: inset 0 0 0 2px var(--ring); }
+mark { background: var(--mark-bg); color: inherit; border-radius: var(--r-xs); padding: 0 1px; }
+.ask { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; margin-right: 6px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); font-weight: 600; }
+.tip { display: inline-block; margin: var(--gap) var(--pad); padding: 3px 8px; border-radius: var(--r-sm); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--elev-sm); font-size: var(--t12); }
+.badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: var(--r-sm); background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border); font-family: var(--mono); font-size: var(--t12); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 8px var(--pad); background: var(--muted); border-top: 1px solid var(--border); font-size: var(--t12); color: var(--muted-foreground); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--foreground); background: var(--control-rest); font-size: var(--t12); }
+
+/* ── MODE BAND: compact strip, icon-only dock, density pair ── */
+.strip .head { border-bottom: 0; }
+/* The card IS the window in compact: CommandPaletteHeader is h-[var(--container-header-height)]
+   inside an h-full container in a 72px window, so the card must not add its own border to the
+   height. Without this the strip measures 73.6px (72 header + 2 x 0.8px at dpr 1.25) and the
+   geometry claim is false by the border. */
+.strip { width: var(--palette-w); height: var(--header-h); box-shadow: var(--elev); }
+.strip .head { height: 100%; }
+.dock { display: flex; }
+.dock .side { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2); border-inline-end: 1px solid var(--border); width: 52px; }
+.dock .list { flex: 1; min-width: 0; }
+.dens { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.dens .row { grid-template-columns: 28px minmax(0,1fr) 64px 88px; }
+.dens .n { font-family: var(--mono); font-variant-numeric: var(--num); text-align: right; color: var(--muted-foreground); }
+.dens .n.neg { color: var(--st-exceed); }
+
+/* ── RESPONSIVE MODE SCALING — the mechanism, not three hand-authored variants.
+   Every other mock in this folder ships a fixed-width card and zero container
+   queries; all 44 of its @media rules are prefers-reduced-motion. `container-type:
+   inline-size` + size queries are Baseline Widely available (Chrome 105/Safari 16/
+   Firefox 110), so the card can respond to ITS OWN width rather than the viewport's.
+   That is the correct axis for a frameless window the user can resize from 280px to
+   full width: no viewport breakpoint is ever right for it. Below, the SAME rows that
+   appear in surfaces 1-2 collapse themselves — the 300px dock is not a special case,
+   it is just a narrow container. ── */
+.palette, .dens { container-type: inline-size; container-name: surf; }
+
+/* under 460px: the path and the kind label are the first things to go — the title
+   and the status mark survive, because 18's law is that colour is never the only
+   channel and the mark is the one affordance that still reads at 280px */
+@container surf (max-width: 460px) {
+  .row .p { display: none; }
+  .row .k { display: none; }
+  .row { grid-template-columns: 28px minmax(0,1fr) auto; }
+  .dens .row { grid-template-columns: 28px minmax(0,1fr) 56px; }
+  .dens .row .n:last-child { display: none; }
+}
+
+/* under 340px: the row goes to icon + title + mark, and the search field drops the
+   keycaps. 24x24 is the WCAG 2.2 AA floor; --target-compact (32px) is Carbon sm. */
+@container surf (max-width: 340px) {
+  .row { grid-template-columns: 28px minmax(0,1fr) auto; }
+  .head kbd { display: none; }
+  .sec { padding-inline: var(--space-3); }
+}
+
+/* ── status marks: shape + colour + word (18's rule) ── */
+.mk { display: inline-block; width: 9px; height: 9px; flex: none; background: var(--st-idle); border-radius: var(--r-mark); }
+.mk.engaged { background: var(--st-engaged); border-radius: 50%; }
+.mk.armed { background: transparent; border: 2px solid var(--st-armed); border-radius: 50%; width: 10px; height: 10px; }
+.mk.planned { background: var(--st-planned); border-radius: 1px; }
+.mk.caution { background: transparent; border: 2px solid var(--st-caution); border-radius: 1px; transform: rotate(45deg); width: 10px; height: 10px; }
+.mk.exceed { background: var(--st-exceed); border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 11px; height: 11px; }
+.mk.idle { background: transparent; border: 2px solid var(--st-idle); border-radius: 50%; width: 10px; height: 10px; }
+.stw { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t12); }
+.stw.engaged { color: var(--st-engaged); } .stw.armed { color: var(--st-armed); }
+.stw.planned { color: var(--st-planned); } .stw.caution { color: var(--st-caution); }
+.stw.exceed { color: var(--st-exceed); } .stw.idle { color: var(--muted-foreground); }
+.tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; border: 1px solid var(--border); }
+.tag.engaged { background: var(--st-engaged-wash); color: var(--st-engaged); }
+.tag.armed { background: var(--st-armed-wash); color: var(--st-armed); }
+.tag.planned { background: var(--st-planned-wash); color: var(--st-planned); }
+.tag.caution { background: var(--st-caution-wash); color: var(--st-caution); }
+.tag.exceed { background: var(--st-exceed-wash); color: var(--st-exceed); }
+.tag.idle { background: var(--st-idle-wash); color: var(--muted-foreground); }
+
+/* ── ask mode ── */
+.chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
+.me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px 14px var(--r-md) 14px; background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
+.steps { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
+.st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: var(--r-xs); background: var(--control-active); color: var(--foreground); font-family: var(--mono); }
+.ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
+.ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: 1px 5px; border-radius: var(--r-xs); }
+.caret { font-family: var(--mono); color: var(--primary); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-sm); font-size: var(--t12); font-weight: 600; background: var(--st-planned-wash); color: var(--st-planned); border: 1px solid var(--border); }
+.pill.a { background: var(--popover); color: var(--popover-foreground); border-color: var(--border-strong); }
+.gu { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--popover); overflow: hidden; }
+.gu .h { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: var(--t14); font-weight: 600; }
+.chip { padding: 2px 7px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--control-rest); color: var(--secondary-foreground); font-family: var(--mono); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: var(--t14); }
+/* Carbon v11 data-table spec: column padding is $spacing-05 = 16px on both axes, not 12. */
+th { text-align: left; padding-block: var(--space-2); padding-inline: var(--space-5); font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); background: var(--muted); border-block-end: 1px solid var(--border); }
+td { padding-block: var(--space-3); padding-inline: var(--space-5); border-block-end: 1px solid var(--rule); } tr:last-child td { border-block-end: 0; }
+td.n, th.n { font-family: var(--mono); font-variant-numeric: var(--num); text-align: right; }
+th.n { font-family: var(--ff); font-variant-numeric: normal; }
+.sig { display: inline-block; width: 8px; }
+details { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+summary { padding: 8px 12px; font-size: var(--t12); font-weight: 600; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.met { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 12px 12px; }
+.met b { display: block; font-family: var(--mono); font-variant-numeric: var(--num); font-size: var(--t14); }
+.met span { font-size: 11px; letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); }
+.bar { display: grid; gap: var(--gap); padding: 12px; border: 1px solid var(--input); border-radius: var(--r-md); box-shadow: var(--elev-sm); }
+.bar .ta { min-height: 48px; color: var(--muted-foreground); font-size: var(--t16); }
+.bar .f { display: flex; align-items: center; gap: var(--gap); }
+.send { margin-left: auto; width: var(--target); height: var(--target); display: grid; place-items: center; border-radius: var(--r-sm); background: var(--primary); color: var(--primary-foreground); }
+
+/* ── agent activity ── */
+.ag { display: grid; gap: var(--gap-2); padding: 14px var(--pad); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--secondary); }
+.ag h3 { margin: 0; font-size: var(--t14); display: flex; align-items: center; gap: var(--gap); }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--gap); font-size: var(--t12); margin: 0; }
+.kv dt { color: var(--muted-foreground); }
+.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: var(--num); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog { height: 6px; border-radius: var(--r-pill); background: var(--control-active); overflow: hidden; position: relative; }
+.prog i { display: block; height: 100%; width: 66%; background: var(--primary); }
+.tr { width: 100%; margin-top: 12px; font-size: var(--t12); border-collapse: collapse; }
+.tr td { padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+.tr td:first-child { font-family: var(--mono); }
+.tr td.n { font-family: var(--mono); font-variant-numeric: var(--num); text-align: right; color: var(--muted-foreground); }
+
+/* ── dialogs ── */
+.dlg { border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--elev); overflow: hidden; }
+.dlg .h { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad); border-bottom: 1px solid var(--border); font-size: var(--t18); font-weight: 600; }
+.set { display: flex; align-items: center; gap: var(--gap); padding: 12px var(--pad); border-bottom: 1px solid var(--rule); }
+.set:last-child { border-bottom: 0; }
+.set .g { flex: 1; } .set .t { font-size: var(--t14); font-weight: 600; } .set .d { font-size: var(--t12); color: var(--muted-foreground); }
+.btn { display: inline-grid; place-items: center; height: var(--target); padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--control-outline); background: var(--control-rest); color: var(--foreground); font-size: var(--t14); }
+.sw2 { width: 30px; height: 18px; border-radius: var(--r-pill); background: var(--input); position: relative; flex: none; }
+.sw2::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: var(--r-knob); background: var(--card); }
+.sw2.on { background: var(--primary); } .sw2.on::after { left: 14px; }
+.alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: 1px solid var(--st-exceed); border-radius: var(--r-md); background: var(--st-exceed-wash); }
+.alert h4 { margin: 0; font-size: var(--t14); }
+.alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); }
+
+/* ── the ladder specimen: seed → ramp → alias, shown not described ── */
+.ladder { display: grid; gap: var(--gap-2); padding: 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--card); }
+.ramp { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+.ramp i { height: 34px; border-radius: var(--r-xs); position: relative; }
+.ramp i::after { content: attr(data-n); position: absolute; inset: auto 0 -15px; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--muted-foreground); }
+.ramp-cap { margin-bottom: 16px; }
+.alias { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.alias div { display: grid; gap: 4px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--card); }
+.alias b { font-family: var(--mono); font-size: 10px; color: var(--muted-foreground); font-weight: 400; }
+.alias i { display: block; height: 22px; border-radius: 2px; border: 1px solid var(--border); }
+.law { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+
+/* ── self-running keyframes (MEANINGFUL tier: enter + sweep, no ambient loop) ── */
+@keyframes ex-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+.surface { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) both; }
+.prog i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 34%; height: 100%; background: linear-gradient(90deg, transparent, oklch(1 0 0 / .55), transparent); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+.prog { position: relative; }
+
+/* Reduced motion, in the shape src/renderer/styles/globals.css proved works: the universal
+   !important reset is the only thing that reaches pseudo-elements, because a per-selector
+   `animation: none` written against a class loses to a library utility in the cascade layers.
+   See styles/AGENTS.md — "Consequence for reduced motion, and why the mirror lies". */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+  }
+  .surface { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .prog i::after { display: none !important; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 14 14"><path d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4L13 5.4V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 1.8v3.8H13" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-md" viewBox="0 0 16 16"><path d="M4 1.8h8V14H4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.2 6h3.6M6.2 8.4h3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 16 16"><path d="M2 4.5h5l1.2 1.6H14V12H2z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6.5h6M5 9h4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+</defs></svg>
+
+<div class="brief">
+  <h1>29 · Composed Stack — the synthesis the lab's own evidence points at</h1>
+  <p><b>What this file is</b> — not a thirtieth research direction. It is the stack that a critical read of the other 38 produces: <b>28</b>'s seed → derivative → alias tiering, <b>10</b>'s named layer ladder and the only density axis in this folder bound to <code>data-window-mode</code>, <b>17</b>'s numeric contract, <b>18</b>'s shape-plus-word status law extended to six states, <b>27</b>'s named elevation roles, and <b>05</b>'s per-role <code>-shade</code> / <code>-foreground</code> pairing.</p>
+  <p><b>What it adds</b> — surface 0. The app's default surface is <code>MODE_CONFIGS.compact.height</code> = 72px, and <code>--container-header-height</code> is contractually equal to it, so the compact card <em>is</em> one header tall. Every other mock authors <code>--header-h</code> between 40px and 80px and renders only the expanded card; 13 of the 28 directions therefore cannot physically render the app's default state. Here it is rendered at 72px, beside an icon-only dock and a condensed/expanded density pair, all off the same aliases.</p>
+  <p><b>Geometry (retuned 2026-10-16 against primary sources)</b> — <b>width 800 → 680px.</b> Every launcher with a shipped dimension is narrower than that: VS Code's Quick Open is <code>600px</code> and PowerToys Run is <code>640px</code> in shipped CSS/XAML, Raycast is commonly reported near 750px, and no primary source supports anything wider as a default. 680px sits inside the 640–760 convergence band and still beats VS Code on width, which matters for this app's long repo-relative paths. The only principled ceiling anyone publishes is readability (~70ch, Baymard; ≤80ch per WCAG 1.4.8) — no vendor publishes a launcher max. <b>Control floor 32 → 40px:</b> 32px clears WCAG 2.2 SC 2.5.8 AA (24×24 plus the 24px-circle spacing rule) but sits under Microsoft's own 7.5mm/40px targeting guideline, which is the wrong floor for a Windows app. 40px is also Carbon's <code>md</code> button/row. <b>Row ladder unchanged at 32/40/48</b> — already Carbon's <code>sm</code>/<code>md</code>/<code>lg</code> verbatim. <b>Spacing moved to rem</b> on Carbon v11's published <code>$spacing-01…13</code> (2/4/8/12/16/24/32/40/48/64/80/96/160), because rem is the majority output across Primer, Carbon, Atlassian, Tailwind and USWDS and a px rhythm stops scaling under WCAG 1.4.4. <b>Contract tokens deliberately stay px</b> — <code>--header-h</code> and <code>--palette-w</code> must keep matching <code>MODE_CONFIGS</code> in the main process, and a rem value would silently diverge the moment a user changed their root font size.</p>
+  <p><b>Type plan</b> — system stack only; <code>--mono</code> is JetBrains Mono with Cascadia Mono offline. Scale 12/13/14/16/18/20/24px. Every numeric role carries <code>font-variant-numeric: tabular-nums</code>; <code>src/renderer/</code> contains <b>zero</b> occurrences today, which is the single cheapest measurable win in this file. Type size is deliberately <em>not</em> part of the density axis: Material 3 defines density as changing "top and bottom padding" and leaves text alone, which is why <code>[data-window-mode="compact"]</code> remaps padding, row height and the target floor but no type token. Licence: our own tokens; no third-party asset ships.</p>
+  <p><b>Responsive mechanism</b> — <code>container-type: inline-size</code> plus size queries, Baseline Widely available since Chrome 105 / Safari 16 / Firefox 110. A frameless window the user can resize from 280px to full width has no correct viewport breakpoint, so the card responds to its own width. The 300px dock in surface 0 is not a special case; it is the same rows in a narrow container.</p>
+  <p><b>The three-tier rule</b> — <code>:root</code> holds seeds and derivatives; the two <code>[data-theme]</code> blocks hold aliases and nothing else. That ordering is load-bearing, not decorative: a <code>:root</code> token whose value references a theme-scoped property is invalid where it is declared and silently vanishes below it (mock 07's mesh layer, mock 11's <code>--lyne-ink</code>). The ramp is literal rather than generated on purpose — a generator must answer to the same contrast gate as the tokens, or it generates failures silently.</p>
+  <ul class="moves">
+    <li><b>Move 1</b>Adopt the tiers. <code>tokens/colors.css</code> becomes the 12-step ramps; <code>semantic/theme.css</code> keeps its single <code>@theme inline</code> block and becomes the alias layer. No component edit.</li>
+    <li><b>Move 2</b>Adopt the ladder and the density axis. <code>--surface-base / -raised / -overlay / -sunken</code> plus <code>--border</code> ≠ <code>--input</code>; wire <code>--s-cond</code> / <code>--s-norm</code> to the <code>[data-window-mode]</code> block in <code>globals.css</code>, which is the app's real density mechanism.</li>
+    <li><b>Move 3</b>Adopt the two contracts. <code>font-variant-numeric: tabular-nums</code> plus a fixed numeric gutter in <code>tokens/typography.css</code>; the six-state law and its shape marks in the semantic layer, every hue paired with a shape and a word.</li>
+  </ul>
+  <div style="display:flex;gap:16px;margin-top:16px">
+    <div class="sw" data-theme="light"><i style="background:var(--surface-base)"></i><i style="background:var(--surface-raised)"></i><i style="background:var(--surface-sunken)"></i><i style="background:var(--border)"></i><i style="background:var(--border-strong)"></i><i style="background:var(--primary)"></i><i style="background:var(--st-engaged)"></i><i style="background:var(--st-armed)"></i><i style="background:var(--st-planned)"></i><i style="background:var(--st-caution)"></i><i style="background:var(--st-exceed)"></i></div>
+    <div class="sw" data-theme="dark"><i style="background:var(--surface-base)"></i><i style="background:var(--surface-raised)"></i><i style="background:var(--surface-sunken)"></i><i style="background:var(--border)"></i><i style="background:var(--border-strong)"></i><i style="background:var(--primary)"></i><i style="background:var(--st-engaged)"></i><i style="background:var(--st-armed)"></i><i style="background:var(--st-planned)"></i><i style="background:var(--st-caution)"></i><i style="background:var(--st-exceed)"></i></div>
+  </div>
+</div>
+
+<main class="board">
+<!-- ════════════════ LIGHT ════════════════ -->
+<section class="col" data-theme="light">
+<h2>Light</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 29 · synthesis</span>
+  <h3 class="hero-title">Composed Stack</h3>
+  <p class="hero-thesis">One seed set, one twelve-step ladder, one numeric column. A new vertical is a seed, not a redesign; a new mode is a density value, not a second stylesheet.</p>
+  <div class="hero-field">
+    <i style="background:var(--n-050)"></i><i style="background:var(--n-100)"></i><i style="background:var(--n-200)"></i><i style="background:var(--n-300)"></i><i style="background:var(--n-400)"></i><i style="background:var(--n-500)"></i><i style="background:var(--n-600)"></i><i style="background:var(--n-700)"></i><i style="background:var(--n-800)"></i><i style="background:var(--n-900)"></i><i style="background:var(--n-950)"></i>
+    <i class="h" style="background:var(--primary)"></i><i class="h" style="background:var(--st-engaged)"></i><i class="h" style="background:var(--st-armed)"></i><i class="h" style="background:var(--st-planned)"></i><i class="h" style="background:var(--st-caution)"></i><i class="h" style="background:var(--st-exceed)"></i>
+    <span class="cap">n-050 … n-950 — the derivative tier · then the six status seeds</span>
+  </div>
+</header>
+
+<!-- ── surface 0 · THE MODE BAND ── -->
+<div class="surface" data-ui>
+  <p class="lbl" data-ui>0 · Mode band — the default surface, the dock, and the density axis</p>
+  <div class="desktop" style="display:grid;gap:20px">
+
+    <div>
+      <p class="note">A · <b>Compact</b> — 680 × 72, the app's real default. <code>--header-h</code> equals <code>MODE_CONFIGS.compact.height</code> because the compact card <em>is</em> one header tall; no other mock in this folder renders it. Density is live on this element: 8px inline padding, 32px target.</p>
+      <div class="palette strip" data-window-mode="compact">
+        <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="vr"></span><span class="stw armed"><i class="mk armed"></i>Armed</span><kbd>Alt</kbd><kbd>Space</kbd></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note">B · <b>Icon-only dock</b> — 300px, and <em>not a special case</em>: these four rows carry byte-identical markup to surface 2's result rows, path and kind label included. The <code>@container surf (max-width: 460px)</code> query strips them at runtime. Measured: <code>.p</code> and <code>.k</code> compute <code>display:none</code> here and <code>block</code> at full width. The title and the status mark survive, because 18's law is that colour is never the only channel.</p>
+      <div class="palette dock" style="width:300px">
+        <div class="side"><i><svg width="16" height="16"><use href="#i-search"/></svg></i><i class="on"><svg width="16" height="16"><use href="#i-doc"/></svg></i><i><svg width="16" height="16"><use href="#i-dir"/></svg></i></div>
+        <div class="list">
+          <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="stw armed"><i class="mk armed"></i>Armed</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="stw planned"><i class="mk planned"></i>Planned</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="stw engaged"><i class="mk engaged"></i>Engaged</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="stw idle"><i class="mk idle"></i>Idle</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note">C · <b>Density pair</b> — the same three rows at <code>data-window-mode="compact"</code> (32px row, 8px inline padding, 32px target) and default (40px row, 12px padding, 40px target). Padding and box heights move; the type scale does not. This is the only density binding in the folder.</p>
+      <div style="display:grid;gap:10px">
+        <div class="dens" data-window-mode="compact">
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">main boot</span></span><span class="n">214</span><span class="n">1.9%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">MCP connect</span></span><span class="n">1,204</span><span class="n neg">-38%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-doc"/></svg><span><span class="t">es.exe init</span></span><span class="n">96</span><span class="n">0.8%</span></div>
+        </div>
+        <div class="dens">
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">main boot</span></span><span class="n">214</span><span class="n">1.9%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">MCP connect</span></span><span class="n">1,204</span><span class="n neg">-38%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-doc"/></svg><span><span class="t">es.exe init</span></span><span class="n">96</span><span class="n">0.8%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Understanding your question…</div>
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Searching the web…<em>web</em></div>
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Reading source pages…<em>web</em></div>
+      <div class="st"><span class="stw caution"><i class="mk caution"></i>caution</span>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getPiDesktopAgent()</code> memoises and only builds on the first desktop task; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th class="n">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td><span class="sig"></span>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td><span class="sig"></span>toolbox build</td><td class="n">388</td><td>getDesktopRuntime</td></tr>
+        <tr><td><span class="sig"></span>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td><span class="sig"></span>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="tag engaged"><i class="mk engaged"></i>High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="tag caution"><i class="mk caution"></i>Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="tag caution"><i class="mk caution"></i>in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">2.8 s</td></tr>
+    <tr><td>search_elements</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td><span class="stw exceed"><i class="mk exceed"></i>error</span></td><td class="n">element not found</td></tr>
+    <tr><td>type_text</td><td><span class="stw idle"><i class="mk idle"></i>pending</span></td><td class="n">—</td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td><span class="stw planned"><i class="mk planned"></i>planned</span></td><td class="n">—</td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="stw engaged"><i class="mk engaged"></i>connected</span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="stw engaged"><i class="mk engaged"></i>connected</span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="stw idle"><i class="mk idle"></i>disabled</span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4><span class="stw exceed"><i class="mk exceed"></i>exceeded</span> Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>6 · The ladder, the law, and the numeric column — shown, not described</p><div class="page" style="display:grid;gap:16px">
+  <div class="ladder">
+    <p class="note"><b>Tier 2 · derivative</b> — twelve neutral steps and the six status seeds. Everything the alias layer can ever need comes from here.</p>
+    <div class="ramp ramp-cap">
+      <i style="background:var(--n-000)" data-n="000"></i><i style="background:var(--n-050)" data-n="050"></i><i style="background:var(--n-100)" data-n="100"></i><i style="background:var(--n-200)" data-n="200"></i>
+      <i style="background:var(--n-300)" data-n="300"></i><i style="background:var(--n-400)" data-n="400"></i><i style="background:var(--n-500)" data-n="500"></i><i style="background:var(--n-600)" data-n="600"></i>
+      <i style="background:var(--n-700)" data-n="700"></i><i style="background:var(--n-800)" data-n="800"></i><i style="background:var(--n-900)" data-n="900"></i><i style="background:var(--n-950)" data-n="950"></i>
+    </div>
+    <p class="note"><b>Tier 3 · alias</b> — the named elevation roles. <code>--border</code> is decorative and deliberately a different value from <code>--input</code>, the control boundary at 3:1.</p>
+    <div class="alias">
+      <div><i style="background:var(--surface-base)"></i><b>surface-base</b></div>
+      <div><i style="background:var(--surface-raised)"></i><b>surface-raised</b></div>
+      <div><i style="background:var(--surface-overlay)"></i><b>surface-overlay</b></div>
+      <div><i style="background:var(--surface-sunken)"></i><b>surface-sunken</b></div>
+      <div><i style="background:var(--border)"></i><b>border</b></div>
+      <div><i style="background:var(--border-strong)"></i><b>border-strong</b></div>
+      <div><i style="background:var(--input)"></i><b>input</b></div>
+      <div><i style="background:var(--control-active)"></i><b>control-active</b></div>
+    </div>
+  </div>
+  <div class="ladder">
+    <p class="note"><b>The status law</b> — six states, each with a shape, a hue and a word. Grep this file for a bare status colour and you will not find one: the mark is never omitted and the label is never omitted.</p>
+    <div class="law">
+      <span class="tag engaged"><i class="mk engaged"></i>engaged</span>
+      <span class="tag armed"><i class="mk armed"></i>armed</span>
+      <span class="tag planned"><i class="mk planned"></i>planned</span>
+      <span class="tag caution"><i class="mk caution"></i>caution</span>
+      <span class="tag exceed"><i class="mk exceed"></i>exceeded</span>
+      <span class="tag idle"><i class="mk idle"></i>idle</span>
+    </div>
+    <p class="note">Six, not four: a five-state tool vocabulary has nowhere to go in a four-state law, which is the ceiling this direction fixes against <code>18</code>.</p>
+  </div>
+  <div class="ladder">
+    <p class="note"><b>The numeric column</b> — tabular figures, right alignment, a fixed sign gutter, row rules instead of zebra, and no rounding of the last significant digit.</p>
+    <table><thead><tr><th>Phase</th><th class="n">ms</th><th class="n">Δ</th><th>Owner</th></tr></thead><tbody>
+      <tr><td><span class="sig"></span>main boot</td><td class="n">214</td><td class="n">+0</td><td>main.ts</td></tr>
+      <tr><td><span class="sig"></span>toolbox build</td><td class="n">388</td><td class="n">−18</td><td>getDesktopRuntime</td></tr>
+      <tr><td><span class="sig"></span>MCP connect</td><td class="n">1,204</td><td class="n">+1,190</td><td>mcpService</td></tr>
+      <tr><td><span class="sig"></span>es.exe init</td><td class="n">96</td><td class="n">−4</td><td>initializeEs</td></tr>
+    </tbody></table>
+  </div>
+</div></div>
+</section>
+
+<!-- ════════════════ DARK ════════════════ -->
+<section class="col" data-theme="dark">
+<h2>Dark</h2>
+<header class="hero">
+  <span class="hero-kicker">Qyther · design lab · 29 · synthesis</span>
+  <h3 class="hero-title">Composed Stack</h3>
+  <p class="hero-thesis">One seed set, one twelve-step ladder, one numeric column. A new vertical is a seed, not a redesign; a new mode is a density value, not a second stylesheet.</p>
+  <div class="hero-field">
+    <i style="background:var(--n-950)"></i><i style="background:var(--n-900)"></i><i style="background:var(--n-800)"></i><i style="background:var(--n-700)"></i><i style="background:var(--n-600)"></i><i style="background:var(--n-500)"></i><i style="background:var(--n-400)"></i><i style="background:var(--n-300)"></i><i style="background:var(--n-200)"></i><i style="background:var(--n-100)"></i><i style="background:var(--n-050)"></i>
+    <i class="h" style="background:var(--primary)"></i><i class="h" style="background:var(--st-engaged)"></i><i class="h" style="background:var(--st-armed)"></i><i class="h" style="background:var(--st-planned)"></i><i class="h" style="background:var(--st-caution)"></i><i class="h" style="background:var(--st-exceed)"></i>
+    <span class="cap">n-950 … n-050 — the derivative tier · then the six status seeds</span>
+  </div>
+</header>
+
+<div class="surface" data-ui>
+  <p class="lbl" data-ui>0 · Mode band — the default surface, the dock, and the density axis</p>
+  <div class="desktop" style="display:grid;gap:20px">
+
+    <div>
+      <p class="note">A · <b>Compact</b> — 680 × 72, the app's real default. <code>--header-h</code> equals <code>MODE_CONFIGS.compact.height</code> because the compact card <em>is</em> one header tall; no other mock in this folder renders it. Density is live on this element: 8px inline padding, 32px target.</p>
+      <div class="palette strip" data-window-mode="compact">
+        <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="vr"></span><span class="stw armed"><i class="mk armed"></i>Armed</span><kbd>Alt</kbd><kbd>Space</kbd></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note">B · <b>Icon-only dock</b> — 300px, and <em>not a special case</em>: these four rows carry byte-identical markup to surface 2's result rows, path and kind label included. The <code>@container surf (max-width: 460px)</code> query strips them at runtime. Measured: <code>.p</code> and <code>.k</code> compute <code>display:none</code> here and <code>block</code> at full width. The title and the status mark survive, because 18's law is that colour is never the only channel.</p>
+      <div class="palette dock" style="width:300px">
+        <div class="side"><i><svg width="16" height="16"><use href="#i-search"/></svg></i><i class="on"><svg width="16" height="16"><use href="#i-doc"/></svg></i><i><svg width="16" height="16"><use href="#i-dir"/></svg></i></div>
+        <div class="list">
+          <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="stw armed"><i class="mk armed"></i>Armed</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="stw planned"><i class="mk planned"></i>Planned</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="stw engaged"><i class="mk engaged"></i>Engaged</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="stw idle"><i class="mk idle"></i>Idle</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note">C · <b>Density pair</b> — the same three rows at <code>data-window-mode="compact"</code> (32px row, 8px inline padding, 32px target) and default (40px row, 12px padding, 40px target). Padding and box heights move; the type scale does not. This is the only density binding in the folder.</p>
+      <div style="display:grid;gap:10px">
+        <div class="dens" data-window-mode="compact">
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">main boot</span></span><span class="n">214</span><span class="n">1.9%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">MCP connect</span></span><span class="n">1,204</span><span class="n neg">-38%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-doc"/></svg><span><span class="t">es.exe init</span></span><span class="n">96</span><span class="n">0.8%</span></div>
+        </div>
+        <div class="dens">
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">main boot</span></span><span class="n">214</span><span class="n">1.9%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">MCP connect</span></span><span class="n">1,204</span><span class="n neg">-38%</span></div>
+          <div class="row"><svg width="15" height="15"><use href="#i-doc"/></svg><span><span class="t">es.exe init</span></span><span class="n">96</span><span class="n">0.8%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
+    <p class="sec">Recently Opened</p>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">colors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-b)"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-c)"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15" style="color:var(--file-a)"><use href="#i-file"/></svg><span><span class="t">toolbox.ts</span><span class="p">Qyther/src/main/services/pi/toolbox.ts</span></span><span class="k">TypeScript</span><span class="badge">↵</span></div>
+  </div>
+  <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+  <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
+  <div>
+    <p class="sec">Results <span class="cnt">6</span></p>
+    <div class="row sel"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t"><mark>co</mark>lors.css</span><span class="p">Qyther/src/renderer/styles/tokens/colors.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">SHADCN-DESIGN-SYSTEM.md</span><span class="p">Qyther/design-systems/SHADCN-DESIGN-SYSTEM.md</span></span><span class="k">Markdown</span><span class="badge">↵</span></div>
+    <div class="row foc"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">theme.css</span><span class="p">Qyther/src/renderer/styles/semantic/theme.css</span></span><span class="k">CSS</span><span class="badge">↵</span></div>
+    <div class="row hov"><svg width="15" height="15"><use href="#i-file"/></svg><span><span class="t">spacing.css</span><span class="p">Qyther/src/renderer/styles/tokens/spacing.css</span></span><span class="k"><span class="ask">Ask</span>CSS</span><span class="badge">↵</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-dir"/></svg><span><span class="t">screenshots</span><span class="p">Qyther/docs/assets/screenshots</span></span><span class="k">Folder</span><span class="badge">→</span></div>
+    <div class="row"><svg width="15" height="15"><use href="#i-md"/></svg><span><span class="t">AGENTS.md</span><span class="p">Qyther/src/renderer/styles/AGENTS.md</span></span><span class="k">Markdown</span><span class="spin"></span></div>
+    <span class="tip">Ask about this file (Alt+Enter)</span>
+  </div>
+  <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+  <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
+  <div class="chat">
+    <div class="me">What is our current cold-start cost breakdown?</div>
+    <div class="steps">
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Understanding your question…</div>
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Searching the web…<em>web</em></div>
+      <div class="st"><span class="stw engaged"><i class="mk engaged"></i>engaged</span>Reading source pages…<em>web</em></div>
+      <div class="st"><span class="stw caution"><i class="mk caution"></i>caution</span>Running tool…<em>tool</em></div>
+    </div>
+    <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getPiDesktopAgent()</code> memoises and only builds on the first desktop task; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
+    <div class="gu"><div class="h">Cold-start cost by phase<span><span class="chip">CSV</span> <span class="chip">JSON</span> <span class="chip">MD</span> <span class="chip">All columns</span></span></div>
+      <table><thead><tr><th>Phase</th><th class="n">ms</th><th>Owner</th></tr></thead><tbody>
+        <tr><td><span class="sig"></span>main boot</td><td class="n">214</td><td>main.ts</td></tr>
+        <tr><td><span class="sig"></span>toolbox build</td><td class="n">388</td><td>getDesktopRuntime</td></tr>
+        <tr><td><span class="sig"></span>MCP connect</td><td class="n">1,204</td><td>mcpService</td></tr>
+        <tr><td><span class="sig"></span>es.exe init</td><td class="n">96</td><td>initializeEs</td></tr>
+      </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;font-size:var(--t12);color:var(--muted-foreground)"><svg width="14" height="14"><use href="#i-doc"/></svg>3 sources <span class="tag engaged"><i class="mk engaged"></i>High confidence (85%)</span></div>
+    <details open><summary>Task Details</summary>
+      <div class="met"><div><b>4,812</b><span>Tokens</span></div><div><b>$0.0131</b><span>Cost (est.)</span></div><div><b>8.6 s</b><span>Time</span></div><div><b>559 tok/s</b><span>Speed</span></div></div>
+      <p style="margin:0;padding:0 12px 12px;font-size:11px;color:var(--muted-foreground)">Input 3,190 · Output 1,622 — Model: qwen3.6-plus. Costs are estimates based on token usage. Actual charges may vary.</p>
+    </details>
+    <div class="bar"><div class="ta">Ask anything about your code, files, or project...</div>
+      <div class="f"><span class="x"><svg width="15" height="15"><use href="#i-plus"/></svg></span><span class="chip">3 MCP</span><span class="tag caution"><i class="mk caution"></i>Stop response</span><span class="send"><svg width="14" height="14"><use href="#i-up"/></svg></span></div></div>
+  </div>
+</div></div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
+  <div class="ag"><h3>Automating browser task… <span class="tag caution"><i class="mk caution"></i>in_progress</span></h3>
+    <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
+      <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
+      <dt>Upcoming steps:</dt><dd>Analyze screen content · Plan next action · Execute interaction</dd>
+      <dt>Time:</dt><dd>4.2 s</dd></dl>
+    <div class="prog" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="3" aria-label="Step 2 of 3"><i></i></div>
+    <span style="font-size:var(--t12);color:var(--muted-foreground)">Step 2 of 3</span>
+  </div>
+  <table class="tr"><tbody>
+    <tr><td>screenshot</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">1.1 s</td></tr>
+    <tr><td>get_screen_text</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">2.8 s</td></tr>
+    <tr><td>search_elements</td><td><span class="stw engaged"><i class="mk engaged"></i>ok</span></td><td class="n">0.4 s</td></tr>
+    <tr><td>invoke_element</td><td><span class="stw exceed"><i class="mk exceed"></i>error</span></td><td class="n">element not found</td></tr>
+    <tr><td>type_text</td><td><span class="stw idle"><i class="mk idle"></i>pending</span></td><td class="n">—</td></tr>
+    <tr><td>close_window <span class="chip">verifies</span></td><td><span class="stw planned"><i class="mk planned"></i>planned</span></td><td class="n">—</td></tr>
+  </tbody></table>
+</div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+  <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
+    <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
+    <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
+    <div class="set"><span class="g"><span class="t">Keyboard shortcuts</span><br><span class="d">Every shortcut the palette implements</span></span><span class="btn">View</span></div>
+    <div class="set"><span class="g"><span class="t">MCP servers</span><br><span class="d">3 connected</span></span><span class="btn">Manage</span></div>
+  </div>
+  <div class="dlg" style="box-shadow:var(--elev-sm)"><div class="h" style="font-size:var(--t16)">MCP servers<span class="chip">Search servers...</span></div>
+    <div class="set"><span class="stw engaged"><i class="mk engaged"></i>connected</span><span class="g"><span class="t">filesystem</span><br><span class="d">stdio · 14 tools</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="stw engaged"><i class="mk engaged"></i>connected</span><span class="g"><span class="t">sequential-thinking</span><br><span class="d">stdio · 1 tool</span></span><span class="chip">stdio</span><span class="sw2 on"></span></div>
+    <div class="set"><span class="stw idle"><i class="mk idle"></i>disabled</span><span class="g"><span class="t">playwright</span><br><span class="d">stdio · 28 tools</span></span><span class="chip">stdio</span><span class="sw2"></span></div>
+  </div>
+  <div class="alert" role="alert"><h4><span class="stw exceed"><i class="mk exceed"></i>exceeded</span> Ask mode is not ready</h4>
+    <ul><li>API_KEY — required</li><li>MODEL — optional, defaults to qwen3.6-plus</li><li>BASE_URL — optional, defaults to the Qyther endpoint</li></ul>
+    <div><span class="btn">Back to Files</span></div>
+  </div>
+</div></div>
+
+<div class="surface" data-ui><p class="lbl" data-ui>6 · The ladder, the law, and the numeric column — shown, not described</p><div class="page" style="display:grid;gap:16px">
+  <div class="ladder">
+    <p class="note"><b>Tier 2 · derivative</b> — twelve neutral steps and the six status seeds. Everything the alias layer can ever need comes from here.</p>
+    <div class="ramp ramp-cap">
+      <i style="background:var(--n-000)" data-n="000"></i><i style="background:var(--n-050)" data-n="050"></i><i style="background:var(--n-100)" data-n="100"></i><i style="background:var(--n-200)" data-n="200"></i>
+      <i style="background:var(--n-300)" data-n="300"></i><i style="background:var(--n-400)" data-n="400"></i><i style="background:var(--n-500)" data-n="500"></i><i style="background:var(--n-600)" data-n="600"></i>
+      <i style="background:var(--n-700)" data-n="700"></i><i style="background:var(--n-800)" data-n="800"></i><i style="background:var(--n-900)" data-n="900"></i><i style="background:var(--n-950)" data-n="950"></i>
+    </div>
+    <p class="note"><b>Tier 3 · alias</b> — the named elevation roles. <code>--border</code> is decorative and deliberately a different value from <code>--input</code>, the control boundary at 3:1.</p>
+    <div class="alias">
+      <div><i style="background:var(--surface-base)"></i><b>surface-base</b></div>
+      <div><i style="background:var(--surface-raised)"></i><b>surface-raised</b></div>
+      <div><i style="background:var(--surface-overlay)"></i><b>surface-overlay</b></div>
+      <div><i style="background:var(--surface-sunken)"></i><b>surface-sunken</b></div>
+      <div><i style="background:var(--border)"></i><b>border</b></div>
+      <div><i style="background:var(--border-strong)"></i><b>border-strong</b></div>
+      <div><i style="background:var(--input)"></i><b>input</b></div>
+      <div><i style="background:var(--control-active)"></i><b>control-active</b></div>
+    </div>
+  </div>
+  <div class="ladder">
+    <p class="note"><b>The status law</b> — six states, each with a shape, a hue and a word. Grep this file for a bare status colour and you will not find one: the mark is never omitted and the label is never omitted.</p>
+    <div class="law">
+      <span class="tag engaged"><i class="mk engaged"></i>engaged</span>
+      <span class="tag armed"><i class="mk armed"></i>armed</span>
+      <span class="tag planned"><i class="mk planned"></i>planned</span>
+      <span class="tag caution"><i class="mk caution"></i>caution</span>
+      <span class="tag exceed"><i class="mk exceed"></i>exceeded</span>
+      <span class="tag idle"><i class="mk idle"></i>idle</span>
+    </div>
+    <p class="note">Six, not four: a five-state tool vocabulary has nowhere to go in a four-state law, which is the ceiling this direction fixes against <code>18</code>.</p>
+  </div>
+  <div class="ladder">
+    <p class="note"><b>The numeric column</b> — tabular figures, right alignment, a fixed sign gutter, row rules instead of zebra, and no rounding of the last significant digit.</p>
+    <table><thead><tr><th>Phase</th><th class="n">ms</th><th class="n">Δ</th><th>Owner</th></tr></thead><tbody>
+      <tr><td><span class="sig"></span>main boot</td><td class="n">214</td><td class="n">+0</td><td>main.ts</td></tr>
+      <tr><td><span class="sig"></span>toolbox build</td><td class="n">388</td><td class="n">−18</td><td>getDesktopRuntime</td></tr>
+      <tr><td><span class="sig"></span>MCP connect</td><td class="n">1,204</td><td class="n">+1,190</td><td>mcpService</td></tr>
+      <tr><td><span class="sig"></span>es.exe init</td><td class="n">96</td><td class="n">−4</td><td>initializeEs</td></tr>
+    </tbody></table>
+  </div>
+</div></div>
+</section>
+</main>
+</body>
+</html>

@@ -1,54 +1,52 @@
 ---
-title: Desktop agent path with the pixel verifier
+title: Desktop path — the live Ask loop, and the verifier loop nothing calls
 ---
-%%{accTitle: "Desktop path: intent desktop enters the AskGraph's desktopAgent node, which makes a single call to the Pi desktop agent — one Agent loop over 32 TypeBox tools, no subgraph. Pi owns the loop, streams typed AgentEvents into a bridge, and runs the automatic GroundTruthVerifier pixel check only for a tool whose result sets details.verifies (close_window today). There is no approval gate: every tool runs without asking. Cancelling a turn aborts the run through abortPiDesktopRun, and withAbort settles the node even if the model never answers. Tools reach Win32/UIA/OCR through the DesktopAdapter."}%%
+%%{accTitle: "Desktop path as shipped: there is no intent classifier and no desktopAgent node. The model chooses one of the 32 desktop tools inside the single Ask-mode Agent that runAskTurn builds in src/main/services/pi/ask-turn.ts, which binds the desktop family through getDesktopToolbox() in pi/agent.ts. Tools never throw; they return isError plus details, and reach Win32 through koffi FFI, UIA through node-winautomation COM, and OCR through tesseract plus desktopCapturer, all behind WindowsDesktopAdapter. Cancellation is the chat pump's own AbortController: chat:cancelTurn aborts it, the listener calls agent.abort(), and withAbort settles the run even if the model never answers. The second box is the truth about the pixel verifier: PiDesktopAgent in pi/agent.ts owns the initial-screenshot decision, the details.verifies opt-in that runs GroundTruthVerifier, and the agent.steer() feedback, and it declares toolExecution parallel — but runPiDesktopTask() and abortPiDesktopRun() have zero production callers, so a shipped desktop turn runs the tools with no verifier in the loop. There is no approval gate anywhere: every tool runs without asking."}%%
 flowchart TB
   classDef node fill:#0a0a0a,stroke:#38bdf8,stroke-width:2px,color:#fafafa;
   classDef gate fill:#2a0d0d,stroke:#e5484d,color:#fafafa;
   classDef layer fill:#0d1b22,stroke:#5b6470,color:#fafafa;
   classDef term fill:#1b1b1b,stroke:#5b6470,color:#fafafa;
+  classDef unwired fill:#161305,stroke:#a87500,color:#e8d9a0,stroke-dasharray:5 4;
 
-  IN(["intent = desktop"]):::term
-  DN["desktopAgent node<br/>research-agent.ts"]:::node
-  ENDN(["END"]):::term
+  IN(["Ask turn: the model picks a tool<br/>no intent, no classifier, no node"]):::term
 
-  IN --> DN --> ENDN
-
-  subgraph AGENT["Pi desktop agent (pi/agent.ts) — one Agent, no graph"]
+  subgraph LIVE["What a shipped desktop turn actually runs"]
     direction TB
-    PR["Provider: openai-completions<br/>pi/provider.ts · lazy, memoised"]:::node
-    SP["System prompt<br/>pi/prompt.ts · tool priority"]:::node
-    LOOP["Agent.prompt() loop<br/>pi-agent-core · toolExecution: parallel"]:::node
-    BR["AgentEvent → bridge<br/>pi/events.ts · pure, typed union"]:::node
-    PR --> LOOP
-    SP --> LOOP
+    LOOP["One Agent per turn — pi/ask-turn.ts runAskTurn()<br/>toolExecution: sequential · thinkingLevel: off<br/>six families bound by pi/ask-tools.ts"]:::node
+    FAM["desktop family — 32 TypeBox AgentTools<br/>pi/toolbox.ts, handed over by getDesktopToolbox()"]:::node
+    BR["AgentEvent → AskEventTranslator (pi/ask-events.ts)<br/>step = tool name, label = displayLabelFor()"]:::node
+    AB["Abort: chat:cancelTurn → the pump's controller<br/>→ agent.abort(); withAbort (pi/abort.ts) settles the run"]:::gate
+    LOOP --> FAM
     LOOP --> BR
+    LOOP -.signal.-> AB
   end
-  DN -- "runPiDesktopTask(task, sessionId, bridge)" --> LOOP
+  IN --> LOOP
 
-  subgraph REACT["Toolbox (pi/toolbox.ts) — 32 TypeBox AgentTools"]
+  subgraph REACT["Tool contract (pi/toolbox.ts)"]
     direction TB
-    TOOL["32 tools<br/>tools never throw: isError + details"]:::node
-    SHOT{"details.verifies ?<br/>only close_window sets it<br/>no approval gate — every tool runs without asking"}:::gate
-    TOOL --> SHOT
-    SHOT -- "yes → GroundTruthVerifier" --> TOOL
-    SHOT -- "no → result back to the loop" --> TOOL
+    TOOL["32 tools<br/>never throw: isError + details.status<br/>details.verifies is set only on close_window"]:::node
   end
-  BR -- "tool_execution_start / _end" --> TOOL
-  LOOP -.drives.-> TOOL
+  FAM --> TOOL
 
-  VF["GroundTruthVerifier<br/>verifier.ts · pixel diff 0.01 / effect 0.02<br/>hard-reject or score &lt;0.5 → agent.steer()"]:::gate
-  SHOT -- "verifies" --> VF
-  VF -.steer.-> LOOP
-
-  AB["Abort: chat pump finally →<br/>abortPiDesktopRun() → withAbort settles the node"]:::node
-  LOOP -- "signal" --> AB
-
-  subgraph BACKEND["Native layers"]
+  subgraph UNWIRED["PiDesktopAgent (pi/agent.ts) — built, and reached by no production call site"]
     direction TB
-    AD["DesktopAdapter (windows-adapter.ts)"]:::layer
+    DLOOP["new Agent: toolExecution parallel<br/>own per-run AbortController"]:::unwired
+    SHOT{"initial screenshot<br/>skipped for simple window tasks"}:::unwired
+    VF["GroundTruthVerifier (desktop/verifier.ts)<br/>pixel diff 0.01 / effect 0.02<br/>hard-reject or score below 0.5 → agent.steer()"]:::unwired
+    ENTRY["runPiDesktopTask() · getPiDesktopAgent() · abortPiDesktopRun()<br/>ZERO production callers — the only production import of this<br/>file is getDesktopToolbox() and the quit step closePiDesktopAgent()"]:::unwired
+    SHOT --> DLOOP
+    DLOOP -- "tool set details.verifies" --> VF
+    VF -.steer.-> DLOOP
+    ENTRY -.-> DLOOP
+  end
+  TOOL -. "verifier would hook here — it does not, today" .-> VF
+
+  subgraph BACKEND["Native layers — shared by both loops through one memoised runtime"]
+    direction TB
+    AD["DesktopAdapter (desktop/windows-adapter.ts)<br/>+ AccessibilityTreeAdapter + GroundTruthVerifier<br/>released by disposeDesktopRuntime() on quit"]:::layer
     W32["koffi FFI · libwin32<br/>user32.dll / shell32.dll"]:::layer
-    UIA["node-winautomation COM UIA<br/>uia-native.ts"]:::layer
+    UIA["node-winautomation COM UIA<br/>desktop/uia-native.ts"]:::layer
     OCR["tesseract.js OCR · Electron desktopCapturer"]:::layer
     AD --> W32
     AD --> UIA

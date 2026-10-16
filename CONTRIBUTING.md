@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing. This document is the practical guide for working in this repository. It is short because most of the real rules live in the nested `AGENTS.md` files, which are binding work contracts, not optional reading.
 
-Qyther is a Windows-first, frameless, always-on-top command palette (global hotkey Alt+Space) built with Electron 42, React 19, TypeScript 6.0, Vite 8, Tailwind v4 and Zod v4. It also ships an AI "Ask" mode running a LangGraph agent, including a Windows GUI automation agent that can drive your real desktop. Read `SECURITY.md` before changing anything on those paths.
+Qyther is a Windows-first, frameless, always-on-top command palette (global hotkey Alt+Space) built with Electron 42, React 19, TypeScript 6.0, Vite 8 and Tailwind v4; tool schemas are TypeBox (`@earendil-works/pi-ai`), and `zod` is declared but imported by nothing. It also ships an AI "Ask" mode driven by **one Pi `Agent` per turn** (`src/main/services/pi/ask-turn.ts`) over six tool families, including a Windows GUI automation family that can drive your real desktop. Read `SECURITY.md` before changing anything on those paths.
 
 ## Before you open a file
 
@@ -17,7 +17,8 @@ Start with these if your change touches them:
 
 - `src/main/ipc/AGENTS.md` — the IPC surface, including `src/preload/`
 - `src/main/AGENTS.md` — main-process boot ordering, window modes, tray, global hotkey, logging
-- `src/main/services/AGENTS.md` and its children (`langgraph/`, `desktop/`, `browser/`, `document/`, `mcp/`, `database/`) — the agent runtime
+- `src/main/services/AGENTS.md` and its children (`pi/`, `desktop/`, `browser/`, `document/`, `web/`, `mcp/`, `database/`) — the agent runtime
+- `src/shared/AGENTS.md` — the types-only boundary modules that main, preload and renderer all import
 - `src/renderer/AGENTS.md`, `src/renderer/hooks/AGENTS.md`, `src/renderer/components/ui/AGENTS.md`, `src/renderer/components/ask-mode/AGENTS.md`
 - `src/renderer/styles/AGENTS.md` and `design-systems/SHADCN-DESIGN-SYSTEM.md` — the token system
 - `docs/AGENTS.md` — which documents are live and which are historical
@@ -29,7 +30,7 @@ Qyther is Windows-only. Packaging targets are Windows NSIS x64 only; there is no
 1. Install Node. Node 22 or newer is recommended; the maintainer develops on Node 24. There is no `engines` field in `package.json` yet, so no version range is formally supported.
 2. `npm install`
 3. Rebuild the native dependencies: `npx electron-rebuild`. Three native modules must stay in the build externals list in `electron.vite.config.ts`: `koffi`, `libwin32` and `node-winautomation`.
-4. Copy `.env.example` to `.env` and fill in the required values: `API_KEY`, `BASE_URL` and `MODEL`. Optional: `FAST_MODEL`, and `TAVILY_API_KEY` / `BRAVE_API_KEY` / `JINA_API_KEY` for web search and the remote page reader. These are the only names the code reads — there is no `OPENAI_API_KEY` support and no `LLM_*` support. `BASE_URL` can point at any OpenAI-compatible endpoint; the model layer is `@langchain/openai`.
+4. Copy `.env.example` to `.env` and fill in the required values: `API_KEY`, `BASE_URL` and `MODEL`. Optional: `TAVILY_API_KEY` / `BRAVE_API_KEY` / `JINA_API_KEY` for two keyed search providers and the remote page reader. These are the only names the code reads — there is no `OPENAI_API_KEY` support, no `LLM_*` support, and **no `FAST_MODEL`** (that name has zero readers in `src/`; the deleted classifier was its last consumer). `BASE_URL` can point at any OpenAI-compatible endpoint; the model layer is `@earendil-works/pi-ai` behind `src/main/services/pi/provider.ts` — the `@langchain/openai` this step used to name is not in `package.json`.
 5. Optional, for browser automation: `npm run install-playwright` (installs Chromium for the Playwright MCP server).
 6. File search needs the Everything CLI (`es.exe`). `src/main/utils/esDownloader.ts` will locate or download it on Windows.
 
@@ -64,7 +65,7 @@ A channel is only alive when all four exist:
 3. the call site in the renderer (`window.electronAPI.…`)
 4. the type at `src/renderer/types/electron.d.ts`
 
-Site 4 is not a second declaration: `electron.d.ts` imports `ElectronAPI` from `src/preload/preload.ts`, which is `export type ElectronAPI = typeof electronAPI` (`preload.ts:416`). You normally change nothing there. Never add a channel type to `src/preload/types.d.ts` or `src/renderer/types.d.ts` — both are stale hand-maintained duplicates and extending one is the most common way to desync the bridge.
+Site 4 is not a second declaration: `electron.d.ts` imports `ElectronAPI` from `src/preload/preload.ts`, which is `export type ElectronAPI = typeof electronAPI` (`preload.ts:416`). You normally change nothing there. Never add a channel type to `src/renderer/types.d.ts` — that file is a stale hand-maintained duplicate that still wins for every channel it declares, and extending one copy is the most common way to desync the bridge. `src/preload/types.d.ts` is **not** a duplicate: it is a three-line re-export of the renderer type and must stay empty.
 
 Channel names follow `namespace:camelCaseVerb`. The existing namespaces are `app`, `window`, `command`, `url`, `file`, `apps`, `dialog`, `debug`, `chat`, `mcp`, `browser`, `api-config`. The two three-segment exceptions (`file:everything:status`, `desktop:screenshot:capture`) are existing debt; do not add new ones casually. Validate in main, not only in preload — main is the only boundary the sandbox actually guarantees. `src/main/ipc/AGENTS.md` has the per-channel validation table and the current drift list.
 
@@ -97,10 +98,10 @@ The CI workflow enforces the second and third of these.
 
 - Named exports only: `export function X(…)` for components; `export class X` with `export const x = new X()` as the file's last line for service classes.
 - Kebab-case filenames.
-- Zod is for the LLM boundary only (tool input schemas, structured output). Put a `.describe()` on every field — the descriptions are the model's only schema documentation.
-- No `console.*`. Main process: `createLogger('<Subsystem>')` at module scope. **A new subsystem name must be added to `SUBSYSTEM_ENV_VARS` in `src/main/utils/logger.ts:57-84`** or it inherits the global level, which defaults to `error` in production, so its `info` and `debug` lines are dropped and no environment switch can bring them back. Renderer: `logInfo`/`logWarn`/`logError`/`logDebug` from `src/renderer/utils/debugLogger.ts`.
+- TypeBox is for the LLM boundary (tool input schemas, structured output) — `Type.Object({...})` from `@earendil-works/pi-ai`, with a `description:` on every property, because the descriptions are the model's only schema documentation. `zod` is still in `package.json` but imported by nothing since the Pi cutover deleted the `tool()` factories; do not add a zod schema to a tool.
+- No `console.*`. Main process: `createLogger('<Subsystem>')` at module scope. **A new subsystem name must be added to `SUBSYSTEM_ENV_VARS` in `src/main/utils/logger.ts`** or it inherits the global level, which defaults to `error` in production, so its `info` and `debug` lines are dropped and no environment switch can bring them back. `src/main/utils/logger.test.ts` fails in both directions — a call site with no registry entry, and an entry with no call site. Renderer: `logInfo`/`logWarn`/`logError`/`logDebug` from `src/renderer/utils/debugLogger.ts`.
 - Maximum 50 lines per function. No abstractions for single use, no speculative configurability, no error handling for conditions that cannot occur.
-- LangGraph nodes return `Partial<State>` and never mutate state; pick each new state field's reducer deliberately (see `src/main/services/langgraph/AGENTS.md`).
+- There is no graph. An Ask turn is one Pi `Agent` (`src/main/services/pi/ask-turn.ts`) over the families bound in `pi/ask-tools.ts`; a new tool is one factory plus one entry in exactly one family, and `buildFamilyIndex` throws if two families claim the same name (see `src/main/services/pi/AGENTS.md`). The `Partial<State>` reducers of the deleted LangGraph stack have no successor — do not reintroduce a state shape.
 - The renderer never imports from `src/main`; it talks through `window.electronAPI`.
 - There is no store library. `useState`/`useReducer` plus props, with context reserved for theme and toast.
 
@@ -108,13 +109,14 @@ The CI workflow enforces the second and third of these.
 
 Be careful reading the test situation correctly, because the honest answer is uncomfortable.
 
-`npm run test` runs `vitest run` with `include: ['src/**/*.test.{ts,tsx}']` (`vitest.config.ts:8`). That collects 38 files / 305 tests (measured 2026-10-15). 35 of them import production code; three do not:
+`npm run test` runs `vitest run` with `include: ['src/**/*.test.{ts,tsx}']` (`vitest.config.ts:8`). That collects 50 files / 400 tests (measured 2026-10-16). 48 of them import production code; two do not:
 
-- `src/main/ipc/handlers.test.ts` re-declares its own `validateUrl`/`validatePath`/`isCommandSafe`.
+- `src/main/ipc/handlers.test.ts` re-declares its own `validateUrl`/`validatePath`/`isCommandSafe` and imports nothing but `vitest`.
 - `src/main/services/desktop/ocr.test.ts` re-implements its subject against `pngjs`.
-- `src/main/services/mcp/client-contract.test.ts` imports only the MCP adapter library (it drives the repo's own stdio MCP server, so it is a dependency-behaviour contract, not coverage of this repo).
 
-A green run therefore under-proves the handler surface. The 32 desktop tools (`pi/toolbox.test.ts`), the Pi event bridge (`pi/events.test.ts`), the Pi cancellation path (`pi/cancel.test.ts`), the window singleton, the graph-node registry and the quit-time teardown policy (`src/main/lifecycle.test.ts`) all do have real gates. Still uncovered: the `will-quit` wiring in `main.ts` itself (it imports `electron` and `koffi` at module scope, so it cannot be imported under vitest — which is why the teardown *policy* was split into an Electron-free module to be testable at all), the graph node bodies, the token-stream pump, the desktop agent loop itself, and the browser subtree. `npm run harness:selftest` is the only gate that exercises the shipped window.
+`src/main/services/mcp/client-contract.test.ts` used to be in that list; it now imports `MCPService` from `./client` and `loadPreferences` from `../../preferences`, so it is a gate on this repo's code as well as on the MCP client's behaviour.
+
+A green run therefore under-proves the handler surface. The 32 desktop tools (`pi/toolbox.test.ts`), the Pi event bridge (`pi/events.test.ts`), the Pi cancellation path (`pi/cancel.test.ts`), the Pi provider's env-read timing (`pi/provider.test.ts`), the tool-family index (`pi/families.test.ts`, which fails if two families claim one tool name or a display label stops being renderable), the window singleton and the quit-time teardown policy (`src/main/lifecycle.test.ts`) all do have real gates. On the renderer side two files mount components — `components/ask-mode/UnifiedCommandBar.test.tsx` (IME) and `components/ask-mode/AskModeExpanded.test.tsx` (the whole Ask shell against a stubbed `window.electronAPI`) — and `components/ask-mode/ThinkingSteps.test.tsx` gates the step-folding rule as a pure function. Still uncovered: the `will-quit` wiring in `main.ts` itself (it imports `electron` and `koffi` at module scope, so it cannot be imported under vitest — which is why the teardown *policy* was split into an Electron-free module to be testable at all), the app shell (`App.tsx`, `CommandPalette*`, `ResultsList`, and the whole settings window under `components/settings/` — there is no `SettingsDialog`, settings is a second `BrowserWindow` with its own `SettingsApp.tsx`), the token-stream pump, the desktop agent loop itself, and the browser subtree. `npm run harness:selftest` is the only gate that exercises the shipped window.
 
 One test is known to flake under machine load: `useWindowTween.test.tsx` awaits real `setTimeout` and asserts a count of real jsdom rAF callbacks inside 100 ms, so a busy CPU can starve it. It has passed in isolation every time it has failed in a full run. Do not loosen its assertion to make it quiet — that bound is what distinguishes a working frame pump from a broken one.
 
@@ -131,7 +133,7 @@ What this means for you:
 2. Every changed line must trace back to the request you are addressing.
 3. Run `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` and the three style greps above.
 4. Do your `AGENTS.md` pass in the same branch as the code change, not after the fact.
-5. Do not add a dependency without explaining why the existing stack cannot do the job. Several declared packages (`openai`, `fuse.js`, `langsmith`, `clipboard-event`, `@langchain/community`, `better-sqlite3`) are imported by nothing — their presence is not precedent for adding another.
+5. Do not add a dependency without explaining why the existing stack cannot do the job. `openai`, `fuse.js`, `langsmith`, `clipboard-event`, `@langchain/community`, `better-sqlite3`, `langchain`, `uuid`, `@aws-sdk/client-s3` and `@radix-ui/react-slot` are **not declared at all** — they were removed as never-imported, so their appearance in older docs is not precedent for adding them back. The one package still declared and imported by nothing is `zod` (`dependencies`, `^4.4.3`); tool schemas use TypeBox.
 6. Use the pull request template in `.github/pull_request_template.md` and fill in the "what you could not verify" section.
 
 Before pushing, check that you have not committed secrets: `.env`, `*.pem` and `*.key` are gitignored and must stay local. `mcp-config.json` **is** tracked, and its per-server `env` blocks (`src/main/services/mcp/client.ts:70` passes `cfg.env` straight to the spawned process) are committed too, so never put a real credential in that file or in a pull request. (`README.md` currently claims MIT; that is not accurate — `LICENSE` controls.)

@@ -1,124 +1,87 @@
 # Overall Architecture
 
-> Auto-maintained by Cursor agent. See `.cursor/rules/doc-sync-on-changes.mdc` for sync rules.
-> Last updated: 2026-05-12
+> **Status**: live for "Current Architecture" and the diagram below, re-derived from this checkout on 2026-10-16; **history** for the "Changelog" section, whose entries describe the deleted LangGraph runtime. See `docs/AGENTS.md` rule 1.
 
 ## Current Architecture
 
 **Stack**: Electron 42 + React 19 + TypeScript 6.0 + Vite 8, Windows-first with sandboxed renderer.
 
-**Main Process**: Single Electron app entry (`src/main/main.ts`) that initializes dotenv, registers IPC handlers, global shortcuts (Alt+Space), system tray, and pre-compiles the LangGraph ask graph on startup. Security: `app.enableSandbox()`, navigation blocked to external URLs, window creation denied, menu bar hidden.
+**Main Process**: single Electron app entry (`src/main/main.ts`) that loads dotenv and preferences, opens the sql.js database, initialises `es.exe` and the MCP client, registers the IPC handlers, the Alt+Space global hook and the system tray, then creates the palette window. Security: `app.enableSandbox()`, navigation blocked to external URLs, window creation denied, menu bar hidden. Nothing pre-compiles an agent graph at boot — there is no graph (`src/main/services/langgraph/` is deleted), and the Pi runtime that replaced it is constructed per Ask turn. What is genuinely deferred is *construction*: `getDesktopRuntime()` / `getDesktopToolbox()` and `getPiModels()` memoise, so the tesseract worker, the UIA facade and the provider are opened on first use rather than at startup. The MCP client is the opposite — it connects every configured server during `app.whenReady()` through `initializeWithRetry()`. Quit is a bounded, ordered teardown: `will-quit` calls `event.preventDefault()`, runs `buildShutdownSteps()` through `createShutdown()` (`src/main/lifecycle.ts`) and then `app.exit(0)`.
 
-**Renderer**: React SPA (`src/renderer/App.tsx`) with CommandPalette, file search (Everything on Windows), and AI mode with LangGraph streaming.
+**Renderer**: two `electron-vite` MPA entries, not one SPA. The palette (`src/renderer/index.html` → `src/renderer/App.tsx`) holds CommandPalette, file search and Ask mode; the settings window (`src/renderer/settings.html` → `SettingsApp`) is a separate, lazily-created ordinary `BrowserWindow`. File search is Everything (`es.exe`) and indexes file and folder **names only** — there is no content search over file bodies. Ask mode streams over the `chat:stream-chunk` / `chat:agent-change` / `chat:thinking-step` pushes from the one Pi runtime.
 
-**IPC Layer**: Main handlers in `src/main/ipc/handlers.ts` + API config in `src/main/ipc/api-config.ts` + browser handlers in `src/main/ipc/browser-handlers.ts`. Renderer communicates via Electron IPC channels.
+**IPC Layer**: six handler modules — `src/main/ipc/handlers.ts` (25 channels), `chat-handlers.ts` (11), `mcp-handlers.ts` (10), `browser-handlers.ts` (9), `api-config.ts` (4) and `settings-handlers.ts` (3). Measured in this checkout: 62 unique `ipcMain.handle` channels and exactly one `ipcMain.on` receiver (`window:animationFrame`). The renderer reaches them only through `window.electronAPI` (`src/preload/preload.ts`). Per-channel contract lives in `src/main/ipc/AGENTS.md`.
 
-**LangGraph Agent**: Hierarchical architecture with one main AskGraph (5 nodes) routing through 3 smart subgraphs:
+**Ask agent runtime**: **one Pi `Agent` per turn.** There is no graph, no intent classifier, no conditional edges, no checkpointer and no delegation between agents — the model routes by choosing a tool. `runAskTurn()` (`src/main/services/pi/ask-turn.ts`) builds that agent over the six tool families assembled by `src/main/services/pi/ask-tools.ts` and indexed by `src/main/services/pi/families.ts`:
 
-- **AskGraph** (`src/main/services/langgraph/research-agent.ts`): Simplified StateGraph with `classify` node routing to 3 targets (`browserSubgraph`, `desktopAgent`, `documentSubgraph`) -> `postProcessNode` -> END. `browserSubgraphNode` is a smart wrapper that handles fast-path, comparison, form, chart, external search, internal knowledge, and general chat inline before delegating to `executeBrowserSubgraph` for actual browser intent. `desktopAgentNode` and `documentSubgraphNode` check intent and fall back to inline LLM if not their domain; `desktopAgentNode` is a node in name only — it makes one call to `runPiDesktopTask`. `postProcessNode` detects markdown tables and extracts comparison/form/chart patterns from all subgraph outputs into UIPayloads. Models: `qwen3.6-plus` for all roles (chatModel temp 0.7, routerModel temp 0, rewriteModel temp 0).
+- **desktop** — 32 TypeBox `AgentTool`s in `src/main/services/pi/toolbox.ts`, the list frozen by name in `src/main/services/pi/toolbox.test.ts`. They drive the native substrate in `src/main/services/desktop/`.
+- **web** — 2 tools (`search_web`, `fetch_page`) in `src/main/services/pi/tools/web-tools.ts`, over the `src/main/services/web/` search-and-fetch substrate.
+- **ui** — 5 tools (`create_table`, `create_form`, `create_comparison`, `create_list`, `create_chart`) in `pi/tools/ui-tools.ts`; each returns a `details.uiPayload`.
+- **document** — 5 tools (`create_docx`, `create_pptx`, `create_xlsx`, `read_document`, `modify_document`) in `pi/tools/document-tools.ts`, over the `src/main/services/document/` writers.
+- **browser** — a `browser_`-prefix **filter** over the one shared MCP connection (`pi/tools/browser-tools.ts`), not a wrapper and not a second client.
+- **mcp** — every other tool on that connection (`pi/tools/mcp-tools.ts`); an empty family is a valid state.
 
-- **BrowserSubgraph** (`src/main/services/browser/browser-subgraph.ts`, 8 nodes): Memory -> skillRouter -> loadSkills -> planner -> executeSubtask <-> verifier loop. 5 recovery strategies (retry, alternative, replan, skip, abort). Skill catalog: web-navigation, form-filling, data-extraction, web-scraping, authentication, visual-interaction.
+`buildFamilyIndex()` maps tool name → family → agent label and **throws** if two families claim the same name, because Pi resolves a call by name and a collision would make one family unreachable.
 
-- **Pi desktop agent** (`src/main/services/pi/agent.ts`): one `Agent` loop over 32 TypeBox tools with `toolExecution: "parallel"`, replacing the old 7-node desktop subgraph and its hand-rolled ReAct loop. Typed `AgentEvent`s are translated by `pi/events.ts` into a bridge (text deltas, tool start/end, final answer). The only automatic check is the pixel verifier, and it runs only for a tool whose result sets `details.verifies` (`close_window`); the verdict is fed back with `agent.steer()`. There is **no** approval gate — every tool runs without asking. A turn is stopped by `abortPiDesktopRun()` from the chat pump's `finally`, and `withAbort` (`pi/abort.ts`) settles the node even if the model never answers.
+**`PiDesktopAgent` is not on the shipped path.** `src/main/services/pi/agent.ts` still exports `runPiDesktopTask()`, `getPiDesktopAgent()` and `abortPiDesktopRun()`, and nothing calls them: the only production imports of that file are `pi/ask-tools.ts` taking `getDesktopToolbox()` and `main.ts`'s `pi-desktop-agent` shutdown step taking `closePiDesktopAgent()`. The consequences are load-bearing for anyone reading the desktop docs — the initial-screenshot decision never runs, the `details.verifies` opt-in (set only by `close_window`) marks a check nothing consumes, and the pixel verifier's verdict is never fed back with `agent.steer()`. What remains in `src/main/services/desktop/verifier.ts` is a **change detector**, not a postcondition grader: `PIXEL_DIFF_THRESHOLD` 0.01, `ACTION_EFFECT_MIN_DIFF` 0.02 and a window-title signal. There is no weighted 0.4/0.4/0.2 scorer (that was `desktop-verifier.ts`, deleted) and no retry/alternative/replan/skip/abort ladder (that was `desktop-recovery.ts`, deleted). The browser subtree does still carry a recovery-strategy union as an inert type (`BrowserRecoveryAction` in `src/main/services/browser/types.ts`, `strategy: "retry" | "alternative" | "replan" | "skip" | "abort"`) with no code acting on it. Wiring the verifier into the Ask loop or deleting the unused half of `agent.ts` are both open decisions — do not describe either as current behaviour.
 
-- **DocumentSubgraph** (`src/main/services/document/document-subgraph.ts`, 9 nodes): Memory -> classifyAction (read/create/modify) -> planner/executeAction. Dual cross-agent delegation via `delegateToBrowser` and `delegateToDesktop`. Supports docx, xlsx, pptx, pdf formats.
+**Human-in-the-loop: none.** There is no approval gate and no `interrupt()`; `chat:resumeGraph` and `desktop:confirmation-request` were deleted along with `src/shared/ipc/hitl-decision.ts`, and no turn pauses or resumes. Every tool reports its own `details.status` — there is no `DANGER_POLICY` table and no toolbox-level `inferStatusFromTool` name map; both died with `desktop-agent.ts`. The one live `inferStatusFromTool` in the repo is unrelated: a private helper in `src/main/services/browser/stateful-browser-agent.ts` that turns a `browser_*` tool name into a `BrowserTaskProgress` status for the direct `browser:executeTask` path. `DangerLevel` (`desktop/types.ts`) is vestigial: re-exported by the barrel, consumed by nothing.
 
-## LangGraph Topology Diagram
+**Streaming**: `pi/ask-events.ts`'s `AskEventTranslator` turns each Pi `AgentEvent` into zero or more of the six `AskStreamEvent` kinds (`token`, `agent`, `step-start`, `step-complete`, `ui-payload`, `sources`). The pump in `src/main/ipc/chat-handlers.ts` emits them onto `chat:stream-chunk`, `chat:agent-change` and `chat:thinking-step`, every push stamped with a per-turn monotonic `seq` from `beginTurn()`. The terminal chunk carries `uiPayloads`, `sources` and `metrics`, and `metrics` is only `{durationMs, model}` — no token count and no cost, because the runtime reports neither. Step labels come from `FamilyIndex.displayLabelFor()`; `ThinkingStep` lives in `src/shared/ipc/thinking-step.ts` so the shape is declared once.
+
+**Cancellation**: the pump owns one `AbortController` per turn (`activeTurns` in `chat-handlers.ts`) and `chat:cancelTurn` aborts it. `runAskTurn` attaches `abort → agent.abort()` and wraps the prompt in `withAbort(withTimeout(…, ASK_RUN_TIMEOUT_MS = 10 min), signal)`. The pump's own leash is separate and much shorter — `ASK_PUMP_TIMEOUT_MS` = 120 s — and bounds *waiting*, not the model run.
+
+## Ask Runtime Diagram
+
+The canonical, fully evidenced version of this diagram is `docs/diagrams/ask-routing.mmd` (with its rendered `.svg`); the block below is the same shape, kept short so the two cannot drift far.
 
 ```mermaid
 flowchart TD
-    %% ============= MAIN GRAPH: AskGraph (5 nodes) =============
-    Start([__start__]) --> classify
+    Start([user turn]) --> Pump["chat:sendStreamMessage pump<br/>src/main/ipc/chat-handlers.ts<br/>beginTurn(): one AbortController + monotonic seq<br/>ASK_PUMP_TIMEOUT_MS = 120 s"]
+    Pump --> Run["runAskTurn() — src/main/services/pi/ask-turn.ts<br/>ONE Pi Agent per turn<br/>withAbort + withTimeout, ASK_RUN_TIMEOUT_MS = 10 min"]
+    Run --> Route{"the model routes by CHOOSING A TOOL<br/>no classifier · no conditional edge · no checkpointer"}
 
-    classify -->|browser| browserSubgraph
-    classify -->|desktop| desktopAgent
-    classify -->|document| documentSubgraph
-
-    browserSubgraph --> postProcessNode
-    desktopAgent --> postProcessNode
-    documentSubgraph --> postProcessNode
-    postProcessNode --> End([END])
-
-    %% ============= BROWSER SUBGRAPH (8 nodes) =============
-    subgraph BrowserSubgraph["Browser Subgraph — 8 nodes"]
-        direction TB
-        bMemory[Memory Retrieve] --> bSkill[Skill Router]
-        bSkill --> bLoad[Load Skills]
-        bLoad --> bPlan[Planner]
-        bPlan -->|has subtasks| bExec[Execute Subtask]
-        bPlan -->|no subtasks| bMemStore[Memory Store]
-        bExec -->|success| bVerify[Verifier]
-        bExec -->|error| bRecovery[Recovery]
-        bVerify -->|passed + more| bExec
-        bVerify -->|passed + done| bMemStore
-        bVerify -->|score < 0.3| bRecovery
-        bRecovery -->|retry/alternative| bExec
-        bRecovery -->|replan| bPlan
-        bRecovery -->|skip/abort| bMemStore
-        bMemStore --> bEnd([END])
+    subgraph Families["Six tool families — pi/ask-tools.ts binds them, pi/families.ts indexes them"]
+        direction LR
+        DESK["desktop — 32 TypeBox tools (pi/toolbox.ts)"]
+        WEB["web — search_web, fetch_page"]
+        UI["ui — create_table / form / comparison / list / chart"]
+        DOC["document — create_docx / pptx / xlsx, read, modify"]
+        BR["browser — browser_-prefix filter over the shared MCP connection"]
+        MCP["mcp — the connection's non-browser_ tools"]
     end
+    Route --> Families
 
-    %% ============= DESKTOP (no subgraph — one Pi Agent loop) =============
-    subgraph DesktopAgent["Desktop — Pi agent, 32 tools, no graph"]
-        direction TB
-        dTools[32 TypeBox tools] --> dVerifyGate{details.verifies?}
-        dVerifyGate -->|close_window only| dVerify[Pixel Verifier]
-        dVerify -->|score < 0.5 / hard reject| dSteer[agent.steer() corrective]
-        dSteer --> dTools
-        dVerifyGate -->|everything else| dTools
-        dCancel[Turn cancel<br/>abortPiDesktopRun + withAbort] -.settles.-> dTools
-        dEnd2([END])
-    end
+    Families -->|"AgentEvent stream"| Trans["AskEventTranslator — pi/ask-events.ts<br/>token · agent · step-start · step-complete · ui-payload · sources"]
+    Trans --> Push["chat:stream-chunk · chat:thinking-step · chat:agent-change<br/>every push stamped with the turn's seq"]
+    Push --> Final["terminal chunk: uiPayloads + sources + metrics<br/>metrics = durationMs + model ONLY"]
+    Final -.-> Rec["pi/turn-record.ts → saveTrajectory()<br/>one row per completed turn — read by nothing"]
 
-    %% ============= DOCUMENT SUBGRAPH (9 nodes) =============
-    subgraph DocumentSubgraph["Document Subgraph — 9 nodes"]
-        direction TB
-        docMemory[Memory Retrieve] --> docClass[Classify Action]
-        docClass -->|read| docExec[Execute Action]
-        docClass -->|create/modify| docPlan[Planner]
-        docPlan -->|first needs browser| docBrowser[Delegate To Browser]
-        docPlan -->|first needs desktop| docDesktop[Delegate To Desktop]
-        docPlan -->|execute| docExec
-        docPlan -->|empty plan| docMemStore[Memory Store]
-        docExec -->|error| docRecovery[Recovery]
-        docExec -->|next needs browser| docBrowser
-        docExec -->|next needs desktop| docDesktop
-        docExec -->|more subtasks| docExec
-        docExec -->|no more subtasks| docVerify[Verifier]
-        docBrowser -->|error| docRecovery
-        docBrowser -->|next also browser| docBrowser
-        docBrowser -->|next needs desktop| docDesktop
-        docBrowser -->|more execute| docExec
-        docBrowser -->|no more| docVerify
-        docDesktop -->|error| docRecovery
-        docDesktop -->|next needs browser| docBrowser
-        docDesktop -->|next also desktop| docDesktop
-        docDesktop -->|more execute| docExec
-        docDesktop -->|no more| docVerify
-        docVerify -->|passed + more, next browser| docBrowser
-        docVerify -->|passed + more, next desktop| docDesktop
-        docVerify -->|passed + more, execute| docExec
-        docVerify -->|passed + done| docMemStore
-        docVerify -->|partial score >= 0.3| docMemStore
-        docVerify -->|failed < 0.3| docRecovery
-        docRecovery -->|retry| docExec
-        docRecovery -->|replan| docPlan
-        docRecovery -->|delegate browser| docBrowser
-        docRecovery -->|delegate desktop| docDesktop
-        docRecovery -->|skip/abort| docMemStore
-        docMemStore --> docEnd([END])
+    Cancel["chat:cancelTurn → controller.abort() → agent.abort()"] -.-> Pump
+
+    subgraph Deleted["Deleted at the Pi cutover — do not draw or cite these again"]
+        direction LR
+        G1["AskGraph · classify · routeAfterClassify · postProcessNode"]
+        G2["browserSubgraph / documentSubgraph / desktopAgent nodes"]
+        G3["node-registry · MemorySaver checkpointer · AskState reducers"]
+        G4["desktop-planner / -verifier / -recovery / -memory, MCPAdapter naming"]
     end
 ```
 
-**MCP Services**: `src/main/services/mcp/client.ts` — `MCPAdapter` (2.x; was `MultiServerMCPClient`) for external MCP server integration, released as the `mcp` step of the shutdown list in `src/main/main.ts` (bounded, ordered teardown before `app.exit(0)` — see `src/main/lifecycle.ts`).
+**MCP Services**: `src/main/services/mcp/client.ts` — the `MCPService` client (the name `MCPAdapter` in this file and in `CHANGELOG.md` is the pre-cutover name for the same object) connects every server declared in `mcp-config.json` plus preferences, converts each server's JSON Schema tools into Pi tools once, and is released as the `mcp` step of the shutdown list in `src/main/main.ts` (bounded, ordered teardown before `app.exit(0)` — see `src/main/lifecycle.ts`). There is no MCP **server** in `src/`; the only one in the repo is `scripts/harness/mcp-server.mjs`. Every family filters this single connection rather than opening its own.
 
-**Browser Automation**: `src/main/services/browser/stateful-browser-agent.ts` — Playwright-based agent with session manager (`browser-session-manager.ts`). Chromium installed via `npx playwright install chromium` at startup.
+**Browser Automation**: the browser capability is a Pi tool **family**, not a graph. `src/main/services/pi/tools/browser-tools.ts` filters the shared MCP connection by the `browser_` name prefix; `src/main/services/browser/stateful-browser-agent.ts` is a Pi `Agent` over that same toolbox for the direct `browser:executeTask` IPC path, with `browser-session-manager.ts` keeping one session and auto-closing it after 5 min inactivity. There is no planner, verifier or recovery ladder in this subtree — the model plans. Chromium is installed via `npx playwright install chromium` during startup. The `SKILL.md` prompt material under `browser/skills/` is read from disk and is **not** copied into a production build, so skills are only observable under `npm run dev`.
 
-**Desktop Automation**: the agent is `src/main/services/pi/` (one Pi `Agent` loop, 32 TypeBox tools, event bridge, pixel verifier); the native substrate it drives is `src/main/services/desktop/` — Win32 FFI (koffi), native UI Automation through `node-winautomation`, Electron desktopCapturer screenshots, tesseract OCR. There is no desktop subgraph, no planner, no recovery ladder and no cross-agent browser delegation from the desktop path any more.
+**Desktop Automation**: the tools are `src/main/services/pi/toolbox.ts` (32 TypeBox `AgentTool`s, frozen by name in `pi/toolbox.test.ts`) and the native substrate they drive is `src/main/services/desktop/` — Win32 FFI through koffi and libwin32 (`input-simulation.ts`), UI Automation through native `node-winautomation` COM (`uia-native.ts`, facade `accessibility-tree.ts`; the PowerShell UIA wrapper was dead and is deleted), Electron `desktopCapturer` screenshots, tesseract OCR, and the `verifier.ts` change detector described above. There is no desktop subgraph, no planner, no recovery ladder and no cross-agent browser delegation: the single Ask agent holds the desktop, browser and document tools at once, so a "delegation" is just the model calling a `browser_` tool mid-turn.
 
-**Database**: `sql.js` via `src/main/services/database/database-manager.ts` — stores desktop agent trajectories and failure memories for experience-based retrieval, including cross-agent delegation metadata. (`better-sqlite3` is not in `package.json`; it was declared, imported by nothing, and removed.)
+**Database**: `sql.js` via `src/main/services/database/database-manager.ts`, persisted to `app.getPath('userData')/desktop-agent.db` (`persistToDisk` writes the whole file on every write; there is no WAL). Four migrations create four tables — `desktop_trajectories`, `desktop_trajectory_steps`, `desktop_failures` and `migrations`. **The tables are written and never read back**: the Ask pump is the only production writer (`pi/turn-record.ts` builds one `TrajectoryRecord` per completed turn and `chat-handlers.ts` calls `saveTrajectory()`), `recordFailure()` has zero callers, and no code feeds a trajectory into a prompt. There is no `browser-memory`/`trajectories.db` store any more and no cross-agent delegation metadata to record. (`better-sqlite3` is not in `package.json`; it was declared, imported by nothing, and removed.)
 
 ## Changelog
+
+Entries below are dated history: a record of what changed, never of what exists. Every
+`src/main/services/langgraph/*`, `desktop/desktop-*` and `document/document-subgraph.ts` path they
+name — and the `:line` citations attached to them — was deleted at the Pi cutover, so none of those
+files or symbols resolve in this checkout. Do not cite an entry as current behaviour.
 
 <!-- New entries added at the top (newest first) -->
 

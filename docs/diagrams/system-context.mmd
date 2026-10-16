@@ -14,24 +14,24 @@ flowchart LR
     R["React renderer<br/>src/renderer/main.tsx"]:::proc
     T["System tray<br/>src/main/tray.ts"]:::proc
     R -- "window.electronAPI<br/>IPC invoke/listen" --> P
-    P -- "ipcRenderer.invoke / webContents.send<br/>60 handlers" --> M
+    P -- "ipcRenderer.invoke / webContents.send<br/>62 handlers" --> M
   end
 
   G["Alt+Space global hook<br/>koffi WH_KEYBOARD_LL + 10ms pump<br/>shortcuts.ts"]:::proc
   M --- G
 
-  MCP["MCP stdio child processes<br/>filesystem · sequential-thinking · playwright<br/>mcp-config.json"]:::ext
+  MCP["MCP stdio child processes<br/>one per server in mcp-config.json<br/>(gitignored; the example has no playwright entry)"]:::ext
   CH["Chromium (headless)<br/>driven ONLY via Playwright MCP"]:::ext
   ES["es.exe (Everything CLI)<br/>utils/esRunner.ts"]:::ext
   LLM["LLM endpoint<br/>any OpenAI-compatible API"]:::ext
-  WEB["html.duckduckgo.com<br/>api.tavily.com fallback"]:::ext
+  WEB["web search chain, in registry order<br/>exa · parallel · searxng · marginalia<br/>duckduckgo · tavily · brave"]:::ext
   OS["Win32 / UIA / OCR<br/>koffi · libwin32 · node-winautomation · tesseract.js"]:::ext
-  DB["userData stores<br/>desktop-agent.db (sql.js)<br/>browser-memory/trajectories.db<br/>preferences.json"]:::store
+  DB["userData stores<br/>desktop-agent.db (sql.js)<br/>preferences.json"]:::store
 
-  M -- "stdio JSON-RPC<br/>MCPAdapter (client.ts)" --> MCP
+  M -- "stdio JSON-RPC<br/>MCPService (client.ts) over pi-mcp" --> MCP
   MCP -- "Playwright MCP server" --> CH
   M -- "child_process.exec" --> ES
-  M -- "HTTPS (@langchain/openai)" --> LLM
-  M -- "HTTPS fetch (tools.ts)" --> WEB
+  M -- "HTTPS (@earendil-works/pi-ai)" --> LLM
+  M -- "HTTPS fetch (web/fetch/page.ts)" --> WEB
   M -- "FFI / DLL call · COM" --> OS
   M -- "fs.writeFileSync (flush per write)" --> DB

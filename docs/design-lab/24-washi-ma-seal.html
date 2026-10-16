@@ -69,17 +69,17 @@
 }
 /* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 800px; --header-h: 72px; --row-h: 44px; --target: 32px;
   /* radius 0 everywhere. --r-xs survives the scale and is consumed by NOTHING in this direction. */
   --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 2px;
-  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --gap-6: 24px; --gap-8: 32px; --measure: 44rem;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --gap-6: 24px; --gap-8: 32px; --measure: 40rem;
   --pad-2: 2px; --pad-4: 4px; --rule-1: 1px; --rule-2: 2px; --uo: 4px;
-  --void: 40px;                       /* the ma: one deliberately oversized unbroken band */
+  --void: 48px;                       /* the ma: one deliberately oversized unbroken band */
   --pad-t: 4px; --pill-h: 24px; --chip-h: 24px; --kbd-h: 24px; --kbd-min: 20px; --ghost-h: 28px;
   --badge-w: 24px; --badge-h: 24px; --cnt-min: 20px; --cnt-h: 20px; --vr-h: 24px; --col-icon: 28px;
   --col-kv: 120px; --ta-min: 48px; --prog-h: 8px; --st-sz: 16px; --spin-sz: 16px; --dot-sz: 8px;
-  --sw2-w: 28px; --sw2-h: 16px; --sw2-dot: 12px; --plate-pad: 24px; --surface-gap: 36px;
-  --seal-sz: 14px; --seal-hero: 128px; --ghost: 210px; --hero-min: 340px; --pad-hero: 24px;
+  --sw2-w: 28px; --sw2-h: 16px; --sw2-dot: 12px; --plate-pad: 24px; --surface-gap: 40px;
+  --seal-sz: 14px; --seal-hero: 128px; --ghost: 210px; --hero-min: 340px; --pad-hero: 32px;
   --plate-w: 34px; --plate-h: 56px; --sw-w: 24px; --sw-h: 20px; --sk-h: 12px; --sk-w: 96px;
   --lab-gap: 32px; --lab-pad-b: 96px; --lab-max: 1720px; --lab-brief-b: 28px; --move-w: 330px;
   --ff: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
@@ -94,6 +94,24 @@
   --ease-sk: cubic-bezier(0.22, 1, 0.36, 1);
   --anim-spin: sumiSpin 1.4s linear infinite; --anim-sk: skDrift 1.6s var(--ease-sk) infinite;
   --anim-caret: caretBlink 1.1s steps(1, end) infinite;
+}
+:root {
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: var(--lab-gap) var(--lab-gap) var(--lab-pad-b); background: var(--lab-bg); color: var(--lab-fg); font-family: var(--ff); }
@@ -151,8 +169,10 @@ mark { background: var(--mark-bg); color: inherit; border-radius: var(--r); padd
 .me { justify-self: end; max-width: 88%; padding: var(--gap) var(--gap-3); border-radius: var(--r); background: var(--primary); color: var(--primary-foreground); font-size: var(--t14); }
 .steps { display: grid; gap: var(--gap); padding: var(--gap) var(--pad); border: var(--rule-1) solid var(--border); border-radius: var(--r); background: var(--secondary); }
 .st { display: flex; align-items: center; gap: var(--gap); font-size: var(--t12); color: var(--muted-foreground); }
-.st i { width: var(--st-sz); height: var(--st-sz); border-radius: var(--r); display: grid; place-items: center; font-style: normal; font-size: var(--t12); background: var(--success-soft); color: var(--success); }
-.st.run i { background: var(--warning-soft); color: var(--warning); }
+.st i { width: var(--st-sz); height: var(--st-sz); border-radius: var(--r); display: grid; place-items: center; font-style: normal; font-size: var(--t12); background: var(--success-soft); }
+.st i::before { content: ""; width: 5px; height: 5px; border-radius: var(--r); background: var(--success); }
+.st.run i { background: var(--warning-soft); }
+.st.run i::before { background: var(--warning); }
 .st em { margin-left: auto; font-style: normal; padding: var(--pad-4) var(--gap); border-radius: var(--r); background: var(--muted); color: var(--muted-foreground); font-family: var(--mono); }
 .ans { max-width: var(--measure); font-size: var(--t16); line-height: 1.65; }
 .ans code { font-family: var(--mono); font-size: .9em; background: var(--muted); padding: var(--pad-2) var(--pad-4); border-radius: var(--r); }
@@ -220,6 +240,9 @@ summary { padding: var(--gap) var(--pad); font-size: var(--t12); font-weight: 60
 .alert ul { margin: 0; padding-left: var(--gap-3); font-family: var(--mono); font-size: var(--t12); }
 
 /* ══ 24 IDIOM — washi field · ma · hanko seal · mincho only above 16 ══════════ */
+/* taste: kept by design — SHIRONERI/SUMI field, the 40px ma void, one hanko seal
+   per column, tracked all-small-caps labels, radius 0 (identity); caption
+   contrast fixed: [data-theme="light"] .lbl → lab-safe #96897d */
 .seal { --seal-size: var(--seal-sz); position: relative; display: inline-block; flex: none; inline-size: var(--seal-size); block-size: var(--seal-size); background: var(--shu); border-radius: var(--r); transform: rotate(45deg); }
 .seal::after { content: "印"; position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--ff-display); font-size: calc(var(--seal-size) * .56); line-height: 1; color: var(--seal-ink); transform: rotate(-45deg); }
 .seal.big { --seal-size: var(--seal-hero); }
@@ -233,6 +256,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
 .hero-title { font-size: var(--t-display-1); letter-spacing: var(--ls-display); line-height: 1.12; }
 .ans::first-line { font-size: var(--t-display-3); }
 .sec, .lbl, th, summary, .met span, .hero-kicker, .col > h2, .hero-names { font-variant-caps: all-small-caps; letter-spacing: var(--ls-caps); text-transform: none; }
+[data-theme="light"] .lbl { color: #96897d; }
 .row .t { font-size: var(--t13); }
 .ghost, .btn { border-color: transparent; background: transparent; color: var(--foreground); text-decoration-line: underline; text-decoration-color: var(--link); text-decoration-thickness: var(--rule-1); text-underline-offset: var(--uo); }
 .ghost:hover, .btn:hover, .chip:hover { text-decoration-thickness: var(--rule-2); }
@@ -260,8 +284,16 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
 @keyframes sumiSpin { to { transform: rotate(360deg); } }
 @keyframes skDrift { 0%, 100% { opacity: .5 } 50% { opacity: 1 } }
 @keyframes caretBlink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+/* expressive overlay — CALM: one slow decelerating transition, no spring/bounce */
+.row, .btn { transition: background-color var(--ex-dur-3) var(--ex-ease-decel), transform var(--ex-dur-3) var(--ex-ease-decel); }
+/* expressive keyframes — CALM: one slow one-shot decel enter; no loops (ma = stillness) */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) both; }
 @media (prefers-reduced-motion: reduce) {
   :root { --anim-spin: none; --anim-sk: none; --anim-caret: none; }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .hero { animation: none !important; }
 }
 </style>
 </head>
@@ -308,7 +340,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <p class="hero-names">墨 SUMI · 白練 SHIRONERI · 朱色 SHU · 臙脂 ENJI · 紅 BENIHI · 紺 KON · 瑠璃 RURI</p>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -321,7 +353,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -336,14 +368,14 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans"><i class="seal tiny" aria-hidden="true" style="float:right;margin-left:var(--gap-2)"></i>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -365,7 +397,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -384,7 +416,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -415,7 +447,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <p class="hero-names">墨 SUMI · 白練 SHIRONERI · 朱色 SHU · 臙脂 ENJI · 紅 BENIHI · 紺 KON · 瑠璃 RURI</p>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -428,7 +460,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -443,14 +475,14 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans"><i class="seal tiny" aria-hidden="true" style="float:right;margin-left:var(--gap-2)"></i>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -472,7 +504,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -491,7 +523,7 @@ h1 { font-size: var(--t-display-2); letter-spacing: var(--ls-display); }
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

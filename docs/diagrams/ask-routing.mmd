@@ -1,42 +1,60 @@
 ---
-title: AskGraph top-level routing (5 real nodes)
+title: Ask turn — one Pi Agent, six tool families, one event bridge
 ---
-%%{accTitle: "AskGraph: classify routes via a conditional edge to browserSubgraph, desktopSubgraph or documentSubgraph; all three fan into postProcessNode then END. The browser node imperatively dispatches six non-graph handlers that are not nodes."}%%
+%%{accTitle: "Ask mode is one loop, not a graph. The chat:sendStreamMessage pump in src/main/ipc/chat-handlers.ts starts an ActiveTurn (its own AbortController plus a monotonic seq) and awaits runAskTurn in src/main/services/pi/ask-turn.ts, which builds one Pi Agent per turn over every bound tool family at once. There is no intent classifier and no conditional edge: the model routes by choosing a tool, and pi/families.ts maps that name to a family, an agent label and a display label. pi/ask-events.ts translates Pi's typed AgentEvent union into the six-variant AskStreamEvent — token, agent, step-start, step-complete, ui-payload, sources — which the pump pushes over chat:stream-chunk, chat:thinking-step and chat:agent-change, each stamped with seq. The final chunk carries uiPayloads, sources and metrics, where metrics is only durationMs and model. pi/turn-record.ts writes one trajectory row per completed turn. chat:cancelTurn aborts the controller; withAbort makes sure the run settles even if the model never answers. The AskGraph drawn here previously — classify, three subgraphs, postProcessNode, MemorySaver and the node registry — was deleted at the Pi cutover."}%%
 flowchart TB
   classDef node fill:#0a0a0a,stroke:#38bdf8,stroke-width:2px,color:#fafafa;
   classDef term fill:#1b1b1b,stroke:#5b6470,color:#fafafa;
   classDef fake fill:#161305,stroke:#a87500,color:#e8d9a0,stroke-dasharray:5 4;
+  classDef fam fill:#0a0a0a,stroke:#7c5cff,stroke-width:2px,color:#fafafa;
 
-  START(["__start__"]):::term
-  C["classify (classifyNode)<br/>routerModel.invoke "]:::node
-  B["browserSubgraph<br/>(browserSubgraphNode)"]:::node
-  D["desktopSubgraph"]:::node
-  DOC["documentSubgraph"]:::node
-  PP["postProcessNode"]:::node
-  ENDN(["END"]):::term
+  U(["user query, history (last 10 turns), attachments"]):::term
+  PUMP["chat:sendStreamMessage pump — src/main/ipc/chat-handlers.ts<br/>beginTurn(): ActiveTurn controller + seq<br/>120 s ASK_PUMP_TIMEOUT_MS"]:::node
+  RUN["runAskTurn() — src/main/services/pi/ask-turn.ts<br/>ONE Agent per turn: thinkingLevel off, toolExecution sequential<br/>10 min ASK_RUN_TIMEOUT_MS inside withAbort + withTimeout"]:::node
+  PROMPT["buildAskSystemPrompt(sessionId, bound, query) — pi/ask-prompt.ts<br/>advertises only families whose toolbox is non-empty<br/>appends buildBrowserSkillSection(query) when browser is bound"]:::node
 
-  START --> C
-  C -- "detectFastPath skips the LLM ()" --> C
-  C -- "routeAfterClassify<br/>intent==desktop" --> D
-  C -- "intent==document" --> DOC
-  C -- "else (research/general/browser)" --> B
+  U --> PUMP
+  PUMP -- "await runAskTurn(req, onEvent)" --> RUN
+  RUN -- "system prompt" --> PROMPT
+  PROMPT --> RUN
 
-  B --> PP
-  D --> PP
-  DOC --> PP
-  PP --> ENDN
+  ROUTE{"the model routes<br/>by CHOOSING A TOOL<br/>no classifier · no conditional edge · no checkpointer"}:::term
+  RUN --> ROUTE
 
-  subgraph NONNODES["Imperative dispatch INSIDE browserSubgraphNode (checks ) — NOT graph nodes"]
-    direction TB
-    CMP["comparisonNode"]:::fake
-    FORM["formNode"]:::fake
-    CHART["chartNode"]:::fake
-    EXT["externalSearchNode"]:::fake
-    INT["internalKnowledgeNode"]:::fake
-    GEN["generalChatNode"]:::fake
-    CMP -.-> FORM -.-> CHART -.-> EXT -.-> INT -.-> GEN
+  subgraph FAMS["Six tool families — pi/ask-tools.ts binds them, pi/families.ts indexes them"]
+    direction LR
+    DESK["desktop — 32 TypeBox tools<br/>pi/toolbox.ts via getDesktopToolbox()"]:::fam
+    WEB["web — search_web, fetch_page<br/>pi/tools/web-tools.ts"]:::fam
+    UI["ui — create_table, form, comparison, list, chart<br/>each returns details.uiPayload"]:::fam
+    DOC["document — create_docx, pptx, xlsx,<br/>read_document, modify_document"]:::fam
+    BR["browser — browser_-prefix FILTER<br/>over the one shared MCP connection"]:::fam
+    MC["mcp — the same connection's<br/>non-browser_ tools, [] when unconfigured"]:::fam
   end
-  B == "function-call dispatch<br/>(no edge, no checkpointer)" ==> NONNODES
+  ROUTE --> FAMS
 
-  CP["checkpointer: MemorySaver ()"]:::term
-  C -.-> CP
+  DUP["buildFamilyIndex() THROWS on a duplicate tool name<br/>Pi resolves a call by name, so a collision makes one family unreachable"]:::term
+  FAMS -.-> DUP
+
+  TRANS["AskEventTranslator — pi/ask-events.ts<br/>exhaustive switch over Pi's AgentEvent union<br/>token · agent · step-start · step-complete · ui-payload · sources"]:::node
+  FAMS -- "AgentEvent stream" --> TRANS
+
+  PUSH["chat:stream-chunk · chat:thinking-step · chat:agent-change<br/>every push stamped with the turn's seq<br/>step label from FamilyIndex.displayLabelFor(), step = tool name verbatim"]:::node
+  TRANS --> PUSH
+  PUSH --> RENDER(["renderer: useChatSession folds steps, ThinkingSteps renders the timeline"]):::term
+
+  FINAL["terminal chunk: uiPayloads + sources + metrics<br/>metrics = durationMs + model ONLY<br/>no length/4 token count, no hard-coded price"]:::node
+  TRANS --> FINAL
+
+  REC["pi/turn-record.ts → saveTrajectory()<br/>one row per completed turn, repeated tool calls kept per occurrence"]:::node
+  FINAL -.-> REC
+
+  CANCEL["chat:cancelTurn threadId<br/>controller.abort() → agent.abort()<br/>user Stop · pump timeout · normal completion"]:::term
+  CANCEL -.-> PUMP
+
+  subgraph GONE["Deleted at the Pi cutover — do not draw or cite these again"]
+    direction LR
+    G1["AskGraph · getAskGraph · classify · routeAfterClassify"]:::fake
+    G2["browserSubgraph / documentSubgraph / desktopAgent node"]:::fake
+    G3["node-registry.ts: ASK_GRAPH_NODES, NODE_AGENT_MAP, RESPONSE_NODE_SET"]:::fake
+    G4["MemorySaver checkpointer · clearGraphCache() · AskState reducers"]:::fake
+  end

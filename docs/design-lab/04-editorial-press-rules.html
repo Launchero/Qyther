@@ -20,6 +20,7 @@
 -->
 <style>
 /* ── token block: light — the paper system ─────────────────────────────────── */
+/* taste: kept by design — editorial serif (Fraunces) display, hairline rules instead of cards, mono file paths & labels, zero-radius press geometry, 12/14px dense cadence (editorial print UI) */
 [data-theme="light"] {
   --background: #f7f4ee;              /* paper */
   --foreground: #1a1a18;              /* ink — 15.88:1 on paper */
@@ -129,6 +130,7 @@
   --rule-heavy: 3px;                  /* a heavier rule is still the same rule colour */
   --ring-width-focus: 2px;
   --measure: 68ch;
+  --lab-label: #565043;               /* fixed deck ink: lab-framing captions read on the #ddd4c2 deck in both columns (≈5.4:1) */
   /* serif first for display + answer, grotesque for UI chrome, mono for paths/labels.
      Without the vendored serif these fall back to Georgia/Times until it is installed. */
   --font-display: "Fraunces", "Instrument Serif", Georgia, "Times New Roman", serif;
@@ -164,21 +166,21 @@ h1 {
   padding-bottom: var(--gap-block); border-bottom: var(--rule-heavy) solid var(--border);
 }
 .brief { max-width: var(--measure); margin: 0 auto var(--rhythm-m); color: var(--foreground); }
-.brief p { max-width: var(--measure); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--muted-foreground); margin: 0 0 var(--gap-block); }
+.brief p { max-width: var(--measure); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--lab-label); margin: 0 0 var(--gap-block); }
 .brief p b { color: var(--foreground); font-weight: 600; }
 .brief code { font-family: var(--font-mono); font-size: .92em; color: var(--foreground); }
 .brief .moves { display: flex; gap: var(--rhythm-s); flex-wrap: wrap; margin: var(--rhythm-s) 0 0; padding: 0; list-style: none; }
-.brief .moves li { flex: 1 1 340px; border-top: var(--rule-hair) solid var(--rule); padding: var(--gap-block) 0 0; font-size: var(--text-sm); color: var(--muted-foreground); }
+.brief .moves li { flex: 1 1 340px; border-top: var(--rule-hair) solid var(--rule); padding: var(--gap-block) 0 0; font-size: var(--text-sm); color: var(--lab-label); }
 .brief .moves b { display: block; font-family: var(--font-mono); font-weight: 400; font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--foreground); margin-bottom: 8px; }
 .swatches { display: flex; gap: var(--rhythm-s); margin: var(--rhythm-s) 0 0; flex-wrap: wrap; }
 .swatch-set { display: flex; gap: 4px; }
 .swatch { width: 34px; height: 26px; }
-.swatch-set figcaption { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin-top: 6px; }
+.swatch-set figcaption { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-label); margin-top: 6px; }
 .board { display: flex; gap: var(--rhythm-l); align-items: flex-start; justify-content: center; flex-wrap: wrap; }
 .col { width: var(--palette-w); max-width: 100%; }
-.col > h2 { font-family: var(--font-mono); font-weight: 400; font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--rhythm-s); text-align: center; }
+.col > h2 { font-family: var(--font-mono); font-weight: 400; font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-label); margin: 0 0 var(--rhythm-s); text-align: center; }
 .surface { margin-bottom: var(--rhythm-l); }
-.surface-label { font-family: var(--font-mono); font-weight: 400; font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--gap-block); }
+.surface-label { font-family: var(--font-mono); font-weight: 400; font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-label); margin: 0 0 var(--gap-block); }
 .surface-label code { font-family: var(--font-mono); }
 .page { background: var(--background); color: var(--foreground); padding: var(--rhythm-m); }
 .desktop { background: var(--desktop-plate); padding: var(--rhythm-m); }
@@ -409,6 +411,48 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; animation-delay: 0ms !important; transition-duration: 0ms !important; }
 }
+
+/* ── expressive overlay: M3X type + spring + liquid-glass vocabulary (theme-independent) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* EXPRESSIVE tier — spring micro-motion + expressive display type (no glass card-morph) */
+.btn, .tile, .chip, .keycap { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover, .tile:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1 { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* keyframe animations (second wave) — ex- prefixed so they never collide with pressSettle / caretRule / spinRule */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+/* EXPRESSIVE — one-shot staggered enter on the surfaces, ambient pulse on the agent panel, sweep shimmer on the progress rule */
+.surface { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) both; }
+.surface:nth-of-type(2) { animation-delay: 60ms; }
+.surface:nth-of-type(3) { animation-delay: 120ms; }
+.surface:nth-of-type(4) { animation-delay: 180ms; }
+.surface:nth-of-type(5) { animation-delay: 240ms; }
+.agent-panel { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.progress { position: relative; }
+.progress::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity:.35; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .surface, .agent-panel, .progress::after { animation: none !important; }
+}
 </style>
 </head>
 <body data-theme="light">
@@ -435,7 +479,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
 <section class="col" data-theme="light">
   <h2>Light</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
     <div class="desktop">
       <div class="palette">
@@ -463,7 +507,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
     <div class="desktop">
       <div class="palette">
@@ -495,7 +539,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette" style="box-shadow:none">
@@ -508,9 +552,9 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -550,7 +594,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel">
@@ -575,7 +619,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">
@@ -604,7 +648,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
 <section class="col" data-theme="dark">
   <h2>Dark</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query (compact geometry)</p>
     <div class="desktop">
       <div class="palette">
@@ -632,7 +676,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus, opening</p>
     <div class="desktop">
       <div class="palette">
@@ -664,7 +708,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette" style="box-shadow:none">
@@ -677,9 +721,9 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
             <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
@@ -719,7 +763,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel">
@@ -744,7 +788,7 @@ summary { padding: var(--gap-block) var(--pad-card); font-family: var(--font-mon
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">

@@ -131,44 +131,44 @@
 
 /* ── shared geometry, type and motion (identical in both themes) ─────────── */
 :root {
-  --palette-w: 800px;
-  --header-h: 72px;
-  --header-h-ask: 56px;
-  --row-h: 40px;
-  --target-min: 32px;
-  --input-w-search: 220px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
+  --palette-w: 720px;
+  --header-h: 64px;
+  --header-h-ask: 52px;
+  --row-h: 44px;
+  --target-min: 40px;
+  --input-w-search: 200px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
   --radius-pill: 999px;
-  --radius-micro: 4px;
-  --pad-card: 12px;
-  --pad-page: 24px;
-  --gap-inline: 8px;
-  --gap-block: 12px;
-  --gap-section: 16px;
-  --gap-tight: 4px;
-  --surface-gap: 40px;
-  --board-gap: 32px;
+  --radius-micro: 6px;
+  --pad-card: 16px;
+  --pad-page: 28px;
+  --gap-inline: 12px;
+  --gap-block: 16px;
+  --gap-section: 24px;
+  --gap-tight: 8px;
+  --surface-gap: 48px;
+  --board-gap: 40px;
   /* micro scale — sub-grid optical spacing the repo's strict 4pt grid has no rungs
      for; adopting this direction means either widening spacing.css or rounding to 4pt */
   --sp-1: 1px; --sp-2: 2px; --sp-3: 3px; --sp-5: 5px; --sp-6: 6px;
   --sp-7: 7px; --sp-10: 10px; --sp-14: 14px; --sp-18: 18px; --sp-20: 20px; --sp-96: 96px;
-  --measure: 44rem;
+  --measure: 64ch;
   --edge-hl: oklch(1 0 0 / 0.02);
-  --blur-popover: 12px;
+  --blur-popover: 14px;
   --blur-modal: 24px;
   --blur-scrim: 40px;
   --sat-glass: 1.6;
   --font-display: "Inter Display", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-ui: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
-  --text-xs: 13px; --lh-xs: 1.4; --ls: -0.01em;
-  --text-sm: 14px; --lh-sm: 1.45;
-  --text-base: 16px; --lh-base: 1.65;
-  --text-2xl: 24px; --lh-2xl: 1.2;
-  --text-display: 40px; --lh-display: 1.1;
-  --text-hero: 56px; --lh-hero: 1.05;
+  --text-xs: 13px; --lh-xs: 1.5; --ls: -0.01em;
+  --text-sm: 14px; --lh-sm: 1.5;
+  --text-base: 15px; --lh-base: 1.7;
+  --text-2xl: 22px; --lh-2xl: 1.25;
+  --text-display: 34px; --lh-display: 1.15;
+  --text-hero: 44px; --lh-hero: 1.1;
   --tracking-label: 0.06em;
   --dur-fast: 260ms;
   --dur-mid: 320ms;
@@ -211,10 +211,12 @@ h1 { font-family: var(--font-display); font-size: var(--text-hero); line-height:
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-family: var(--font-display); font-size: var(--text-display); line-height: var(--lh-display); font-weight: 500; letter-spacing: var(--ls); color: var(--page-fg); margin: 0 0 var(--gap-block); text-align: center; }
 .surface { margin-bottom: var(--surface-gap); }
-.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 var(--gap-inline); }
+.surface-label { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--page-muted); margin: 0 0 var(--gap-inline); }
 
 /* ── the mesh field: the drifting surface, content dead still ───────────── */
-.page, .desktop { position: relative; overflow: hidden; background: var(--field-base); padding: var(--pad-page); border-radius: var(--radius-2xl); }
+/* taste: kept by design — mesh gradient material + glass plates (backdrop-filter),
+   blur-depth elevation with edge highlight, mono keycaps/file paths, 14px density (vapor-UI identity) */
+.page, .desktop { position: relative; overflow: hidden; background: var(--field-base); color: var(--foreground); padding: var(--pad-page); border-radius: var(--radius-2xl); }
 .desktop { background: var(--desktop-plate); }
 .page::before, .desktop::before {
   content: ""; position: absolute; inset: -12%;
@@ -363,8 +365,8 @@ mark { background: var(--mark-bg); color: inherit; border-radius: var(--radius-m
 .pill--agent { background: var(--popover); color: var(--popover-foreground); }
 .steps { display: grid; gap: var(--sp-6); padding: var(--sp-10) var(--gap-block); border-radius: var(--radius-xl); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--border); }
 .step { display: flex; align-items: center; gap: var(--gap-inline); font-size: var(--text-xs); color: var(--muted-foreground); }
-.step .dot { width: 14px; height: 14px; border-radius: var(--radius-pill); display: grid; place-items: center; background: var(--success-soft); color: var(--success); font-size: 10px; }
-.step[data-state="running"] .dot { background: var(--warning-soft); color: var(--warning); }
+.step .dot { width: 14px; height: 14px; border-radius: var(--radius-pill); display: grid; place-items: center; background: var(--success); font-size: 10px; }
+.step[data-state="running"] .dot { background: var(--warning); }
 .step .tag { margin-left: auto; padding: var(--sp-1) var(--sp-6); border-radius: var(--radius-micro); background: var(--muted); color: var(--muted-foreground); font-family: var(--font-mono); }
 .genui { border-radius: var(--radius-xl); background: var(--popover); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border), var(--shadow-popover); }
 .genui-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); padding: var(--sp-10) var(--gap-block); border-bottom: 1px solid var(--border); }
@@ -458,6 +460,10 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes caretBlink { 50% { opacity: 0; } }
 @keyframes skeletonPulse { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes ex-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.015); } }
 
 /* ── reduced motion: the drift stops and the plates stay opaque-correct ─── */
 @media (prefers-reduced-motion: reduce) {
@@ -467,6 +473,46 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
   .caret, .spinner, .skeleton { animation: none; }
   .tooltip, .ask-pill, .dialog { backdrop-filter: none; }
   .palette, .icon-btn, .ghost-btn, .tile, .row, .send, .btn, .command-bar { transition: none; }
+}
+
+/* ── expressive overlay: M3X type + spring + liquid-glass vocabulary (theme-independent) ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+/* FULL tier — glass material + spring morph on cards/hero + expressive type */
+.dialog, .tile { transition: transform var(--ex-dur-3) var(--ex-ease-decel), border-radius var(--ex-dur-3) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-out); backdrop-filter: blur(var(--ex-blur)); }
+.dialog:hover { transform: scale(var(--ex-scale)); box-shadow: var(--ex-glass-edge); }
+.btn, .chip, .tile { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1 { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* FULL keyframes: ex-enter on the hero surfaces (staggered, spring, both) + ambient ex-breathe on the mesh glass */
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) both; }
+.palette:nth-child(2) { animation-delay: 60ms; }
+.palette:nth-child(3) { animation-delay: 120ms; }
+.page::before, .desktop::before { animation: meshDrift var(--drift-loop) var(--ease-drift) infinite, ex-breathe 6s var(--ex-ease-out) infinite; }
+/* FULL: ambient ex-pulse on the agent panel + ex-sweep on the progress bar via a low-opacity ::after gradient */
+.agent-panel { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.progress { position: relative; }
+.progress::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); opacity: .4; animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .palette, .page::before, .desktop::before, .agent-panel, .progress::after { animation: none !important; }
 }
 </style>
 </head>
@@ -497,7 +543,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
 <section class="col" data-theme="light">
   <h2>Light</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query — mesh field, opaque plate: the safe subset</p>
     <div class="desktop">
       <div class="palette">
@@ -525,7 +571,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus ring, opening, glass tooltip, skeleton</p>
     <div class="desktop">
       <div class="palette">
@@ -560,7 +606,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette" style="box-shadow:inset 0 0 0 1px var(--glass-ring)">
@@ -573,10 +619,10 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
-            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot"></span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
             <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
@@ -615,7 +661,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel">
@@ -640,7 +686,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">
@@ -669,7 +715,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
 <section class="col" data-theme="dark">
   <h2>Dark</h2>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">1 · Palette, Files tab, empty query — mesh field, opaque plate: the safe subset</p>
     <div class="desktop">
       <div class="palette">
@@ -697,7 +743,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">2 · Palette, query <code>design tokens</code> — hover, selection, focus ring, opening, glass tooltip, skeleton</p>
     <div class="desktop">
       <div class="palette">
@@ -732,7 +778,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">3 · Ask mode — transcript streaming, generative-UI table, sources, metrics</p>
     <div class="page">
       <div class="palette" style="box-shadow:inset 0 0 0 1px var(--glass-ring)">
@@ -745,10 +791,10 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
         <div class="chat">
           <div class="bubble-user">What is our current cold-start cost breakdown?</div>
           <div class="steps">
-            <div class="step"><span class="dot">✓</span>Understanding your question…</div>
-            <div class="step"><span class="dot">✓</span>Searching the web…<span class="tag">web</span></div>
-            <div class="step"><span class="dot">✓</span>Reading source pages…<span class="tag">web</span></div>
-            <div class="step" data-state="running"><span class="dot">•</span>Running tool…<span class="tag">tool</span></div>
+            <div class="step"><span class="dot"></span>Understanding your question…</div>
+            <div class="step"><span class="dot"></span>Searching the web…<span class="tag">web</span></div>
+            <div class="step"><span class="dot"></span>Reading source pages…<span class="tag">web</span></div>
+            <div class="step" data-state="running"><span class="dot"></span>Running tool…<span class="tag">tool</span></div>
           </div>
           <div class="answer">
             <p>Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></p>
@@ -787,7 +833,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">4 · Desktop-agent activity + tool trace</p>
     <div class="page">
       <div class="agent-panel">
@@ -812,7 +858,7 @@ summary { padding: var(--gap-inline) var(--gap-block); font-size: var(--text-xs)
     </div>
   </div>
 
-  <div class="surface">
+  <div class="surface" data-ui>
     <p class="surface-label">5 · Settings, MCP modal rows, and the not-ready card</p>
     <div class="page" style="display:grid;gap:var(--gap-section)">
       <div class="dialog">

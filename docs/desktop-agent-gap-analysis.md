@@ -1,6 +1,6 @@
 # Desktop Agent Gap Analysis
 
-> **Status**: roadmap — **pre-Pi-cutover, not inventory.** This study predates the replacement of the desktop agent by the Pi agent, so its "our implementation" sections describe code that no longer exists: the 7-node desktop subgraph, the hand-rolled ReAct loop (`DesktopAgent.runReactLoop`), the `DANGER_POLICY` table and its 29/2/1 split, LangChain tool factories, and PowerShell UIA. The live path is **32 TypeBox tools in `src/main/services/pi/toolbox.ts`** driven by one Pi `Agent` loop (`src/main/services/pi/agent.ts`), with native `node-winautomation` COM for accessibility. Its competitor research and roadmap sections are still useful; its descriptions of *our* code are not. See `docs/AGENTS.md`.
+> **Status**: roadmap — **pre-Pi-cutover, not inventory.** This study predates the replacement of the desktop agent by the Pi agent, so its "our implementation" sections describe code that no longer exists: the 7-node desktop subgraph, the hand-rolled ReAct loop (`DesktopAgent.runReactLoop`), the `DANGER_POLICY` table and its 29/2/1 split, LangChain tool factories, and PowerShell UIA. The live path is **32 TypeBox `AgentTool`s in `src/main/services/pi/toolbox.ts`** (the list is frozen by `src/main/services/pi/toolbox.test.ts`) driven by **one Pi `Agent` per turn** built by `runAskTurn()` in `src/main/services/pi/ask-turn.ts` over the six families assembled in `src/main/services/pi/ask-tools.ts` and indexed by `src/main/services/pi/families.ts` — there is **no** LangGraph, no LangChain, no intent classifier, no `AskGraph`, no subgraphs, no checkpointer and no delegation between agents; the model routes by choosing a tool. `PiDesktopAgent` in `src/main/services/pi/agent.ts` still exists but has **zero production callers** (`runPiDesktopTask`, `getPiDesktopAgent`, `abortPiDesktopRun` are all uncalled), so the initial-screenshot decision, the `details.verifies` opt-in (set only by `close_window`) and the pixel-verifier feedback are **not** in the shipped loop. There is no desktop `DANGER_POLICY` and no 29/2/1 split to recount — that table and the desktop `inferStatusFromTool` map died with `desktop-agent.ts` and were not replaced; each desktop tool reports its own `details.status`. (A same-named private `inferStatusFromTool` still lives in `src/main/services/browser/stateful-browser-agent.ts` for its own progress events — the browser path mirrors tool names while the Ask path reads declarations.) There is no human approval gate at all: `interrupt()`, `chat:resumeGraph`, `desktop:confirmation-request` and `src/shared/ipc/hitl-decision.ts` are deleted, and no `desktopConfirmation` state exists; cancellation is one `AbortController` per turn (`beginTurn`/`activeTurns` in `src/main/ipc/chat-handlers.ts`, `chat:cancelTurn`, `withAbort`/`withTimeout` in `src/main/services/pi/abort.ts`). Accessibility is native `node-winautomation` COM (`src/main/services/desktop/uia-native.ts`, facade `accessibility-tree.ts`), not PowerShell UIA — `uia-wrapper.ts` was dead and is deleted. Episodic records (`desktop_trajectories`, `desktop_trajectory_steps`, `desktop_failures`) are now **written once per completed Ask turn** by `src/main/services/pi/turn-record.ts` (called from `chat-handlers.ts`) and **read back by nothing**, so they are an evaluation artefact, not memory. Pi has no step cap, so the 25-step limit is gone; the ceilings are `ASK_RUN_TIMEOUT_MS` (10 min) and the pump's `ASK_PUMP_TIMEOUT_MS` (120 s). The root rail's **<500 ms cold-start target is aspirational and has never been measured** — this repo has no boot instrumentation. Its competitor research and roadmap sections are still useful; its descriptions of *our* code are not. See `docs/AGENTS.md`.
 
 > **Date**: 2026-05-13
 > **Scope**: Our `src/main/services/desktop/` implementation vs. leading open-source desktop automation agents
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-Our desktop agent is a **Windows-only, ReAct-loop-based** automation system with **32 LangChain tools** driven by a single LLM (`qwen3.6-plus`). It uses Win32 FFI (koffi) for input simulation, native UIA via `node-winautomation` COM for accessibility, and Electron `desktopCapturer` for screenshots. It features a basic danger classification, a pixel-diff verifier, and no human approval gate — tools run without asking, by deliberate product decision.
+Our desktop capability is a **Windows-only, tool-calling-loop** automation system: one Pi `Agent` per turn holding **32 TypeBox `AgentTool`s** (`src/main/services/pi/toolbox.ts`, alongside the `web`, `ui`, `document`, `browser` and `mcp` families) driven by a single LLM (`qwen3.6-plus`). It uses Win32 FFI (koffi) for input simulation, native UIA via `node-winautomation` COM for accessibility, and Electron `desktopCapturer` for screenshots. It has **no danger classification** (the `DANGER_POLICY` table was deleted at the Pi cutover and not replaced — each tool reports its own `details.status`), a pixel-diff verifier that **the shipped loop never reaches** (`GroundTruthVerifier` is consulted only by `PiDesktopAgent`, which has zero production callers), and no human approval gate — tools run without asking, by deliberate product decision.
 
 **Key finding**: Our implementation covers the *foundational layer* of computer use well (input simulation, screenshots, basic UI automation), but is missing entire *categories* of capability that are now standard across the state-of-the-art open-source landscape:
 
@@ -37,31 +37,35 @@ Our desktop agent is a **Windows-only, ReAct-loop-based** automation system with
 
 ---
 
-## 2. Our Current Capabilities — Complete Inventory
+## 2. Our Capabilities — Inventory As Audited (pre-Pi-cutover; see 2.2/2.3 for what changed)
 
 ### 2.1 Architecture
 
+The shape below is the **pre-cutover** architecture, kept for the audit it records. The shipped shape is flatter: `chat:sendStreamMessage` (`src/main/ipc/chat-handlers.ts`) → one `runAskTurn()` (`src/main/services/pi/ask-turn.ts`) → one Pi `Agent` over the six families → tool execution. No classifier, no subgraph, no verifier, no recovery node.
+
 ```
-LangGraph Research Agent
-  └─→ desktop intent routing
-        └─→ DesktopAgent (ReAct loop, maxSteps=25)
-              ├─ ChatOpenAI (qwen3.6-plus, 60s timeout)
-              ├─ 26 LangChain StructuredTool
-              ├─ WindowsDesktopAdapter (Win32 FFI via koffi)
-              ├─ AccessibilityTreeAdapter (native UIA via node-winautomation)
-              └─ GroundTruthVerifier (pixel-diff)
+LangGraph Research Agent                     (DELETED — no graph exists)
+  └─→ desktop intent routing                 (DELETED — routing is the model picking a tool)
+        └─→ DesktopAgent (ReAct loop, maxSteps=25)   (DELETED — Pi has no step cap)
+              ├─ ChatOpenAI (qwen3.6-plus, 60s timeout)   (DELETED — Pi provider.ts, 10-min run budget)
+              ├─ 26 LangChain StructuredTool              (DELETED — 32 TypeBox AgentTools in pi/toolbox.ts)
+              ├─ WindowsDesktopAdapter (Win32 FFI via koffi)   (LIVE)
+              ├─ AccessibilityTreeAdapter (native UIA via node-winautomation)   (LIVE)
+              └─ GroundTruthVerifier (pixel-diff)          (LIVE class, unreachable: only PiDesktopAgent consults it)
 ```
 
-### 2.2 Tool Inventory (26 Tools)
+### 2.2 Tool Inventory (26 Tools — stale snapshot; the live desktop toolbox is 32)
+
+The live list is frozen in `src/main/services/pi/toolbox.test.ts` (it asserts `toHaveLength(32)` against `createPiDesktopToolbox`), and six names in it are absent from the table below: `execute_command`, `get_element_text`, `hold_key`, `invoke_element`, `navigate_to_path`, `set_element_value`. The **Danger** column is a record of the deleted `DANGER_POLICY` table, not a live property: nothing consumes a danger level any more, and each tool reports its own `details.status`. Do not recount this table as inventory.
 
 | # | Tool | Danger | Description |
 |---|---|---|---|
 | **Observation (8)** | | | |
-| 1 | `screenshot` | safe | Electron desktopCapturer, primary monitor only in LLM response |
+| 1 | `screenshot` | safe | Electron desktopCapturer; the live tool takes an optional `monitorIndex` (0 = primary) and names every monitor in its text result |
 | 2 | `get_screen_text` | safe | Tesseract.js OCR on primary monitor (singleton worker) |
 | 3 | `get_window_info` | safe | GetForegroundWindow title + rect |
 | 4 | `get_window_list` | safe | EnumWindows with cached hWndMap |
-| 5 | `get_element_info` | safe | Focused UIA element via PowerShell |
+| 5 | `get_element_info` | safe | Focused UIA element via **native `node-winautomation` COM**, not PowerShell (`uia-native.ts` behind the `accessibility-tree.ts` facade) |
 | 6 | `search_elements` | safe | Recursive UIA tree search (max depth 5) |
 | 7 | `get_selected_text` | safe | Ctrl+C → clipboard read → restore |
 | 8 | `file_operations` | varies | 7 sub-actions: list/read/write/copy/move/delete/exists |
@@ -90,15 +94,17 @@ LangGraph Research Agent
 
 ### 2.3 Safety Mechanisms
 
-- **Danger classification table**: 29 of 32 tools classified as `'safe'` (auto-executed). `close_window` is `'dangerous'`, `drag` and `execute_command` are `'reviewable'` — but no level gates on approval any more: there is no confirmation dialog and no interrupt. The table feeds only the automatic in-loop pixel verifier, which runs for `dangerous` tools; the `reviewable` level is consulted for nothing — and any tool missing from the table falls through to `'reviewable'` (`desktop-agent.ts`).
-- **GroundTruthVerifier**: Takes baseline screenshot, computes pixel diff after action (1/16 sampling). `hardReject` is **never set to `true`** in practice — soft feedback only.
+- **There is no danger classification any more.** The `DANGER_POLICY` table (`29 safe / 2 reviewable / 1 dangerous`, consulted by tool name) and `inferStatusFromTool` were deleted at the Pi cutover along with `desktop-agent.ts`, and **neither was replaced**. `DangerLevel` survives in `src/main/services/desktop/types.ts` as a vestigial type re-exported by the barrel and consumed by nothing. Each tool now reports its own `details.status`. There is no approval gate and no interrupt: `chat:resumeGraph`, `desktop:confirmation-request` and `src/shared/ipc/hitl-decision.ts` are deleted, so every tool — including `close_window`, `drag` and `execute_command` — runs without asking. The one surviving opt-in is `details.verifies`, set only by `close_window`, and **the loop that would consume it (`PiDesktopAgent`) has no production caller**, so today it marks nothing. `execute_command` runs arbitrary strings through `exec` with `shell: 'powershell.exe'` and a 30 s timeout, with no allowlist and no prompt.
+- **GroundTruthVerifier**: takes a baseline screenshot plus window title, then reports a pixel diff (threshold 0.01), a `window_change` signal and an `action_effect` signal for `click`/`double_click` (floor 0.02). `hardReject` is **still never set to `true`** by any signal — but that is now academic, because nothing in the shipped Ask path constructs the verifier; only `PiDesktopAgent` reads `details.verifies` and feeds a verdict back with `agent.steer()`.
 
 ### 2.4 Integration
 
-- Integrated into LangGraph research agent via `desktopAgentNode`
-- IPC flow: `chat:sendStreamMessage` → LangGraph stream → tool execution → verifier → recovery (no confirmation round trip exists)
-- Progress events via EventEmitter
-- Context trimming at 40 messages
+- Integrated into the Ask turn directly: the 32 desktop tools are one of the six families bound by `buildAskToolboxes()` (`src/main/services/pi/ask-tools.ts`) into the single `Agent` that `runAskTurn()` builds. The `desktopAgentNode` of the deleted graph, and the `runPiDesktopTask()` seam that used to sit behind it, are both gone — the latter still exists in `src/main/services/pi/agent.ts` with zero production callers.
+- IPC flow (live): `chat:sendStreamMessage` → `runAskTurn` → tool execution → streamed result. There is no LangGraph stream, no verifier stage and no recovery stage between them, and no confirmation round trip exists.
+- Progress reaches the renderer as three pushed channels from the chat pump — `chat:stream-chunk` (tokens), `chat:thinking-step` (a tool starting/completing) and `chat:agent-change` (the family label derived from the tool the model picked) — not from an `EventEmitter` on the agent.
+- History is trimmed to `HISTORY_TURNS = 10` prior turns (`src/main/services/pi/ask-turn.ts`), not 40 messages.
+- Cancellation: `chat:cancelTurn` aborts the turn's `AbortController` (`beginTurn`/`activeTurns` in `src/main/ipc/chat-handlers.ts`); `runAskTurn` attaches `abort → agent.abort()` and wraps the prompt in `withAbort(withTimeout(...), signal)` (`src/main/services/pi/abort.ts`). `abortPiDesktopRun()` is not part of this path.
+- Episodic record: one row per completed turn is written to `desktop_trajectories` / `desktop_trajectory_steps` by `buildTurnRecord()` (`src/main/services/pi/turn-record.ts`) from `chat-handlers.ts`. `recordFailure()` has zero callers, so `desktop_failures` has no writer, and nothing reads any of the three tables back.
 
 ---
 
@@ -139,7 +145,7 @@ LangGraph Research Agent
 - **Trajectory Reflector**: Per-worker observation of entire episode with reflective advice
 - **Experience-augmented hierarchical planning**: Web search + narrative memory fusion → topologically sorted subtask queue
 
-**Relevance**: The Manager-Worker hierarchy, dual memory, and ACI patterns are directly applicable. Our flat ReAct loop (single LLM, no memory, no hierarchical planning) is the single biggest architectural gap vs. state-of-the-art.
+**Relevance**: The Manager-Worker hierarchy, dual memory, and ACI patterns are directly applicable. Our flat loop (single LLM, no memory it can *read*, no hierarchical planning — trajectories are written per turn and never retrieved) is the single biggest architectural gap vs. state-of-the-art.
 
 ---
 
@@ -234,11 +240,11 @@ LangGraph Research Agent
 
 **What it is**: The canonical computer use API from Anthropic.
 
-**Actions we lack vs. Anthropic**:
-- `hold_key` (press and hold a key, release later)
+**Actions we lack vs. Anthropic** (`hold_key` has since shipped as a desktop tool; the rest are still absent):
+- ~~`hold_key` (press and hold a key, release later)~~ — shipped
 - `left_mouse_down` / `left_mouse_up` (granular mouse control)
 - `triple_click`
-- `cursor_position` (query current cursor position)
+- `cursor_position` (query current cursor position — the Win32 call is already bound as `getCursorPosition()` in `input-simulation.ts`; only the tool is missing)
 - `zoom` (accessibility zoom)
 
 **Relevance**: Anthropic's action set is the de facto standard. Our tool set covers most but misses the finer-grained controls.
@@ -273,7 +279,7 @@ LangGraph Research Agent
 - Single shared desktop-control surface (parallel isolation is a community request, not fully solved)
 - Refuses terminal driving (by design for safety)
 
-**Relevance**: Codex is the most important competitive reference because it is the **first production computer use deployment by a major AI provider** (not academic/open-source). Its safety architecture (sandbox + approval + refusal lists), background isolation pattern, memory/scheduling features, and plugin ecosystem are directly applicable. The deliberate refusal to drive terminal apps is notable given our desktop agent is terminal-free. The shared desktop-control surface limitation also highlights that multi-agent isolation remains unsolved even at OpenAI scale.
+**Relevance**: Codex is the most important competitive reference because it is the **first production computer use deployment by a major AI provider** (not academic/open-source). Its safety architecture (sandbox + approval + refusal lists), background isolation pattern, memory/scheduling features, and plugin ecosystem are directly applicable. The deliberate refusal to drive terminal apps is notable given our desktop agent went the other way at the Pi cutover: `execute_command` hands the model arbitrary PowerShell with no allowlist and no approval gate, so the sandbox-escape class of risk Codex chooses to refuse outright is one we currently accept. The shared desktop-control surface limitation also highlights that multi-agent isolation remains unsolved even at OpenAI scale.
 
 ---
 
@@ -291,7 +297,7 @@ LangGraph Research Agent
 | Double click | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — |
 | Right click | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | — |
 | Hover | ✅ | — | — | ✅ | — | — | ✅ | — |
-| Hold key | ❌ | — | ✅ | ✅ | — | — | — | 🔴 |
+| Hold key | ✅ `hold_key` (gap since closed) | — | ✅ | ✅ | — | — | — | 🔴 |
 | Mouse down/up | ❌ | — | — | ✅ | — | — | — | 🟡 |
 | Triple click | ❌ | — | — | ✅ | — | — | — | 🟡 |
 | Cursor position query | ❌ | — | — | ✅ | — | — | — | 🟡 |
@@ -303,20 +309,20 @@ LangGraph Research Agent
 | Window info | ✅ | ✅ | — | ✅ | — | — | — | — |
 | Selected text | ✅ | — | — | ✅ | — | — | — | — |
 | **Browser** | | | | | | | |
-| CDP browser control | ❌ | ✅ (ext) | — | ✅ (15 tools) | ✅ | — | ✅ (Atlas-based in-app) | 🔴 |
-| DOM querying | ❌ | — | — | ✅ | ✅ | — | — | 🔴 |
-| Form filling | ❌ | — | — | ✅ | ✅ | — | ✅ (in-app browser) | 🔴 |
+| CDP browser control | ⚠️ (`browser` family = the `browser_`-prefixed tools filtered off the shared Playwright MCP connection, Chromium via Playwright not raw CDP; count is server-driven) | ✅ (ext) | — | ✅ (15 tools) | ✅ | — | ✅ (Atlas-based in-app) | 🔴 |
+| DOM querying | ⚠️ (page snapshot / script eval via the browser family, subject to what the configured MCP server exposes) | — | — | ✅ | ✅ | — | — | 🔴 |
+| Form filling | ⚠️ (browser-family fill/type tools, same caveat) | — | — | ✅ | ✅ | — | ✅ (in-app browser) | 🔴 |
 | Stealth/anti-detect | ❌ | — | — | ✅ | — | — | — | 🟡 |
-| Tab management | ❌ | — | — | ✅ | — | — | ✅ | 🟡 |
+| Tab management | ⚠️ (browser-family tab tools, same caveat) | — | — | ✅ | — | — | ✅ | 🟡 |
 | **File System** | | | | | | | |
 | File read/write | ✅ | ✅ | — | — | ✅ | ✅ | — |
 | File copy/move/delete | ✅ | ✅ | — | — | ✅ | ✅ | — |
 | Directory listing | ✅ | ✅ | — | — | ✅ | ✅ | — |
 | Path traversal protection | ❌ | ✅ | — | — | — | — | 🟡 |
 | **Terminal / Shell** | | | | | | | | |
-| Code execution | ❌ | — | — | — | ✅ | ✅ | ❌ (refuses) | 🔴 |
-| Shell commands | ❌ | — | — | — | ✅ | ✅ | ❌ (refuses) | 🔴 |
-| Script execution | ❌ | — | — | — | ✅ | ✅ | ❌ (refuses) | 🟡 |
+| Code execution | ✅ `execute_command` (PowerShell via `exec`, 30 s timeout, output truncated; no allowlist, no prompt) | — | — | — | ✅ | ✅ | ❌ (refuses) | 🔴 |
+| Shell commands | ✅ same tool | — | — | — | ✅ | ✅ | ❌ (refuses) | 🔴 |
+| Script execution | ⚠️ (one-shot `exec` only — no pseudo-terminal, no streaming, no interactive session) | — | — | — | ✅ | ✅ | ❌ (refuses) | 🟡 |
 | **Application Control** | | | | | | | |
 | Launch app | ✅ | ✅ | — | ✅ | — | ✅ | — |
 | Window management | ✅ | ✅ | — | ✅ | — | — | — |
@@ -326,12 +332,12 @@ LangGraph Research Agent
 | macOS | ❌ | ✅ | ❌ | ✅ | ✅ (partial) | ❌ | ✅ | 🔴 |
 | Linux | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | 🔴 |
 | **Architecture** | | | | | | | |
-| ReAct loop | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ (agent loop) | — |
+| ReAct loop | ✅ (one Pi `Agent` tool-calling loop per turn, `toolExecution: "sequential"`; there is no graph and no per-agent delegation) | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ (agent loop) | — |
 | Hierarchical planning | ❌ | — | ✅ | ✅ | — | ✅ | — | 🔴 |
 | Manager-Worker pattern | ❌ | — | ✅ | ✅ | — | ✅ | — | 🟡 |
 | **Memory & Learning** | | | | | | | |
-| Experience memory | ❌ | — | ✅ (dual) | ✅ (6 policies) | — | ✅ | ✅ (persistent mem) | 🔴 |
-| Strategy retrieval | ❌ | — | ✅ | ✅ | — | — | ✅ (context recall) | 🔴 |
+| Experience memory | ⚠️ (written, never read: one trajectory row per completed Ask turn into `desktop_trajectories`/`desktop_trajectory_steps` via `pi/turn-record.ts`; `desktop_failures` has no writer and no reader) | — | ✅ (dual) | ✅ (6 policies) | — | ✅ | ✅ (persistent mem) | 🔴 |
+| Strategy retrieval | ❌ (no production code reads any of the three tables back into a prompt) | — | ✅ | ✅ | — | — | ✅ (context recall) | 🔴 |
 | Playbook/workflow recording | ❌ | ✅ (custom skills) | — | ✅ (28 playbooks) | — | — | — | 🟡 |
 | Self-learning/improvement | ❌ | — | — | ✅ | — | ✅ | — | 🟡 |
 | Self-exploration | ❌ | — | — | — | — | — | — | 🟡 |
@@ -343,16 +349,16 @@ LangGraph Research Agent
 | Context awareness | ❌ | — | — | ✅ | — | — | ✅ (per-session mem) | 🟡 |
 | **Safety & Security** | | | | | | | |
 | HITL confirmation | ❌ (removed by design) | — | — | — | ✅ | — | ✅ (approval policy) | — |
-| Multi-tier danger policy | ⚠️ basic | — | — | — | — | — | ✅ (sandbox+approval) | 🟡 |
+| Multi-tier danger policy | ❌ (no policy table exists: `DANGER_POLICY` was deleted at the Pi cutover and not replaced; each tool reports its own `details.status`) | — | — | — | — | — | ✅ (sandbox+approval) | 🟡 |
 | Shell command blocking | ❌ | — | — | — | — | — | ✅ (refuses terminal) | 🔴 |
 | PII redaction | ❌ | — | — | ✅ (S75) | — | — | — | 🟡 |
 | Pattern-based interception | ❌ | — | — | — | — | — | ✅ (refusal list) | 🔴 |
 | Path traversal protection | ❌ | ✅ | — | — | — | — | ✅ (seatbelt sandbox) | 🟡 |
 | Cost/token limits | ❌ | — | — | — | — | — | — | 🟡 |
-| Iteration caps | ⚠️ (25 steps) | — | — | — | — | — | — | 🟡 |
+| Iteration caps | ⚠️ (no step cap — Pi has no `maxSteps`, so the 25-step limit is gone; the ceilings are the 10-min `ASK_RUN_TIMEOUT_MS` and the pump's 120 s `ASK_PUMP_TIMEOUT_MS`, plus a 10-turn history) | — | — | — | — | — | — | 🟡 |
 | **Verification** | | | | | | | |
-| Pixel-diff verification | ✅ | — | — | ✅ | — | — | — |
-| Action effect verification | ⚠️ soft only | — | — | ✅ | — | — | 🔴 |
+| Pixel-diff verification | ⚠️ (class exists and never sets `hardReject`; unreachable today — only `PiDesktopAgent` consults `details.verifies`, and it has no production caller) | — | — | ✅ | — | — | — |
+| Action effect verification | ⚠️ soft only, and likewise off the shipped path | — | — | ✅ | — | — | 🔴 |
 | Post-condition checking | ❌ | — | — | ✅ | — | — | 🟡 |
 | Self-evaluation | ❌ | — | ✅ | ✅ | — | — | 🟡 |
 | **Multi-Monitor** | | | | | | | |
@@ -360,7 +366,7 @@ LangGraph Research Agent
 | Full coordinate space | ❌ | — | — | ✅ | ✅ | — | 🟡 |
 | **Other** | | | | | | | |
 | Multi-provider LLM | ❌ (1) | ✅ (12+) | — | — | ✅ (5) | — | ✅ (OpenAI) | 🔴 |
-| MCP server mode | ❌ | ✅ | — | ✅ | — | — | ✅ (MCP helper) | 🟡 |
+| MCP server mode | ❌ as a server (we are an MCP **client** — the shared connection every family filters over; the only MCP server in the repo is `scripts/harness/mcp-server.mjs`, which is not a desktop-tool server) | ✅ | — | ✅ | — | — | ✅ (MCP helper) | 🟡 |
 | Document editors | ❌ | — | — | — | ✅ | — | — | 🟡 |
 | Voice capabilities | ❌ | — | — | — | — | — | — | 🟢 |
 | Custom skills/templates | ❌ | ✅ | — | ✅ | — | — | ✅ (90+ plugins) | 🟡 |
@@ -385,7 +391,7 @@ LangGraph Research Agent
 - **Abstraction**: Create a `DesktopAdapter` interface (already exists in `types.ts`) with platform-specific implementations
 
 #### 5.1.2 Browser Automation (CDP Integration)
-**Status**: No browser-specific tools; browser interaction limited to coordinate-based clicks/typing
+**Status**: Browser automation now exists as a tool family — `pi/tools/browser-tools.ts` filters the shared MCP connection by the `browser_` prefix and the one Ask `Agent` binds the result, so Chromium is driven through the Playwright MCP server (navigate/snapshot/fill/evaluate-class tools; the count is whatever the configured server exposes, and a fresh clone that copies `mcp-config.example.json` binds **zero** because that file declares no `playwright` server). What is still true: this is not a CDP client of our own, there is no in-app browser, and the desktop tools themselves still interact with a browser only by coordinate clicks.
 **Competitors**: ScreenHand (15 CDP tools), Accomplish (Chrome extension), Open Interpreter (LLM-first browser), Anthropic (built-in)
 **Impact**: Browser tasks are the most common desktop automation use case. Coordinate-based browser interaction is unreliable and slow.
 **Recommended approach**:
@@ -395,7 +401,7 @@ LangGraph Research Agent
 - Add stealth mode options (user-agent override, WebGL fingerprinting protection)
 
 #### 5.1.3 Code Execution / Terminal Access
-**Status**: No terminal/shell execution capability
+**Status**: Closed at the Pi cutover by `execute_command` (`src/main/services/pi/toolbox.ts`) — arbitrary PowerShell through `exec` with a 30 s default timeout, a 10 MB buffer and output truncated at 5000 chars, with **no allowlist, no blocklist and no prompt**. The `isCommandSafe` guard in `src/main/ipc/command-guard.ts` protects the `command:execute` IPC channel and does **not** apply to this tool. What remains unbuilt is streaming and an interactive session: there is no pseudo-terminal, so long-running or TUI commands are out.
 **Competitors**: Open Interpreter (primary mode), OS-Copilot (primary tool), Accomplish (CLI engine)
 **Impact**: Many tasks (installing software, running scripts, managing services, data processing) are impossible or impractical via GUI alone
 **Recommended approach**:
@@ -405,11 +411,11 @@ LangGraph Research Agent
 - Support both PowerShell and bash depending on platform
 
 #### 5.1.4 Multi-Provider LLM Support
-**Status**: Single provider (ChatOpenAI compatible endpoint, currently qwen3.6-plus)
+**Status**: Single provider, single model. `src/main/services/pi/provider.ts` builds one custom Pi provider (id `"qyther"`) over the OpenAI **Chat-Completions** API against a renderer-supplied `BASE_URL`, with `MODEL` defaulting to `qwen3.6-plus`. There is no LangChain and no `ChatOpenAI` any more — the four `@langchain/*` packages are gone from `package.json` and the whole `langgraph/` folder with them.
 **Competitors**: Accomplish (12+ providers), Open Interpreter (5 providers), OS AI Computer Use (OpenAI + Anthropic)
 **Impact**: Vendor lock-in; cannot leverage best model for specific task; no fallback if API is unavailable
 **Recommended approach**:
-- Abstract LLM provider behind interface (following LangChain's existing abstraction)
+- Abstract LLM provider behind an interface — Pi already provides the seam (`createProvider` + a pluggable API in `pi/provider.ts`), so a second provider is a second provider definition, not a new framework
 - Support at minimum: OpenAI, Anthropic (Claude), Google (Gemini), local (Ollama)
 - Add model selection UI in renderer
 - Implement per-task model routing (e.g., cheaper model for simple tasks, powerful model for complex)
@@ -417,7 +423,7 @@ LangGraph Research Agent
 ### 5.2 HIGH PRIORITY GAPS
 
 #### 5.2.1 Memory & Learning from Experience
-**Status**: Stateless — every task starts fresh, no learning from prior interactions
+**Status**: Functionally stateless, but no longer *unwritten*. The store is built and empty of purpose: `buildTurnRecord()` (`src/main/services/pi/turn-record.ts`) is called from `src/main/ipc/chat-handlers.ts` and writes one `desktop_trajectories` row plus its `desktop_trajectory_steps` rows per completed Ask turn (also on timeout and on user Stop), yet **nothing in `src/` reads any of the three tables back into a prompt**, `recordFailure()` in `DatabaseManager` has zero production callers so `desktop_failures` has no writer, and a turn that throws writes nothing because the step accumulators live inside the `try` scope. So there is still no learning from prior interactions — the missing half is retrieval, not storage.
 **Competitors**: Agent-S (dual memory: narrative + episodic), ScreenHand (6 learning policies + playbooks), FRIDAY (SelfLearner module)
 **Impact**: Repeated mistakes, no improvement over time, no knowledge transfer between tasks
 **Recommended approach**:
@@ -428,9 +434,9 @@ LangGraph Research Agent
 - Phase 3: self-exploration and curriculum learning
 
 #### 5.2.2 Hierarchical Planning
-**Status**: Flat ReAct loop — single LLM generates one action at a time up to 25 steps
+**Status**: Flat loop — one LLM picks one tool at a time inside a single `Agent` per turn (`runAskTurn`), with **no step cap at all** now (Pi has no `maxSteps`; the ceiling is the 10-minute run budget and the model's own stopping). There is no graph to add a tier to: the deleted LangGraph stack, its `classifyNode` router and the 7-node desktop subgraph are gone, and `families.ts` is only a name→label index, not a planner.
 **Competitors**: Agent-S (Manager-Worker hierarchy), ScreenHand (goal planner + deterministic planner), FRIDAY (FridayPlanner)
-**Impact**: Poor long-horizon planning; single LLM must both plan and execute simultaneously; limited to 25-step horizon
+**Impact**: Poor long-horizon planning; single LLM must both plan and execute simultaneously; no bounded horizon to reason about
 **Recommended approach**:
 - Introduce **two-level planning**: high-level plan generation → subtask execution
 - Plan format: ordered list of subtasks with preconditions and postconditions
@@ -438,7 +444,7 @@ LangGraph Research Agent
 - Post-condition verification between subtasks (did the subtask actually achieve its goal?)
 
 #### 5.2.3 Safety & Security Hardening
-**Status**: Basic danger policy (29/32 tools are `'safe'`), verifier never hard-rejects, no shell command filtering
+**Status**: No danger policy of any kind. The `DANGER_POLICY` table and its 29/2/1 split were deleted at the Pi cutover along with `desktop-agent.ts` and `inferStatusFromTool`, and **neither was replaced** — each tool reports its own `details.status`, and `DangerLevel` in `src/main/services/desktop/types.ts` is a vestigial type re-exported by the barrel and consumed by nothing. The verifier never hard-rejects and is additionally off the shipped path. Shell command filtering still does not exist for the agent: `execute_command` runs arbitrary PowerShell, and `command-guard.ts`'s blocklist covers only the `command:execute` IPC channel. There is no approval gate to consult — no `interrupt()`, no `chat:resumeGraph`, no `desktop:confirmation-request`, no `src/shared/ipc/hitl-decision.ts`.
 **Competitors**: CoWork-OS (pattern blocking for `sudo`, `rm -rf /`, etc.), AgentTrust (95% accuracy interception), ScreenHand (S75 PII redaction), OpenAI Codex (sandbox + approval + refusal lists)
 **Impact**: Agent can execute destructive actions (close windows, type arbitrary text, delete files) without user approval. No protection against prompt injection or malicious task descriptions.
 **Recommended approach**:
@@ -453,7 +459,7 @@ LangGraph Research Agent
   3. *Refusal list*: Codex deliberately refuses to drive terminal apps, Codex itself, or security/admin prompts — a pattern we can adopt (e.g., refuse to interact with system settings, password managers, banking apps)
 
 #### 5.2.4 Verification & Post-Condition Checking
-**Status**: GroundTruthVerifier exists but `hardReject` is never true; only soft HumanMessage feedback
+**Status**: `GroundTruthVerifier` (`src/main/services/desktop/verifier.ts`) still exists and still never sets `hardReject` — no signal it produces ever carries that flag — but the bigger fact is that **the shipped Ask turn never reaches it**: only `PiDesktopAgent` reads `details.verifies` (set solely by `close_window`) and feeds a verdict back with `agent.steer()`, and that class has zero production callers. The 912-line NL-postcondition `desktop-verifier.ts` was deleted at the cutover and has no Pi equivalent, so today the remaining verifier is a change detector, not a postcondition checker.
 **Competitors**: ScreenHand (deterministic postconditions per action), Agent-S (Self-Evaluator with textual rewards)
 **Impact**: No enforcement of action success; LLM may continue executing based on false assumptions
 **Recommended approach**:
@@ -473,7 +479,7 @@ LangGraph Research Agent
 - Inject into system prompt as context
 
 #### 5.3.2 Multi-Monitor Coordinate Awareness
-**Status**: `clampToScreen` only considers primary display; multi-monitor captures available but only primary sent to LLM
+**Status**: `clampToScreen` in `src/main/services/desktop/windows-adapter.ts` still clamps every coordinate to the **primary** display's `workAreaSize`, so a point on a secondary monitor is silently moved. Capture is no longer the limitation: the `screenshot` tool takes an optional `monitorIndex` and the adapter returns that single monitor when it is supplied, so any monitor's pixels can reach the model — it is the *input* side that is still primary-only.
 **Competitors**: OS AI Computer Use (full virtual desktop space), vnc-use (full desktop via VNC)
 **Impact**: Cannot interact with elements on secondary monitors; coordinates may be wrong on multi-monitor setups
 **Recommended approach**:
@@ -491,13 +497,13 @@ LangGraph Research Agent
 - Update from successful task trajectories
 
 #### 5.3.4 Additional Anthropic-Standard Actions
-**Status**: Missing: `hold_key`, `left_mouse_down/up`, `triple_click`, `cursor_position`, `zoom`
+**Status**: `hold_key` has since shipped as a desktop tool (`src/main/services/pi/toolbox.ts`). Still missing as tools: `left_mouse_down`/`left_mouse_up`, `triple_click`, `cursor_position`, `zoom`. Note that `getCursorPosition()` is already exported from `src/main/services/desktop/input-simulation.ts` over the Win32 `GetCursorPos` binding, so `cursor_position` is a tool wrapper over an existing call, not new native work.
 **Competitors**: Anthropic Computer Use (all available)
 **Impact**: Certain interactions require finer-grained control (e.g., selecting text via mouse drag requires down/move/up, not just drag)
 **Recommended approach**:
-- Add these actions to `input-simulation.ts` and corresponding tools
-- `hold_key` and `left_mouse_down/up` are straightforward SendInput additions
-- `cursor_position` via `GetCursorPos` Win32 API
+- Add the remaining actions to `input-simulation.ts` and corresponding tools
+- `left_mouse_down/up` is a thin tool over the existing `sendMouseEvent(…, MOUSEEVENTF_*DOWN/UP)` primitive — the same shape `hold_key` used, which is a tool over `pressKeyRaw(vk, 'down'|'up')`; neither needed new FFI
+- `cursor_position` needs only a tool over the existing `GetCursorPos` binding
 - `triple_click` = three rapid clicks
 - `zoom` via accessibility zoom API or scroll wheel emulation
 
@@ -511,11 +517,11 @@ LangGraph Research Agent
 - Block access to system directories (Windows, System32, etc.)
 
 #### 5.3.6 MCP Server Mode
-**Status**: Internal LangChain tools only; no external MCP server interface
+**Status**: The tools are Pi TypeBox `AgentTool`s, not LangChain tools, and there is no MCP **server** interface over them — `src/` deliberately hosts no MCP server code. What we *do* have is the client side: `src/main/services/mcp/client.ts` connects the servers named in `mcp-config.json` and every family filters that one shared connection. The only MCP server in the repository is the UI harness at `scripts/harness/mcp-server.mjs`, which exposes harness verbs, not desktop tools.
 **Competitors**: ScreenHand (111 MCP tools), OSWright (35 MCP tools)
 **Impact**: Cannot be used as a tool by external AI agents (Claude Desktop, Cursor, etc.)
 **Recommended approach**:
-- Expose key desktop tools as MCP server using `@modelcontextprotocol/sdk`
+- Expose key desktop tools as an MCP server — `@modelcontextprotocol/sdk` is declared **only as a devDependency** today (`package.json`, used by `scripts/harness/mcp-server.mjs`), and `src/` imports MCP solely as a client through `@earendil-works/pi-mcp` (whose own dependencies do not include the SDK), so shipping a server means promoting it to a runtime dependency
 - Start with observation tools (screenshot, OCR, window list) + basic interaction tools (click, type)
 - Phase 2: full tool set with proper tool descriptions
 
@@ -535,7 +541,7 @@ LangGraph Research Agent
 - Consider "focus-only" mode that only interacts with a specific window rather than full screen
 
 #### 5.3.8 Persistent Memory & Context Recall
-**Status**: Completely stateless between sessions
+**Status**: Stateless between sessions in behaviour, though no longer silent on disk — each completed Ask turn writes a trajectory row (see 5.2.1), and nothing reads it back. Chat history itself is in-memory only (`src/main/services/langchain/agent.ts` holds the session map; the sql.js database stores agent turns, not conversations), so a restart still loses the transcript.
 **Competitors**: OpenAI Codex (persistent memory across sessions), Agent-S (dual memory system)
 **Codex pattern**: Remembers user preferences, corrections, and gathered context across sessions. Can proactively suggest work based on previous context. Memory is user-scoped and persistent.
 **Recommended approach**:
@@ -593,7 +599,7 @@ LangGraph Research Agent
 
 | Project | Language(s) | UI Framework | Agent Framework | LLM Integration | Desktop APIs | Browser Automation | IPC / Transport |
 |---|---|---|---|---|---|---|---|
-| **Our Project** | TypeScript 100% | React 19 + Vite | LangGraph.js | LangChain + ChatOpenAI | Win32 FFI (koffi), native UIA (node-winautomation), Electron desktopCapturer | None (coordinate-only) | Electron IPC |
+| **Our Project** | TypeScript 100% | React 19 + Vite | Pi SDK (`@earendil-works/pi-agent-core` `Agent`; LangGraph.js and LangChain are deleted) | Pi `pi-ai` over a custom `openai-completions` provider, one BYO-key endpoint | Win32 FFI (koffi), native UIA (node-winautomation), Electron desktopCapturer | Playwright MCP (`browser_`-prefixed tools over the shared MCP connection) | Electron IPC |
 | **Accomplish** | TypeScript 92.6% | React + Electron | OpenCode (custom) | Multi-provider (12+): Anthropic, OpenAI, Google, xAI, DeepSeek, Ollama, LM Studio | Electron IPC + node-pty | Chrome extension | Electron IPC, stdio |
 | **Agent-S / S3** | Python 99.7% | CLI only | Custom hierarchical (Manager-Worker) | OpenAI, Anthropic, Azure, vLLM | PyAutoGUI, platform-specific bridges | None | Stdio |
 | **ScreenHand** | TypeScript 90.6%, Swift 3.4%, C# 2.3% | CLI / MCP server | Custom 7-layer ReAct | OpenAI, Anthropic via MCP | Native AX (macOS), UIA (Windows) | CDP (15 tools) | MCP (stdio) |
@@ -622,12 +628,13 @@ LangGraph Research Agent
 
 | Approach | Projects | Notes |
 |---|---|---|
-| **LangGraph / LangGraph.js** | Our project, vnc-use | Graph-based state machines with checkpointing; enables HITL interrupts |
+| **LangGraph / LangGraph.js** | vnc-use (this study listed **our project** here; the whole LangGraph stack was deleted at the Pi cutover) | Graph-based state machines with checkpointing; enables HITL interrupts — which is exactly what we no longer have, since the graph, `interrupt()`, `chat:resumeGraph` and the HITL decision type all went together |
+| **Pi SDK agent loop** | Our project | `@earendil-works/pi-agent-core` `Agent`: one typed event stream, one loop, tools bound directly, no nodes and no checkpointer |
 | **Custom hierarchical (Manager-Worker)** | Agent-S, ScreenHand | Two-tier planning → execution; enables experience-augmented planning |
 | **Custom ReAct loop** | Open Interpreter, Accomplish (OpenCode), Anthropic CU | Simple single-loop; fast but limited for long-horizon tasks |
 | **Custom modular (planner + learner + retriever)** | OS-Copilot/FRIDAY | Separation of concerns enables self-learning module |
 
-**Our position**: LangGraph.js is solid for state management and HITL interrupts. The gap is not the framework but the *graph topology* — we have a flat loop, not a hierarchical Manager-Worker graph.
+**Our position**: The framework argument in this row is superseded — we no longer run LangGraph, so there is no graph topology to deepen and no checkpoint/HITL affordance to lean on. The gap the study identified (a flat loop instead of a hierarchical Manager-Worker design) is unchanged and is now a property of the single Pi `Agent`, not of a graph we could re-wire.
 
 #### LLM Integration Patterns
 
@@ -635,16 +642,16 @@ LangGraph Research Agent
 |---|---|---|
 | **Multi-provider (5-12+)** | Accomplish (12+), Open Interpreter (5+ via LiteLLM), Agent-S (4+) | No vendor lock-in; fallback available; per-task model routing |
 | **Dual provider** | OS AI Computer Use (OpenAI + Anthropic) | Covers top two models |
-| **Single provider (API-native)** | Our project (ChatOpenAI-compatible), OpenAI Codex (OpenAI only) | Simpler but creates vendor dependency; Codex has native computer use |
+| **Single provider (API-native)** | Our project (one custom Pi provider over an OpenAI **Chat-Completions**-compatible `BASE_URL`, model from `MODEL`, default `qwen3.6-plus`), OpenAI Codex (OpenAI only) | Simpler but creates vendor dependency; Codex has native computer use |
 | **API-native (built-in tool)** | Anthropic Computer Use | Claude's native computer use API — no wrapper needed |
 
 **Key libraries used across projects**:
 - **LiteLLM** (Python): Unified LLM API — Open Interpreter, OS-Copilot
-- **LangChain**: Our project, Accomplish (tool definitions)
+- **LangChain**: Accomplish (tool definitions) — **not us**; our tools are TypeBox `AgentTool`s and our model access is the Pi SDK (`@earendil-works/pi-ai`), with the four `@langchain/*` packages removed from `package.json`
 - **Direct API calls**: Agent-S, OS AI Computer Use, Anthropic CU
-- **MCP transport**: ScreenHand (as server), Accomplish (as client)
+- **MCP transport**: ScreenHand (as server), Accomplish (as client), our project (as **client** only, via `@earendil-works/pi-mcp`)
 
-**Our position**: Single ChatOpenAI-compatible endpoint is the narrowest point. LiteLLM or LangChain's multi-model support would provide the same flexibility as 6/9 competitors.
+**Our position**: A single custom Chat-Completions endpoint is still the narrowest point, but the abstraction to extend is Pi's provider (`pi/provider.ts` builds one via `createProvider` + `openAICompletionsApi`), not LangChain's — we no longer have LangChain, so "incremental" no longer applies; a second provider is new code on the Pi side.
 
 #### Desktop API / Input Simulation
 
@@ -655,7 +662,7 @@ LangGraph Research Agent
 | **PyAutoGUI** | Open Interpreter, Agent-S | Cross-platform (Python) |
 | **AppleScript + CGEvent** | ScreenHand (macOS) | macOS only |
 | **xdotool/ydotool** | ScreenHand (Linux), OS AI CU (Linux) | Linux X11/Wayland |
-| **PowerShell UI Automation** | Our project | Windows only |
+| **Native UIA COM (`node-winautomation`)** | Our project — accessibility goes through `src/main/services/desktop/uia-native.ts`, which `require`s `node-winautomation`, behind the `accessibility-tree.ts` facade (it logs "native, no PowerShell" on init). The **PowerShell UI Automation** path this study recorded was `uia-wrapper.ts`: dead code, deleted at the Pi cutover | Windows only |
 | **node-pty** | Accomplish | Cross-platform pseudo-terminal |
 | **VNC protocol** | vnc-use | Platform-agnostic (requires VNC server) |
 
@@ -666,10 +673,10 @@ LangGraph Research Agent
 | Approach | Projects | Tools |
 |---|---|---|
 | **Chrome DevTools Protocol (CDP)** | ScreenHand (15 tools), Anthropic CU (built-in) | Full DOM access, form filling, JS execution |
-| **Selenium / Playwright** | Open Interpreter (both) | Browser automation frameworks |
+| **Selenium / Playwright** | Open Interpreter (both), our project (**Playwright only**, and only through the Playwright MCP server — Chromium driven by the `browser_`-prefixed tools over the shared MCP connection, not by a Playwright dependency in our own code) | Browser automation frameworks |
 | **Chrome extension** | Accomplish | Controlled tab access, page content extraction |
 | **In-app browser (Atlas-based)** | OpenAI Codex | Built-in browser with direct commenting |
-| **None (coordinate-only)** | Our project, Agent-S, OS AI CU, vnc-use | Relies on screenshot + clicks |
+| **None (coordinate-only)** | Agent-S, OS AI CU, vnc-use | Relies on screenshot + clicks |
 
 **CDP is the dominant pattern**: ScreenHand's 15 CDP tools + Anthropic's built-in browser support show that coordinate-based browser interaction is a dead end for production agents.
 
@@ -694,13 +701,13 @@ Based on what the 8 most relevant projects use, here are the lowest-risk technol
 |---|---|---|---|
 | **CDP browser automation** | `puppeteer-core` or `chrome-remote-interface` (npm) | ScreenHand (CDP), Open Interpreter (Playwright) | Both in npm ecosystem; match our TypeScript stack |
 | **In-app browser** | Embedded Electron webview + commenting system | OpenAI Codex (Atlas) | Codex demonstrates in-app browser with direct agent commenting — alternative to CDP |
-| **Multi-provider LLM** | LangChain's existing `ChatAnthropic`, `ChatGoogleGenerativeAI`, `ChatOllama` + LiteLLM proxy fallback | Accomplish (multi), Open Interpreter (LiteLLM) | Already have LangChain; adding providers is incremental |
+| **Multi-provider LLM** | ~~LangChain's existing `ChatAnthropic`, `ChatGoogleGenerativeAI`, `ChatOllama`~~ — LangChain is deleted, so the equivalent is Pi's provider/API layer (`createProvider` plus a per-API module from `@earendil-works/pi-ai`) + a LiteLLM-style proxy fallback | Accomplish (multi), Open Interpreter (LiteLLM) | There is a provider seam to extend (`pi/provider.ts` already defines a non-builtin provider), but each additional model family is new Pi wiring, not an incremental LangChain import |
 | **Terminal execution** | `node-pty` (npm) | Accomplish | Cross-platform pseudo-terminal; same Electron stack |
 | **macOS support** | Swift native bridge + AppleScript | ScreenHand (Swift), OS AI CU (CGEvent), Codex (macOS AX API) | Required for accessibility API access on macOS |
 | **Linux support** | xdotool/scrot (X11) + ydotool/grim (Wayland) | ScreenHand, OS AI CU | Standard tools; simple FFI or child process wrappers |
 | **Memory/persistence** | sql.js (already in our stack) | Codex (persistent memory), Agent-S (dual memory) | No new dependency; use existing SQLite infrastructure |
-| **MCP server mode** | `@modelcontextprotocol/sdk` (npm) | ScreenHand, Codex (MCP helpers) | Official SDK; minimal integration surface |
-| **Hierarchical planning** | Additional LangGraph subgraphs (no new framework) | Agent-S (custom) | Extend existing LangGraph graph topology |
+| **MCP server mode** | `@modelcontextprotocol/sdk` (npm) — note it is a **devDependency** today, present for `scripts/harness/mcp-server.mjs`, and `src/` imports MCP only as a client through `@earendil-works/pi-mcp`; shipping a server means promoting it to a real dependency | ScreenHand, Codex (MCP helpers) | Official SDK; minimal integration surface |
+| **Hierarchical planning** | ~~Additional LangGraph subgraphs (no new framework)~~ — there is no graph to extend: LangGraph is deleted and the runtime is one `Agent` per turn, so this is new architecture (a planner turn that emits subtasks, or a second agent the first one calls), not a topology edit | Agent-S (custom) | The "no new framework" rationale no longer holds; a delegated child agent also needs a mutex, because `Agent.prompt()` throws if that instance is already processing |
 | **Safety sandbox** | Configurable allowlists/blocklists + approval gates | Codex (seatbelt + approval + refusal) | Three-layer safety model directly applicable |
 | **Plugin ecosystem** | Plugin registry with MCP-based tool definitions | Codex (90+ plugins) | Extensible architecture for third-party tool integrations |
 
@@ -720,7 +727,9 @@ These approaches are notably **absent** across all surveyed projects:
 
 ## 8. Architecture Diagrams
 
-### 8.1 Our Project — Current Architecture
+### 8.1 Our Project — Architecture Diagrams Are PRE-CUTOVER, NOT Current
+
+**Caption**: every "Our Project" diagram in this section was drawn against the LangGraph/LangChain stack and is **historical**. None of it is current architecture. Deleted since: the LangGraph research agent and every node in it (`classify`, `fastPath`, `internalKnowledge`, `quickVerify`, `externalSearchFanOut`, `synthesizeWithSelfCheck`, `replanNode`, `generalChat`, `comparison/form/chart`), the 7-node desktop subgraph, `DesktopAgent.runReactLoop` and its `ChatOpenAI.bindTools` step, the `DANGER_POLICY` check box, and the `desktopConfirmation` node — **the approval gate was removed by a deliberate product decision**, together with `interrupt()`, `chat:resumeGraph`, `desktop:confirmation-request` and `src/shared/ipc/hitl-decision.ts`, so no turn pauses or resumes. The `WindowsDesktopAdapter`, `InputSimulation`, `AccessibilityTreeAdapter` (now native COM, not PowerShell), the koffi/libwin32 FFI layer, Electron `desktopCapturer`, `WindowManager`, the IPC handlers and the renderer half are still recognisable. Current shape: `chat:sendStreamMessage` → `runAskTurn()` → **one** Pi `Agent` over the six families (`desktop` 32, `web` 2, `ui` 5, `document` 5, `browser` = the `browser_`-prefix filter over the shared MCP connection, `mcp` = the rest) → streamed tokens, thinking steps and an agent label pushed on three `chat:*` channels → one trajectory row written per turn. `GroundTruthVerifier` still exists but is not in that path. The live Mermaid sources are `docs/diagrams/ask-routing.mmd` and `docs/diagrams/desktop-hitl.mmd` (the second name is historical; it now draws the single loop plus an explicitly unwired `PiDesktopAgent` box).
 
 #### 8.1.1 Full System Architecture
 
@@ -739,7 +748,7 @@ These approaches are notably **absent** across all surveyed projects:
 │  │                          ├─► desktopAgentNode ─────────────┐   │      │   │
 │  │                          ├─► comparison/form/chart ──► END │   │      │   │
 │  │                          └─► replanNode ──┘                ▼   ▼      │   │
-│  │                                                    desktopConfirmation│   │
+│  │                                          desktopConfirmation [REMOVED] │   │
 │  └──────────────────────────────────┬──────────────────────────────────┬──┘   │
 │                                     │                                  │       │
 │  ┌──────────────────────────────┐   │   ┌──────────────────────────┐   │       │
@@ -747,23 +756,23 @@ These approaches are notably **absent** across all surveyed projects:
 │  │    (Playwright)              │   │   │     (ReAct Loop)          │   │       │
 │  │                              │   │   │                          │   │       │
 │  │  ┌─────────┐ ┌──────────┐  │   │   │  ┌─────────────────────┐  │   │       │
-│  │  │Browser  │ │Browser   │  │   │   │  │  ChatOpenAI         │  │   │       │
+│  │  │Browser  │ │Browser   │  │   │   │  │ Pi model + streamFn │  │   │       │
 │  │  │Tools    │ │Session   │  │   │   │  │  (qwen3.6-plus)     │  │   │       │
 │  │  │(navigate│ │Manager   │  │   │   │  └──────────┬──────────┘  │   │       │
 │  │  │,click,  │ │          │  │   │   │             │ bindTools   │   │       │
 │  │  │fill)    │ └──────────┘  │   │   │  ┌──────────▼──────────┐  │   │       │
-│  │  └─────────┘               │   │   │  │  32 LangChain Tools │  │   │       │
-│  └──────────────────────────────┘   │   │  │  (toolMap)          │  │   │       │
+│  │  └─────────┘               │   │   │  │ 32 Pi TypeBox Tools │  │   │       │
+│  └──────────────────────────────┘   │   │  │   (toolMap is not)  │  │   │       │
 │                                     │   │  └──────────┬──────────┘  │   │       │
 │  ┌──────────────────────────────┐   │   │             │             │   │       │
 │  │      MCP Service             │   │   │  ┌──────────▼──────────┐  │   │       │
-│  │  MCPAdapter (2.x)            │   │   │  │ Danger Policy Check │  │   │       │
-│  │  (external MCP servers)      │   │   │  │ → auto verify only  │  │   │       │
+│  │  MCPService(pi-mcp)          │   │   │  │ danger policy: NONE │  │   │       │
+│  │  (external MCP servers)      │   │   │  │ nothing consults it │  │   │       │
 │  └──────────────────────────────┘   │   │  └──────────┬──────────┘  │   │       │
 │                                     │   │             │             │   │       │
 │                                     │   │  ┌──────────▼──────────┐  │   │       │
 │                                     │   │  │ GroundTruthVerifier │  │   │       │
-│                                     │   │  │ (pixel diff)        │  │   │       │
+│                                     │   │  │ (diff; UNWIRED)     │  │   │       │
 │                                     │   │  └─────────────────────┘  │   │       │
 │                                     │   └──────────────┬────────────┘   │       │
 │                                     │                  │                │       │
@@ -810,7 +819,7 @@ These approaches are notably **absent** across all surveyed projects:
 │  │                         CommandPalette                                │   │
 │  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐                   │   │
 │  │  │ File Mode   │ │ AI Mode      │ │ Settings     │                   │   │
-│  │  │ (Everything │ │ (LangGraph   │ │ Panel        │                   │   │
+│  │  │ (Everything │ │ (Pi Agent    │ │ Panel        │                   │   │
 │  │  │  search)    │ │  streaming)  │ │              │                   │   │
 │  │  └─────────────┘ └──────────────┘ └──────────────┘                   │   │
 │  │                                                                       │   │
@@ -825,6 +834,8 @@ These approaches are notably **absent** across all surveyed projects:
 ```
 
 #### 8.1.2 Desktop Agent ReAct Loop (Detailed)
+
+*Historical: `DesktopAgent.runReactLoop` is deleted, along with its `maxSteps = 25`, its `Danger Policy Check` step and its `ChatOpenAI.bindTools` call. The shipped loop is `runAskTurn()` → one Pi `Agent` with `toolExecution: "sequential"`, no step cap, no danger gate and no verifier step. `screenshot` returns a real image content block rather than the `_type: 'screenshot_result'` marker this loop string-matched, and step copy for the renderer comes from each tool's own `label` via `FamilyIndex.displayLabelFor()`, not from a node-name map.*
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -888,6 +899,8 @@ These approaches are notably **absent** across all surveyed projects:
 ```
 
 #### 8.1.3 LangGraph Graph Topology
+
+*Historical and fully deleted: there is no `classifyNode`, no router and no graph — Ask mode is one `Agent` per turn, and the only thing that resembles routing is `src/main/services/pi/families.ts`, a tool-name → family → label index used for the renderer badge (`chat:agent-change`) and nothing else. `mcp/tool-router.ts` still holds `INTENT_TOOL_MAP`/`KEYWORD_TOOL_MAP` keyed on the intents this classifier used to emit, but its only importer is its own test, so it connects nothing. The `desktop confirmation` branch on the right is the removed approval gate, not a pending one.*
 
 ```
                           ┌───────────┐
@@ -1219,10 +1232,10 @@ These approaches are notably **absent** across all surveyed projects:
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  How Each Project Structures Its Agent Loop                                  │
 │                                                                              │
-│  Our Project (Flat ReAct):                                                   │
+│  Our Project (flat loop — pre-cutover labels corrected; see 8.1 caption):    │
 │  ┌─────────┐     ┌──────┐     ┌────────┐     ┌──────────┐                   │
-│  │LangGraph├────►│Single├────►│28 Tools├────►│Verifier  │                   │
-│  │classify │     │LLM   │     │(toolMap)│     │(soft)    │                   │
+│  │ Pi Agent├────►│Single├────►│32 Tools├────►│Verifier  │                   │
+│  │ask-turn │     │LLM   │     │(TypeBox)│     │(unwired) │                   │
 │  └─────────┘     └──────┘     └────────┘     └──────────┘                   │
 │                                                                              │
 │  ScreenHand (7-Layer MCP):                                                   │
@@ -1320,8 +1333,8 @@ These approaches are notably **absent** across all surveyed projects:
 │  │         │             │        │    → WorldModel ingest               │  │
 │  │  ┌──────▼──────┐      │        │                                      │  │
 │  │  │UIA Tree     │      │        │  EntityTracker:                      │  │
-│  │  │(PowerShell  │      │        │    cross-frame identity via           │  │
-│  │  │ COM)        │      │        │    label + window + 50px proximity    │  │
+│  │  │(native COM, │      │        │    cross-frame identity via           │  │
+│  │  │not PS)      │      │        │    label + window + 50px proximity    │  │
 │  │  └─────────────┘      │        └──────────────────────────────────────┘  │
 │  │                       │                                                  │
 │  │  No WorldModel        │        OpenAI Codex:                            │

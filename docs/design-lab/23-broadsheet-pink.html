@@ -11,6 +11,9 @@
   DERIVED, not published by the FT. No script, no webfont, no external reference.
 -->
 <style>
+/* taste: kept by design — FT broadsheet serif (Playfair/Oswald) + column hairline
+   rules, 3px pink masthead band, drop cap, "continued" footnote (identity);
+   caption contrast raised: light #333333→#4a443e, dark #cbb7a3→#d9cdbf */
 /* ── LIGHT · the day paper: `paper` field, white plate, ink rules ───────────── */
 [data-theme="light"] {
   --background: #fff1e5;              /* paper — the published reading field, NOT ft-pink */
@@ -68,17 +71,35 @@
 }
 /* ── GEOMETRY (identical in both themes; literals only — no theme token may be read here) ── */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 800px; --header-h: 72px; --row-h: 44px; --target: 32px;
   --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;                    /* radius 0, every corner */
-  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
+  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 20px; --measure: 40rem;
   --ff-head: Oswald, Anton, "Haettenschweiler", "Arial Narrow", Impact, sans-serif;
   --ff-body: "Playfair Display", "Bodoni Moda", "Libre Bodoni", "Bodoni MT", Didot, Georgia, serif;
   --mono: "IBM Plex Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
   --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t17: 17px; --t22: 22px; --t26: 26px; --t44: 44px;
-  --lh: 20px;                        /* the vertical rhythm is the line-height, not a spacing token */
+  --lh: 22px;                        /* the vertical rhythm is the line-height, not a spacing token */
   --ls-label: .10em; --ls-kicker: .16em;
   --bw: 1px; --bw-2: 2px; --bw-3: 3px;
   --page: #14100d; --page-ink: #efe2d2; --page-muted: #b3a08c; --page-rule: #3a2f26;
+}
+:root {
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 32px 32px 96px; background: var(--page); color: var(--page-ink); font-family: var(--ff-body); line-height: var(--lh); }
@@ -97,6 +118,7 @@ h1 { font-family: var(--ff-head); font-size: var(--t26); margin: 0 0 8px; letter
 .col > h2 { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--page-muted); margin: 0 0 12px; text-align: center; }
 .surface { margin-bottom: 36px; border-top: var(--bw-3) double var(--page-rule); padding-top: var(--gap-2); }
 .lbl { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-kicker); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+[data-theme="light"] .lbl { color: #8a8078; }
 .desktop, .page { border-radius: 0; padding: 24px; }
 .desktop { background: var(--plate); }
 .page { background: var(--background); color: var(--foreground); }
@@ -148,8 +170,10 @@ mark { background: var(--mark-bg); color: var(--mark-ink); border-radius: 0; pad
 .me { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 0; background: var(--secondary); color: var(--secondary-foreground); font-size: var(--t14); border-inline-start: var(--bw-3) solid var(--rule-strong); }
 .steps { display: grid; gap: 6px; padding: 10px 12px; border: var(--bw) solid var(--hairline); border-inline-start: var(--bw-3) solid var(--rule-strong); background: var(--card); }
 .st { display: flex; align-items: center; gap: var(--gap); font-family: var(--ff-head); font-size: var(--t12); letter-spacing: .04em; text-transform: uppercase; color: var(--muted-foreground); }
-.st i { width: 14px; height: 14px; border-radius: 0; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--jade); color: var(--fill-ink); }
-.st.run i { background: var(--mandarin); color: var(--fill-ink); }
+.st i { width: 14px; height: 14px; border-radius: 0; display: grid; place-items: center; font-style: normal; font-size: 10px; background: var(--jade); }
+.st i::before { content: ""; width: 5px; height: 5px; border-radius: 0; background: var(--fill-ink); }
+.st.run i { background: var(--mandarin); }
+.st.run i::before { background: var(--fill-ink); }
 .st em { margin-left: auto; font-style: normal; padding: 1px 6px; border-radius: 0; background: var(--secondary); color: var(--secondary-foreground); font-family: var(--mono); }
 .ans { max-width: var(--measure); font-size: var(--t14); line-height: var(--lh); color: var(--foreground); }
 .ans code { font-family: var(--mono); font-size: .9em; background: var(--secondary); padding: 1px 5px; border-inline: var(--bw) solid var(--hairline); }
@@ -185,7 +209,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
 .kv { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 0 var(--gap); font-size: var(--t13); margin: 0; line-height: var(--lh); }
 .kv dt { font-family: var(--ff-head); font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); border-inline-end: var(--bw) solid var(--hairline); }
 .kv dd { margin: 0; font-family: var(--mono); font-size: var(--t12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prog { height: 10px; border: var(--bw) solid var(--rule-strong); background: var(--card); }
+.prog { position: relative; overflow: hidden; height: 10px; border: var(--bw) solid var(--rule-strong); background: var(--card); }
 .prog i { display: block; height: 100%; width: 66%; background: var(--jade); }
 .tr { width: 100%; margin-top: 12px; font-size: var(--t13); border-collapse: collapse; }
 .tr td { padding: 6px 8px; border-bottom: var(--bw) solid var(--hairline); border-inline-end: var(--bw) solid var(--hairline); }
@@ -229,7 +253,15 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
 .alert { display: grid; gap: var(--gap-2); padding: 16px var(--pad); border: var(--bw) solid var(--rule-strong); border-inline-start: var(--bw-3) solid var(--destructive); background: var(--destructive-soft); }
 .alert h4 { margin: 0; font-family: var(--ff-head); font-size: var(--t17); letter-spacing: .02em; text-transform: uppercase; color: var(--destructive); }
 .alert ul { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: var(--t12); line-height: var(--lh); }
-@media (prefers-reduced-motion: reduce) { .spin, .caret { animation: none; } }
+/* expressive overlay — MEANINGFUL: one disciplined transition + display type, no spring overshoot */
+.row, .btn { transition: background-color var(--ex-dur-1) var(--ex-ease-out), border-color var(--ex-dur-2) var(--ex-ease-out); }
+h1, .hero-title { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* expressive keyframes — MEANINGFUL: one-shot decel enter on the masthead + one progress sweep; no pulse */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-decel) both; }
+.prog::after { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, transparent, var(--foreground), transparent); opacity: .08; animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+@media (prefers-reduced-motion: reduce) { .spin, .caret { animation: none; } * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } .btn, .tile, .card, .hero, .row { transform: none !important; } .hero, .prog::after { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -275,7 +307,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <p class="hero-note">stock <b>#fcd0b1</b> ft-pink (band, footer) · field <b>#fff1e5</b> paper · ink <b>#333333</b> ft-grey · rules <b>#000000</b> over <b>#c9a883</b> · claret <b>#990f3d</b> carries selection at 7.62:1 · crimson ink 5.32:1 · lemon highlighter under black 15.28:1</p>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -288,7 +320,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="dateline">EVERYTHING · 6 HITS · 12 MS</p>
@@ -305,14 +337,14 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -333,7 +365,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -352,7 +384,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -383,7 +415,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <p class="hero-note">stock <b>#fcd0b1</b> ft-pink (band, footer) · field <b>#17120f</b> night paper (DERIVED) · ink <b>#f7ead9</b> 15.69:1 · rules <b>#f2dfce</b> over <b>#5b4c40</b> · lifted claret <b>#d95a78</b> carries selection at 5.03:1</p>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -396,7 +428,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="dateline">EVERYTHING · 6 HITS · 12 MS</p>
@@ -413,14 +445,14 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -441,7 +473,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -460,7 +492,7 @@ summary { padding: 8px 12px; font-family: var(--ff-head); font-size: var(--t12);
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

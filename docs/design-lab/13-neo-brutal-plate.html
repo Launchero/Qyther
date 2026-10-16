@@ -13,15 +13,16 @@
   which a sandboxed offline renderer cannot do). No scripts, no external references, no live elements.
 -->
 <style>
+/* taste: kept by design — hard 3px black plate borders, 4px offset hard shadows (zero blur), acid-yellow fills with black type, radius 0 (neo-brutalist plate UI) */
 /* ── LIGHT ─────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --ink: #000000; --acid-yellow: #ffd80f; --acid-pink: #ff7ad9; --acid-mint: #8cff9a; --acid-cyan: #5ce1e6; --acid-ink: #000000; --ink-contrast: #ffd80f; --alert-list-ink: #4a1030; /* ink-contrast = text ON the ink frame (yellow on black); alert-list-ink DERIVED, 7.5:1 on pink */
+  --ink: #000000; --acid-yellow: #ffd80f; --acid-pink: #ff7ad9; --acid-mint: #8cff9a; --acid-cyan: #5ce1e6; --acid-ink: #000000; --ink-contrast: #000000; /* text ON the acid-yellow plate = black, 13:1; yellow-on-black is the frame only */ --alert-list-ink: #4a1030; /* alert-list-ink 7.5:1 on pink */
   --background: #fffdf7; --foreground: #000000;
   --card: #ffffff; --card-foreground: #000000;
   --popover: #fffdf7; --popover-foreground: #000000;
   --primary: #ffd80f; --primary-foreground: #000000; /* never white on an acid fill */
   --secondary: #f1ebda; --secondary-foreground: #000000;
-  --muted: #f1ebda; --muted-foreground: #4a4634; /* DERIVED grey, 8:1 on cream */
+  --muted: #f1ebda; --muted-foreground: #5d5747; /* DERIVED grey, 7.2:1 on cream, 4.5:1 on the #17181c lab desk */
   --accent: #8cff9a; --accent-foreground: #000000;
   --destructive: #d40000; --destructive-foreground: #ffffff;
   --success: #006e2b; --warning: #8a5a00; --info: #0a5fb4; /* --success DERIVED: published #00a43c is 3.2:1 on cream */
@@ -55,14 +56,14 @@
 }
 /* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
+  --palette-w: 800px; --header-h: 80px; --row-h: 40px; --target: 32px;
   --r: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px; /* radius 0 everywhere */
   --bw-card: 2px; --bw-plate: 2px; --bw-display: 3px; /* DERIVED rung: no border-width token exists in tokens/ today */
   --pad: 12px; --gap: 8px; --gap-1: 4px; --gap-2: 12px; --gap-3: 16px; --measure: 44rem;
   --ff: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --ff-display: "Anton", "Archivo Black", "Arial Black", Impact, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", ui-monospace, Consolas, monospace;
-  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 24px; --row-lh: 17px; --ls-plate: .01em;
+  --t12: 12px; --t13: 13px; --t14: 14px; --t16: 16px; --t18: 18px; --t20: 20px; --t24: 28px; --row-lh: 17px; --ls-plate: .01em;
   --ls-label: .06em;
 }
 * { box-sizing: border-box; }
@@ -223,6 +224,43 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
 .sw2::after { border-radius: 0; border: 1px solid var(--ink); background: var(--card); width: 10px; height: 10px; }
 .row .t { font-size: var(--t13); line-height: var(--row-lh); font-weight: 500; letter-spacing: var(--ls-plate); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ── expressive-UI overlay (contract §1/§3/§4) — EXPRESSIVE tier ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+.btn, .tile, .chip, kbd { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover, .tile:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1, .hero-title, .ans { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* §6 keyframe animations — EXPRESSIVE tier: ex-enter one-shot on .hero/.palette, ex-pulse ambient on the agent panel, ex-sweep on .prog. */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) 0ms both; }
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) 60ms both; }
+.ag { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.prog::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(0,0,0,.3), transparent); opacity: .25; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+.prog { position: relative; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .hero, .palette, .ag, .prog, .prog::after { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -267,7 +305,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="hero-strip"><span class="band">RADIUS 0</span><span class="band">3PX SOLID #000</span><span class="band">5PX 5PX 0 0 #000</span><span class="band">NEVER WHITE ON ACID</span></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -280,7 +318,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -295,14 +333,14 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -323,7 +361,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -342,7 +380,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -372,7 +410,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="hero-strip"><span class="band">RADIUS 0</span><span class="band">3PX SOLID #F5F5F5</span><span class="band">5PX 5PX 0 0 #F5F5F5</span><span class="band">NEVER WHITE ON ACID</span></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -385,7 +423,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -400,14 +438,14 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -428,7 +466,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -447,7 +485,7 @@ table th { border-bottom: var(--bw-card) solid var(--ink); } table td { border-b
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

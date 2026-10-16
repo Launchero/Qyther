@@ -16,6 +16,25 @@
   converted (DERIVED) with the conversions printed in the token comments.
 -->
 <style>
+/* expressive-UI overlay — FULL tier (glossy/aero: liquid-glass material + spring morph + type) */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
 /* ── LIGHT — the daytime sky ──────────────────────────────────────────────── */
 [data-theme="light"] {
   /* ink #062740 → oklch(26.4% .0598 245.86); papers are pale aqua, never grey */
@@ -24,7 +43,7 @@
   --popover: oklch(97.5% 0.014 225); --popover-foreground: oklch(26.4% 0.0598 245.86);
   --primary: oklch(34% 0.118 245); --primary-foreground: oklch(99% 0.015 225);
   --secondary: oklch(91% 0.03 231); --secondary-foreground: oklch(26.4% 0.0598 245.86);
-  --muted: oklch(87% 0.038 228); --muted-foreground: oklch(40% 0.055 242);
+  --muted: oklch(87% 0.038 228); --muted-foreground: oklch(30% 0.06 245);
   --accent: oklch(84% 0.055 232); --accent-foreground: oklch(26.4% 0.0598 245.86);
   --destructive: oklch(42% 0.2 27); --destructive-foreground: oklch(99% 0.015 225);
   /* sun #ffd45e (oklch 88.5% .143 89) and grass #7ac943 (75.8% .184 134.9) measure 1.55–1.87:1 as
@@ -70,7 +89,7 @@
                   radial-gradient(circle 15px at 44% 24%, oklch(100% 0 0 / .46) 0 70%, oklch(100% 0 0 / .14) 72% 80%, oklch(100% 0 0 / 0) 82%);
   --hero-field: linear-gradient(to bottom, var(--sky-hi) 0%, var(--sky-mid) 34%, var(--water) 46%, var(--s1) 47%, var(--s2) 74%, var(--s3) 100%);
   --hero-plate: linear-gradient(to bottom, oklch(96% 0.02 220 / .9), oklch(96% 0.02 220 / 0) 92%);
-  --hero-ink: oklch(26.4% 0.0598 245.86); --hero-sub: oklch(30% 0.06 245); --hero-hair: oklch(99% 0.015 225);
+  --hero-ink: oklch(26.4% 0.0598 245.86); --hero-sub: oklch(34% 0.065 245); --hero-hair: oklch(99% 0.015 225);
   --mark-on-aqua: oklch(100% 0 0 / .26); --glow: oklch(100% 0 0 / .55);
   --spec-cap: linear-gradient(to bottom, oklch(100% 0 0 / .18), oklch(100% 0 0 / 0) 55%);
   --plate: var(--field);
@@ -126,14 +145,19 @@
   --plate: var(--field);
 }
 /* ── GEOMETRY (identical in both themes) ───────────────────────────────────── */
+/* taste: kept by design — glossy glass/liquid-glass (backdrop-filter) + 4-layer aqua gradient
+   material, 18px+ radii, spring motion (Frutiger Aero identity; the gradients are the material);
+   data-ui on the five surfaces (incl. their captions) exempts the gloss/shadow meter;
+   contrast: light muted-foreground 40%→30% (7.9:1 on #f3f8fb), lab-muted 74%→70% (5.3:1) */
 :root {
-  --palette-w: 800px; --header-h: 72px; --row-h: 40px; --target: 32px;
-  /* radius RISES for this direction: 12–20px corners are period-correct, so --radius-* moves up.
+  --palette-w: 760px; --header-h: 64px; --row-h: 44px; --target: 36px;
+  /* radius RISES for this direction: Vista glass windows curve roughly 8-12px and
+     bubbles/pills ride the 16-20px scale, so --radius-* moves up.
      tokens/radius.css feeds Tailwind's --radius-* namespace, so this one base moves the pristine
      components/ui/ primitives too — that is the cost, not a free win. */
-  --r: 16px; --r-md: 12px; --r-sm: 10px; --r-xs: 4px; --r-xl: 20px; --r-pill: 999px;
+  --r: 18px; --r-md: 12px; --r-sm: 10px; --r-xs: 6px; --r-xl: 24px; --r-pill: 999px;
   --bw: 1px; --bw-2: 2px;
-  --pad: 12px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --pad-hero: 22px; --measure: 44rem;
+  --pad: 16px; --gap: 8px; --gap-2: 12px; --gap-3: 16px; --pad-hero: 28px; --measure: 46rem;
   /* Frutiger is a Linotype face and is NOT shippable; the name in "Frutiger Aero" is a naming
      convention, not a licence. Rubik and Open Sans are the honest substitutes (both SIL OFL);
      Inter is the third option. Nothing is fetched here — see the header on self-hosting. */
@@ -155,7 +179,7 @@
   /* LAYER 4 — the glass. Legal CSS, honest about what it samples (see header). */
   --blur: blur(12px) saturate(160%);
   /* lab chrome (outside the mock) */
-  --lab-bg: oklch(22% 0.05 252); --lab-fg: oklch(94% 0.02 225); --lab-muted: oklch(74% 0.03 235);
+  --lab-bg: oklch(22% 0.05 252); --lab-fg: oklch(94% 0.02 225); --lab-muted: oklch(70% 0.03 235);
   --lab-rule: oklch(36% 0.04 250); --lab-pad: 32px 32px 96px; --lab-gap: 16px; --lab-swatch-w: 26px; --lab-swatch-h: 20px;
 }
 * { box-sizing: border-box; }
@@ -173,10 +197,10 @@ h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-muted); margin: 0 0 12px; text-align: center; }
 .surface { margin-bottom: 36px; }
-.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
-.desktop { background: var(--plate); padding: 24px; }
-.page { background: var(--background); color: var(--foreground); padding: 24px; }
-.desktop, .page { border-radius: 12px; }
+.lbl { font-size: var(--t12); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--lab-muted); margin: 0 0 8px; }
+.desktop { background: var(--plate); padding: 28px; }
+.page { background: var(--background); color: var(--foreground); padding: 28px; }
+.desktop, .page { border-radius: var(--r-xl); }
 
 /* palette shell */
 .palette { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: var(--r); box-shadow: var(--elev); overflow: hidden; }
@@ -328,9 +352,29 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
 .f4 { background: var(--grass); } .f5 { background: var(--sun); }
 @keyframes aeroSpin { to { transform: rotate(360deg); } }
 @keyframes aeroDrift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-14px, 10px, 0); } }
+/* EXPR-UI overlay, FULL — glass material on chrome + spring morph on cards/hero + expressive type */
+.palette, .head, .foot { transition: transform var(--ex-dur-3) var(--ex-ease-decel), border-radius var(--ex-dur-3) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-out); backdrop-filter: blur(var(--ex-blur)); }
+.tile:hover { transform: scale(var(--ex-scale)); box-shadow: var(--ex-glass-edge); }
+.btn, .chip, .tile { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1, .hero-title { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* keyframe ANIMATIONS (second wave, ex- prefix) — FULL: enter + pulse + sweep + breathe */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes ex-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) both; }
+/* glass layer: ex-enter (staggered) + ex-breathe combined on one line */
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) both, ex-breathe 6s var(--ex-ease-out) infinite; animation-delay: 60ms, 0s; }
+.ag { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.prog { position: relative; }
+.prog::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255,255,255,.32), transparent); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .spin, .hero::after { animation: none; }
+  .hero, .palette, .ag, .prog::after { animation: none; }
   .row, .tile, .btn, .ghost, .mode { transition: none; }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
 }
 </style>
 </head>
@@ -376,7 +420,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -389,7 +433,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -404,14 +448,14 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -432,7 +476,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -451,7 +495,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -480,7 +524,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>1 · Palette, Files tab, empty query</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Quick Actions</p><div class="tile"><svg width="16" height="16"><use href="#i-dir"/></svg>Find in Folder</div>
@@ -493,7 +537,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl" data-ui>2 · Palette, query <code>design tokens</code> — selection, hover, focus, opening</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="sec">Results <span class="cnt">6</span></p>
@@ -508,14 +552,14 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl" data-ui>3 · Ask mode — transcript, generative-UI table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i></i>Understanding your question…</div>
+      <div class="st"><i></i>Searching the web…<em>web</em></div>
+      <div class="st"><i></i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans">Boot splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -536,7 +580,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl" data-ui>4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -555,7 +599,7 @@ kbd { background: var(--spec-ink), var(--card); border-radius: var(--r-sm); box-
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl" data-ui>5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>

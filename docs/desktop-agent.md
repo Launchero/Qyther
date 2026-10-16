@@ -1,43 +1,38 @@
 # Desktop Agent Architecture
 
-> Auto-maintained by Cursor agent. See `.cursor/rules/doc-sync-on-changes.mdc` for sync rules.
-> Last updated: 2026-05-12
+> **Status**: live for "Current Architecture" below, re-derived from this checkout on 2026-10-16; the "Changelog" entry is history and names deleted files. Deeper reference: `docs/architecture.md` and `src/main/services/desktop/AGENTS.md` / `src/main/services/pi/AGENTS.md`. See `docs/AGENTS.md` rule 1.
 
 ## Current Architecture
 
-The desktop agent is a ReAct loop that performs GUI automation on Windows. It uses a planner subgraph to decompose tasks into subtasks, executes each subtask via tool-calling LLM, verifies results via screenshot/OCR/diff-based checks, and stores trajectories for future retrieval.
+There is no desktop agent subsystem any more. A desktop task is an ordinary Ask turn: one Pi `Agent` (`runAskTurn()` in `src/main/services/pi/ask-turn.ts`) holds the 32 desktop tools alongside the web, ui, document, browser and mcp families and routes by choosing a tool. There is no planner that decomposes a task into subtasks, no separate verifier pass, no recovery ladder and no cross-agent delegation — the model plans, and every tool result is already visible to it.
 
 ### Key Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| Desktop Agent | `desktop-agent.ts` | ReAct loop with 26 tools, tool execution, danger policy |
-| Desktop Subgraph | `desktop-subgraph.ts` | LangGraph StateGraph: memoryRetrieve -> planner -> executeSubtask -> delegateToBrowser -> verifier -> recovery -> memoryStore |
-| Desktop Planner | `desktop-planner.ts` | Decomposes tasks into ordered subtasks; skips LLM for simple window actions; detects browser-requiring subtasks |
-| Desktop Verifier | `desktop-verifier.ts` | Verifies subtask completion via window state, pixel diff, OCR; validates browser delegation results |
-| Windows Adapter | `windows-adapter.ts` | Windows-specific UI automation and screenshot capture |
-| Input Simulation | `input-simulation.ts` | Win32 API input simulation (SendInput, ShowWindow) |
-| Desktop Tools | `desktop-tools.ts` | Tool definitions for LangChain (click, type, screenshot, window management, etc.) |
+| Desktop tools | `src/main/services/pi/toolbox.ts` | The 32 Windows tools as TypeBox `AgentTool`s (click, type, screenshot, window management, UIA element inspection, clipboard, launch, `execute_command`). Frozen by name in `src/main/services/pi/toolbox.test.ts`; tools never throw — a failure comes back as readable text with `isError` set, and each result carries its own `details.status` |
+| Family assembly | `src/main/services/pi/ask-tools.ts`, `src/main/services/pi/families.ts` | `buildAskToolboxes()` binds each family's toolbox; `buildFamilyIndex()` maps tool name → family → agent label → display label and throws on a duplicate name |
+| Unused agent wrapper | `src/main/services/pi/agent.ts` | Holds `getDesktopToolbox()` (the live seam: the memoised runtime plus the tool list) **and** `PiDesktopAgent` with `runPiDesktopTask()` / `getPiDesktopAgent()` / `abortPiDesktopRun()` — which have **zero production callers**. Only `closePiDesktopAgent()` is reached, from `main.ts`'s `pi-desktop-agent` shutdown step. Consequence: the initial-screenshot decision, the `details.verifies` opt-in and the `agent.steer()` verifier feedback loop are not on the shipped path |
+| Adapter seam | `src/main/services/desktop/types.ts` | `DesktopAdapter` — the interface between the tools and Win32. `DangerLevel` in the same file is vestigial: re-exported by the barrel, consumed by nothing, because the policy table and the approval gate died with `desktop-agent.ts` |
+| Windows adapter | `src/main/services/desktop/windows-adapter.ts` | The only `DesktopAdapter` implementation: clamps coordinates to the primary work area and owns the tesseract OCR worker |
+| Input simulation | `src/main/services/desktop/input-simulation.ts` | Every Win32 call — koffi FFI plus libwin32: `SendInput`, cursor, window enumeration and geometry, foreground/activation, DPI and elevation reads |
+| Accessibility | `src/main/services/desktop/uia-native.ts`, `accessibility-tree.ts` | UI Automation through native `node-winautomation` COM, behind the `AccessibilityTreeAdapter` facade. This is **not** PowerShell UIA — the PowerShell wrapper (`uia-wrapper.ts`) was dead and is deleted, and the facade logs "native, no PowerShell" |
+| Screenshot capture | `src/main/services/desktop/screenshot-capture.ts` | Electron `desktopCapturer` first, one bounded PowerShell System.Drawing fallback |
+| Change detector | `src/main/services/desktop/verifier.ts` | `GroundTruthVerifier`: a pixel diff against `PIXEL_DIFF_THRESHOLD` (0.01), an `action_effect` signal for `click`/`double_click` under `ACTION_EFFECT_MIN_DIFF` (0.02), plus a window-title signal. It is a change detector, not a postcondition grader, and there is no weighted score. Constructed by `getDesktopRuntime()` but consulted only by the un-called `PiDesktopAgent` |
 
-### Cross-Agent Browser Delegation
+There is no `desktop-agent.ts`, `desktop-subgraph.ts`, `desktop-planner.ts`, `desktop-verifier.ts`, `desktop-recovery.ts`, `desktop-memory.ts`, `desktop-tools.ts`, `ui-detector.ts` or `uia-wrapper.ts` in this checkout — all were deleted at the Pi cutover. The old 912-line NL-postcondition verifier and the retry/alternative/replan/skip/abort ladder have no Pi equivalent.
 
-The desktop subgraph can delegate browser-centric subtasks to the browser agent mid-execution. When the planner detects a subtask requiring web interaction (URLs, web forms, web data extraction), it flags it with `requiresBrowser: true`. The `delegateToBrowser` node then:
+### Verification and human approval
 
-1. Extracts the subtask description and postcondition
-2. Builds a browser task payload with accumulated desktop context
-3. Calls `executeBrowserSubgraph()` to run the browser agent
-4. Receives structured results back (actions, artifacts, execution trace)
-5. Routes to the next subtask (desktop or browser) via conditional edges
+Neither exists on the shipped path. There is no approval gate, no `interrupt()`, no `desktop:confirmation-request` and no `chat:resumeGraph`; `src/shared/ipc/hitl-decision.ts` is deleted with them. Every tool runs without asking, and `execute_command` in particular runs an arbitrary string through a PowerShell `exec` (`shell: 'powershell.exe'`) with a 30 s **default** timeout the model may override — the `DANGEROUS_COMMAND_PATTERNS` blocklist in `src/main/ipc/command-guard.ts` guards the `command:execute` IPC channel and does **not** apply to that tool. The only automatic check left is the pixel change detector above, and the tool that opts into it (`close_window`, the only one setting `details.verifies`) has no consumer in the shipped loop.
 
-```
-memoryRetrieve -> planner -> executeSubtask
-  ├── (next subtask.requiresBrowser = true) -> delegateToBrowser -> [more browser?] -> delegateToBrowser / [more desktop?] -> executeSubtask / [done] -> memoryStore
-  └── (next subtask requires desktop) -> verifier -> [pass + more?] -> executeSubtask / [pass + done] -> memoryStore / [fail] -> recovery
-```
+### Trajectories
 
-The browser subgraph handles its own verification. The desktop subgraph stores full cross-agent trajectories in memory, including delegated browser actions and artifacts, enabling experience-based retrieval for future hybrid tasks.
+`pi/turn-record.ts` builds one `TrajectoryRecord` per completed Ask turn and the chat pump writes it through `saveTrajectory()` into the sql.js file at `userData/desktop-agent.db` (`desktop_trajectories` plus `desktop_trajectory_steps`). That is the whole story: **the rows are written and read by nothing** — no retrieval feeds a future prompt, and `recordFailure()` has zero callers, so `desktop_failures` stays empty by construction. The store is evaluation substrate, not memory. The old `desktop-memory.ts` retrieval node and the cross-agent delegation metadata it used to record are gone with the graph.
 
 ## Changelog
+
+This entry is dated history. Every path it names (`desktop-planner.ts`, `desktop-verifier.ts`, `desktop-agent.ts`) was deleted at the Pi cutover, so none of it describes current code.
 
 ### [2026-05-12] optimize-window-interaction: Eliminate 30s planner timeout and 11s verifier overhead for simple window tasks
 - **What**: Three optimizations for window management tasks (minimize, maximize, restore, close, focus):

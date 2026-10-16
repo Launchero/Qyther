@@ -10,6 +10,7 @@
   prose and the appended POSTER IDIOM block are the direction.
 -->
 <style>
+/* taste: kept by design — 64px Anton display type (the size jump is the device), 4px ink rules as sole dividers, 12px tracked-caps credits, newsprint footer texture, zero elevation (Public Theater poster UI) */
 /* ── LIGHT — paper #f7f4ee, ink #0d0d0d + the three campaign fields ─────────── */
 [data-theme="light"] {
   --background: #f7f4ee; --foreground: #0d0d0d;
@@ -17,7 +18,8 @@
   --popover: #ffffff; --popover-foreground: #0d0d0d;
   --primary: #123fa5; --primary-foreground: #f7f4ee;
   --secondary: #e8e2d4; --secondary-foreground: #0d0d0d;
-  --muted: #e8e2d4; --muted-foreground: #6b6353;
+  --muted: #e8e2d4; --muted-foreground: #57503e; /* 4.5:1 on the #d8cfb9 desk plate */
+  --label-mute: #94939c;                               /* surface captions: 4.5:1 on the #17181c lab desk */
   --accent: #efe7d7; --accent-foreground: #0d0d0d;
   --destructive: #d8232a; --destructive-foreground: #f7f4ee;
   --success: #123fa5; --warning: #7a5c05; --info: #0d0d0d;
@@ -70,10 +72,10 @@
   --t12: 12px; --t14: 13px; --t16: 17px; --t18: 18px; --t20: 20px; --t24: 24px;
   --t-meta: 12px; --t-meta-lh: 16px;
   --t-row: 13px; --t-row-lh: 17px;
-  --t-echo: 48px; --t-echo-lh: 48px;
+  --t-echo: 44px; --t-echo-lh: 44px;
   --t-poster: 64px; --t-poster-lh: 64px;
   --t-plate: 40px; --t-plate-lh: 40px;
-  --ls-label: .06em; --ls-caps: .08em; --ls-display: -.005em;
+  --ls-label: .06em; --ls-caps: .08em; --ls-display: -.02em;
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 32px 32px 96px; background: #17181c; color: #e8e8ea; font-family: var(--ff); }
@@ -90,7 +92,7 @@ h1 { font-size: var(--t20); margin: 0 0 8px; letter-spacing: -.016em; }
 .col { width: var(--palette-w); max-width: 100%; }
 .col > h2 { font-size: 12px; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #8f929c; margin: 0 0 12px; text-align: left; }
 .surface { margin-bottom: 36px; }
-.lbl { font-size: 12px; letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 8px; }
+.lbl { font-size: 12px; letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--label-mute, var(--muted-foreground)); margin: 0 0 8px; }
 .desktop, .page { border-radius: 0px; padding: 24px; }
 .desktop { background: var(--plate); }
 .page { background: var(--background); color: var(--foreground); }
@@ -125,7 +127,7 @@ mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 0px; pa
 .badge { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: 0px; background: var(--secondary); color: var(--secondary-foreground); border: 2px solid var(--rule); font-family: var(--mono); font-size: 12px; }
 .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted-foreground); border-top-color: transparent; }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 10px var(--pad); background: var(--muted); border-top: var(--rule-w) solid var(--rule); font-size: 12px; color: var(--muted-foreground); }
-.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 0px; border: 2px solid var(--rule); color: var(--foreground); font-size: 12px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; background: var(--paper-field); }
+.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 0px; border: 2px solid var(--rule); color: var(--foreground); font-size: 12px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; background: var(--card); }
 
 /* ask mode */
 .chat { display: grid; gap: var(--gap-3); padding: 16px var(--pad); }
@@ -232,6 +234,43 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
 .palette { box-shadow: none; }
 @keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
 @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+
+/* ── expressive-UI overlay (contract §1/§3/§4) — EXPRESSIVE tier ── */
+:root{
+  /* expressive type (M3X: display heads move SemiBold→Bold, opsz on Flex) */
+  --ex-weight-display: 800;
+  --ex-weight-title: 600;
+  --ex-track-display: -0.03em;   /* unverified default; -0.04em only ≥72px */
+  /* motion (M3 sourced curves; spring = unverified CSS approximation) */
+  --ex-ease-out:   cubic-bezier(0.2, 0, 0, 1);        /* M3 standard/emphasized (sourced) */
+  --ex-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);   /* M3 emphasized decel (sourced) */
+  --ex-ease-accel: cubic-bezier(0.3, 0, 0.8, 0.15);     /* M3 emphasized accel (sourced) */
+  --ex-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* damped spring ~10% overshoot (unverified) */
+  --ex-dur-1: 120ms;  /* micro / hover            */
+  --ex-dur-2: 300ms;  /* standard / spring settle */
+  --ex-dur-3: 480ms;  /* emphasized / container morph */
+  --ex-lift: 3px;     /* hover travel (unverified default) */
+  --ex-scale: 1.02;   /* card/hero morph scale   */
+  --ex-blur: 10px;    /* liquid-glass refraction hint (unverified) */
+  --ex-glass-edge: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 10px rgba(0,0,0,.25); /* edge-light */
+}
+.btn, .tile, .chip, kbd { transition: transform var(--ex-dur-1) var(--ex-ease-spring), box-shadow var(--ex-dur-2) var(--ex-ease-decel); }
+.btn:hover, .tile:hover { transform: translateY(calc(-1 * var(--ex-lift))); }
+h1, .hero-title, .ans { font-weight: var(--ex-weight-display); letter-spacing: var(--ex-track-display); font-optical-sizing: auto; }
+/* §6 keyframe animations — EXPRESSIVE tier: ex-enter one-shot on .hero/.palette, ex-pulse ambient on the agent panel, ex-sweep on .prog. */
+@keyframes ex-enter { from { opacity:0; transform: translateY(var(--ex-lift, 4px)); } to { opacity:1; transform:none; } }
+@keyframes ex-pulse { 0%,100% { opacity:1; } 50% { opacity:.82; } }
+@keyframes ex-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.hero { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) 0ms both; }
+.palette { animation: ex-enter var(--ex-dur-3) var(--ex-ease-spring) 60ms both; }
+.ag { animation: ex-pulse 3s var(--ex-ease-out) infinite; }
+.prog::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(0,0,0,.25), transparent); opacity: .3; transform: translateX(-100%); animation: ex-sweep 2.8s var(--ex-ease-out) infinite; }
+.prog { position: relative; }
+@media (prefers-reduced-motion: reduce){
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .btn, .tile, .card, .hero, .row { transform: none !important; }
+  .hero, .palette, .ag, .prog, .prog::after { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -278,7 +317,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query — the red plate is the empty state</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query — the red plate is the empty state</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <h3 class="band">No query</h3>
@@ -292,7 +331,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — echo at 48px, selection rule, hover, focus, opening, skeleton</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — echo at 48px, selection rule, hover, focus, opening, skeleton</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="echo"><span class="w">design tokens</span><span class="credit">Everything · 12 ms · 480 hits</span></p>
@@ -309,14 +348,14 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — 64px first word, then 17px body; table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — 64px first word, then 17px body; table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans"><span class="lead">Boot</span><span class="credit">3 phases · 1 source traced</span>splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -337,7 +376,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -356,7 +395,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="credit">Alt+, · 4 rows</span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently light</span></span><span class="btn">Switch to dark</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
@@ -387,7 +426,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="hero-field"><span class="spec">Aa</span><span class="spec">14</span><span class="spec">▮</span><i class="f f1"></i><i class="f f2"></i><i class="f f3"></i><i class="f f4"></i><i class="f f5"></i></div>
 </header>
 
-<div class="surface"><p class="lbl">1 · Palette, Files tab, empty query — the red plate is the empty state</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">1 · Palette, Files tab, empty query — the red plate is the empty state</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span class="ph">Search for files, tools, actions...</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <h3 class="band">No query</h3>
@@ -401,7 +440,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="foot"><span>Tip: Press Alt+Enter to ask about the selected file</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">2 · Palette, query <code>design tokens</code> — echo at 48px, selection rule, hover, focus, opening, skeleton</p><div class="desktop"><div class="palette">
+<div class="surface" data-ui><p class="lbl">2 · Palette, query <code>design tokens</code> — echo at 48px, selection rule, hover, focus, opening, skeleton</p><div class="desktop"><div class="palette">
   <div class="head"><span class="mode">Files</span><span class="q"><svg width="16" height="16"><use href="#i-search"/></svg><span><mark>design</mark> tokens</span></span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span><span class="vr"></span><kbd>Alt</kbd><kbd>Space</kbd></div>
   <div>
     <p class="echo"><span class="w">design tokens</span><span class="credit">Everything · 12 ms · 480 hits</span></p>
@@ -418,14 +457,14 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   <div class="foot"><span>6 results found</span><span><span class="ghost">Keyboard shortcuts</span> <span class="ghost">Theme</span></span></div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">3 · Ask mode — 64px first word, then 17px body; table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
+<div class="surface" data-ui><p class="lbl">3 · Ask mode — 64px first word, then 17px body; table, sources, metrics, command bar</p><div class="page"><div class="palette" style="box-shadow:none">
   <div class="head" style="height:56px"><span class="mode">Ask</span><span class="pill a">Desktop</span><span class="vr"></span><span class="ghost">New Chat</span></div>
   <div class="chat">
     <div class="me">What is our current cold-start cost breakdown?</div>
     <div class="steps">
-      <div class="st"><i>✓</i>Understanding your question…</div>
-      <div class="st"><i>✓</i>Searching the web…<em>web</em></div>
-      <div class="st"><i>✓</i>Reading source pages…<em>web</em></div>
+      <div class="st"><i>ok</i>Understanding your question…</div>
+      <div class="st"><i>ok</i>Searching the web…<em>web</em></div>
+      <div class="st"><i>ok</i>Reading source pages…<em>web</em></div>
       <div class="st run"><i>•</i>Running tool…<em>tool</em></div>
     </div>
     <div class="ans"><span class="lead">Boot</span><span class="credit">3 phases · 1 source traced</span>splits into three paying phases. <code>main.ts</code> initialises preferences, the database and <code>es.exe</code> before the window exists; <code>getAskGraph()</code> precompiles the graph once; and <code>mcpService.initializeWithRetry()</code> connects every configured server, which dominates the total.<span class="caret">▊</span></div>
@@ -446,7 +485,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   </div>
 </div></div></div>
 
-<div class="surface"><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
+<div class="surface" data-ui><p class="lbl">4 · Desktop-agent activity and tool trace</p><div class="page">
   <div class="ag"><h3>Automating browser task… <span class="pill w">in_progress</span></h3>
     <dl class="kv"><dt>Target window:</dt><dd>Firefox — Qyther/README.md</dd>
       <dt>Reasoning:</dt><dd>Capturing screen to understand current state</dd>
@@ -465,7 +504,7 @@ summary { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: 
   </tbody></table>
 </div></div>
 
-<div class="surface"><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
+<div class="surface" data-ui><p class="lbl">5 · Settings, MCP rows, and the not-ready card</p><div class="page" style="display:grid;gap:16px">
   <div class="dlg"><div class="h">Settings<span class="credit">Alt+, · 4 rows</span><span class="x"><svg width="14" height="14"><use href="#i-x"/></svg></span></div>
     <div class="set"><span class="g"><span class="t">Theme</span><br><span class="d">Currently dark</span></span><span class="btn">Switch to light</span></div>
     <div class="set"><span class="g"><span class="t">Window size</span><br><span class="d">Currently expanded (Alt+Shift+M toggles)</span></span><span class="btn">Compact</span></div>
