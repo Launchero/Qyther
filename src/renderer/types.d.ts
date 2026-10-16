@@ -2,6 +2,7 @@
 // any runtime dependency on the main process.
 import type { TurnEnvelope } from '../shared/ipc/turn';
 import type { ChatSessionSummary } from '../shared/ipc/sessions';
+import type { SettingsSnapshot, SettingsPatch } from '../shared/ipc/settings';
 
 export interface ChatMetrics {
   tokensUsed: number;
@@ -65,6 +66,16 @@ export interface ElectronAPI {
   getVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
   getPlatformName: () => Promise<string>;
+  getSystemInfo: () => Promise<{
+    platform: string;
+    platformName: string;
+    arch: string;
+    electronVersion: string;
+    chromeVersion: string;
+    nodeVersion: string;
+    appVersion: string;
+    userDataPath: string;
+  }>;
   isWindows: () => Promise<boolean>;
   isMacOS: () => Promise<boolean>;
   isLinux: () => Promise<boolean>;
@@ -140,6 +151,15 @@ export interface ElectronAPI {
     load: () => Promise<{ configured: boolean; baseUrl?: string; model?: string; maskedKey?: string }>;
     delete: () => Promise<{ success: boolean; error?: string }>;
     test: (config: { apiKey: string; baseUrl: string; model: string }) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  // Settings window + main-owned appearance (a new namespace that this stale duplicate must also
+  // carry, or `window.electronAPI.settings` is invisible to the renderer — the five-site hazard).
+  settings: {
+    open: () => Promise<{ success: boolean }>;
+    get: () => Promise<SettingsSnapshot>;
+    set: (patch: SettingsPatch) => Promise<SettingsSnapshot>;
+    onChanged: (callback: (snapshot: SettingsSnapshot) => void) => () => void;
   };
 
   // Chat API

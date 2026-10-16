@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CommandPalette } from './components/CommandPalette';
 import { ActionPanel } from './components/ActionPanel';
-import { SettingsDialog } from './components/SettingsDialog';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useSearch } from './hooks/useSearch';
 import { useFileSearch } from './hooks/useFileSearch';
@@ -10,6 +9,7 @@ import { useWindowMode } from './hooks/useWindowMode';
 import { useExternalLinkHandler } from './hooks/useExternalLinkHandler';
 import { useContextAttachments } from './hooks/useContextAttachments';
 import { useRecentFiles } from './hooks/useRecentFiles';
+import { useRecentFilesLimit } from './hooks/useRecentFilesLimit';
 import { useResizeDrag } from './hooks/useResizeDrag';
 import { useWindowTween } from './hooks/useWindowTween';
 import type { SearchResult } from './components/ResultsList';
@@ -21,6 +21,14 @@ import { filterSystemCommands, tryCalculator } from './utils/systemCommands';
 
 // Default commands for the palette
 const DEFAULT_COMMANDS: SearchResult[] = [
+  {
+    id: 'cmd-settings',
+    title: 'Open Settings',
+    subtitle: 'Change appearance, model & API, and tools',
+    icon: '⚙',
+    type: 'command',
+    action: 'settings',
+  },
   {
     id: 'cmd-quit',
     title: 'Quit App',
@@ -127,7 +135,8 @@ export function App() {
   
   const [searchMode, setSearchMode] = React.useState<SearchMode>('file');
   const { windowMode, isCollapsing } = useWindowMode({ searchQuery, searchMode });
-  const { recentFiles, addRecentFile } = useRecentFiles(4);
+  const recentFilesLimit = useRecentFilesLimit();
+  const { recentFiles, addRecentFile } = useRecentFiles(recentFilesLimit);
   const { executingId, execute } = useCommandExecution({
     onExecuted: (result) => {
       if ((result.type === 'file' || result.type === 'app') && result.action) {
@@ -214,8 +223,7 @@ export function App() {
   // Keyboard navigation hook
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [actionPanelResult, setActionPanelResult] = useState<SearchResult | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  
+
   const handleAskAbout = useCallback((result: SearchResult) => {
     const file: AttachedFile = {
       name: result.title,
@@ -242,9 +250,11 @@ export function App() {
     onAskAbout: handleAskAbout,
     onToggleHelp: () => setShowShortcuts(prev => !prev),
     onOpenActionPanel: (result: SearchResult) => setActionPanelResult(result),
-    onToggleSettings: () => setShowSettings(prev => !prev),
+    onToggleSettings: () => {
+      void window.electronAPI.settings.open();
+    },
     onNavigateHistory: navigateHistory,
-    isModalOpen: actionPanelResult !== null || showSettings || showShortcuts,
+    isModalOpen: actionPanelResult !== null || showShortcuts,
   });
 
   useExternalLinkHandler();
@@ -332,15 +342,6 @@ export function App() {
           result={actionPanelResult}
           onExecute={execute}
           onAskAbout={handleAskAbout}
-        />
-
-        {/* Settings — theme, mode, shortcuts entry point (Ctrl+,) */}
-        <SettingsDialog
-          open={showSettings}
-          onOpenChange={setShowSettings}
-          windowMode={windowMode}
-          mcpCount={mcpCount}
-          onOpenShortcuts={() => setShowShortcuts(true)}
         />
 
         {/* Initial app loading overlay - only blocks during first render.

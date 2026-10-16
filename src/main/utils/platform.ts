@@ -82,6 +82,18 @@ const SPI_GETCLIENTAREAANIMATION = 0x1042;
 let clientAreaAnimation: boolean | null = null;
 
 /**
+ * A user's "reduced motion" setting, stored in `preferences.json.settings` and surfaced through the
+ * `settings` IPC namespace. When true it overrides the OS animation flag: the main-process tween
+ * snaps instead of easing. Left null until `settings-handlers` applies the persisted value at boot
+ * (or a `settings:set` changes it).
+ */
+let userReducedMotion: boolean | null = null;
+
+export function setUserReducedMotion(value: boolean): void {
+  userReducedMotion = value;
+}
+
+/**
  * Read the OS animation preference once, off the first-paint path.
  *
  * `koffi` is a dynamic import, so the height tween in `windowManager` cannot probe it inline;
@@ -116,8 +128,14 @@ export async function initializeAnimationPreference(): Promise<void> {
   }
 }
 
-/** Whether main-process UI motion should run. Defaults to enabled until the read resolves. */
+/**
+ * Whether main-process UI motion should run. A user's reduced-motion override wins outright;
+ * otherwise default to enabled until the OS read resolves.
+ */
 export function prefersWindowAnimation(): boolean {
+  if (userReducedMotion) {
+    return false;
+  }
   return clientAreaAnimation ?? true;
 }
 

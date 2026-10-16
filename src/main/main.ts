@@ -1,11 +1,14 @@
 // Load environment variables from .env file — MUST be first so dotenv runs
-// before any module-scope ChatOpenAI instances read process.env.*
+// before anything reads process.env at import time. (Pi's provider reads at the
+// point of use, but preferences and platform config still read during import.)
 import 'dotenv/config';
 
 import { app, Menu, ipcMain } from 'electron';
 import { createMainWindow } from './windows';
+import { destroySettingsWindow } from './settings-window';
 import { registerIPCHandlers } from './ipc/handlers';
 import { registerApiConfigHandlers } from './ipc/api-config';
+import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { createTray, destroyTray } from './tray';
 import { initializePreferences } from './preferences';
@@ -130,7 +133,10 @@ app.whenReady().then(async () => {
 
   registerApiConfigHandlers();
   log.info('API config handlers registered');
-  
+
+  registerSettingsHandlers();
+  log.info('Settings handlers registered');
+
   registerBrowserHandlers();
   log.info('Browser handlers registered');
   
@@ -213,6 +219,13 @@ function buildShutdownSteps(): ShutdownStep[] {
   return [
     { name: 'global-shortcuts', dispose: () => unregisterGlobalShortcuts() },
     { name: 'tray', dispose: () => destroyTray() },
+    {
+      // A lazily-opened settings window is a long-lived renderer/GPU child like any window; release
+      // it before `ipc-handlers` removes the bridges it may still use, and no-op when it was never
+      // opened. `destroySettingsWindow()` guards on `isDestroyed()`, so no try/catch is needed.
+      name: 'settings-window',
+      dispose: () => destroySettingsWindow(),
+    },
     {
       // The browser subtree's release path — `cleanupBrowserAgent()` clears the inactivity
       // timer and tears down the Playwright session. There is deliberately no separate

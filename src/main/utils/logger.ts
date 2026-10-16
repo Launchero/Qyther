@@ -68,6 +68,7 @@ export const SUBSYSTEM_ENV_VARS: Record<string, string> = {
   WindowMgr: 'LOG_WINDOW',
   IPC: 'LOG_IPC',
   ApiConfig: 'LOG_IPC',
+  Settings: 'LOG_IPC',
   Chat: 'LOG_CHAT',
   BrowserHandlers: 'LOG_BROWSER',
   BrowserAgent: 'LOG_BROWSER',

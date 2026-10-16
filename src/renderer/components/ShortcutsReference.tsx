@@ -22,7 +22,8 @@ interface ShortcutGroup {
 // Every row here maps to a live binding: hooks/useKeyboard.ts, components/AskModeExpanded.tsx,
 // hooks/useMCPKeyboardShortcuts.ts, App.tsx (theme) and src/main/shortcuts.ts (OS-level).
 // "not while typing" marks the keys gated behind `!isTextInput` in useKeyboard.
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
+// Exported so the settings window's Shortcuts section renders the same data, not a second copy.
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Navigation',
     shortcuts: [

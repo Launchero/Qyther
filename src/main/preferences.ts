@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { WindowMode } from './windowManager';
+import type { SettingsSnapshot } from '../shared/ipc/settings';
 import { createLogger } from './utils/logger';
 
 const log = createLogger('Prefs');
@@ -43,9 +44,11 @@ interface Preferences {
     x: number;
     y: number;
   };
-  
+
   llm?: LLMPreferences;
   mcp?: MCPPreferences;
+  /** Main-owned appearance + general prefs, surfaced through the `settings` IPC namespace. */
+  settings?: SettingsSnapshot;
 }
 
 const PREFERENCES_FILE = join(app.getPath('userData'), 'preferences.json');

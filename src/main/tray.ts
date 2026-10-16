@@ -2,6 +2,7 @@ import { Tray, Menu, nativeImage, app } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { showMainWindow, hideMainWindow } from './windows';
+import { openSettingsWindow } from './settings-window';
 import { createLogger } from './utils/logger';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,12 @@ export function createTray(): void {
       label: 'Hide Window',
       click: () => {
         hideMainWindow();
+      },
+    },
+    {
+      label: 'Settings',
+      click: () => {
+        openSettingsWindow();
       },
     },
     { type: 'separator' },

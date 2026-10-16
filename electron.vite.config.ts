@@ -97,6 +97,15 @@ export default defineConfig({
     ],
     build: {
       outDir: 'out/renderer',
+      // Multi-page: the palette loads index.html, the settings window loads settings.html. electron-vite
+      // does not auto-glob a second renderer HTML, so both entries are listed here — the MPA gate in
+      // AGENTS.md (`npm run build` must emit out/renderer/settings.html, not just index.html).
+      rollupOptions: {
+        input: [
+          resolve(__dirname, 'src/renderer/index.html'),
+          resolve(__dirname, 'src/renderer/settings.html'),
+        ],
+      },
     },
     resolve: {
       alias: {

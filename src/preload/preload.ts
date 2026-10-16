@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { TurnEnvelope } from '../shared/ipc/turn';
 import type { ChatSessionSummary } from '../shared/ipc/sessions';
+import type { SettingsSnapshot, SettingsPatch } from '../shared/ipc/settings';
 
 // #region agent log
 const PRELOAD_LOGGING_ENABLED = process.env.LOG_PRELOAD === 'true';
@@ -365,6 +366,22 @@ export const electronAPI = {
     load: () => ipcRenderer.invoke('api-config:load'),
     delete: () => ipcRenderer.invoke('api-config:delete'),
     test: (config: { apiKey: string; baseUrl: string; model: string }) => ipcRenderer.invoke('api-config:test', config),
+  },
+
+  // Settings window + main-owned appearance. `settings:changed` is a main->renderer push, so the
+  // subscriber gets an unsubscribe function (same shape as `chat`/`browser`/`mcp` listeners) and
+  // MUST store and call it — the settings and palette windows each subscribe once on mount.
+  settings: {
+    open: () => ipcRenderer.invoke('settings:open'),
+    get: () => ipcRenderer.invoke('settings:get') as Promise<SettingsSnapshot>,
+    set: (patch: SettingsPatch) => ipcRenderer.invoke('settings:set', patch) as Promise<SettingsSnapshot>,
+    onChanged: (callback: (snapshot: SettingsSnapshot) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, snapshot: SettingsSnapshot) => callback(snapshot);
+      ipcRenderer.on('settings:changed', handler);
+      return () => {
+        ipcRenderer.removeListener('settings:changed', handler);
+      };
+    },
   },
 };
 

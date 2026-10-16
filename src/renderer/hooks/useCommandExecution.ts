@@ -55,6 +55,10 @@ export function useCommandExecution({
             await window.electronAPI.quit();
           } else if (result.action === 'hide') {
             await window.electronAPI.window.hide();
+          } else if (result.action === 'settings') {
+            // Opens the separate settings window (main-owned); the palette returns to the tray.
+            await window.electronAPI.settings.open();
+            await window.electronAPI.window.hide();
           }
         }
         // URL results
